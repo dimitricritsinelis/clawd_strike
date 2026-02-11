@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/favicon.png?v=1" />
+    <title>Clawd Strike</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0b0b0b;
+        color: #f2f2f2;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      }
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      #start {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background-image:
+          radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
+          linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
+          url("/Loading_Screen_Background_4K.png");
+        background-size: cover;
+        background-position: center center;
+        pointer-events: auto;
+      }
+      #start .panel {
+        width: min(1080px, calc(100vw - 52px));
+        height: 100%;
+        position: relative;
+      }
+      #mute-toggle-btn {
+        position: absolute;
+        top: calc(18px + env(safe-area-inset-top));
+        right: calc(18px + env(safe-area-inset-right));
+        width: clamp(88px, 9vw, 140px);
+        aspect-ratio: 466 / 340;
+        display: grid;
+        place-items: center;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        border-radius: 18px;
+        background: transparent;
+        cursor: pointer;
+        pointer-events: auto;
+        z-index: 4;
+        transform-origin: center;
+        transition: transform 120ms ease, filter 140ms ease;
+      }
+      #mute-toggle-btn::after {
+        content: "";
+        position: absolute;
+        inset: -8px;
+        border-radius: 22px;
+        background: radial-gradient(circle, rgba(255, 205, 126, 0.36), rgba(76, 35, 12, 0) 70%);
+        opacity: 0;
+        transform: scale(0.9);
+        pointer-events: none;
+        transition: opacity 100ms ease, transform 140ms ease;
+      }
+      #mute-toggle-btn .mute-icon {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        pointer-events: none;
+        user-select: none;
+        transition: opacity 140ms ease, filter 140ms ease;
+      }
+      #mute-toggle-btn.is-unmuted .mute-icon {
+        opacity: 1;
+        filter: saturate(1) brightness(1) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.46));
+      }
+      #mute-toggle-btn.is-muted .mute-icon {
+        opacity: 0.46;
+        filter: saturate(0.7) brightness(0.78) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.28));
+      }
+      #mute-toggle-btn:hover {
+        transform: translateY(-2px) scale(1.04);
+      }
+      #mute-toggle-btn:hover::after {
+        opacity: 0.52;
+        transform: scale(1);
+      }
+      #mute-toggle-btn:active {
+        transform: translateY(1px) scale(0.93);
+      }
+      #mute-toggle-btn:active::after {
+        opacity: 0.72;
+        transform: scale(1.06);
+      }
+      #mute-toggle-btn:focus-visible {
+        outline: 2px solid rgba(255, 236, 198, 0.95);
+        outline-offset: 2px;
+        box-shadow: 0 0 0 5px rgba(24, 9, 3, 0.54);
+      }
+      #mute-toggle-btn.flash::after {
+        animation: mute-pulse 180ms ease-out;
+      }
+      @keyframes mute-pulse {
+        0% {
+          opacity: 0.86;
+          transform: scale(0.92);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(1.14);
+        }
+      }
+      #start .logo-wrap {
+        position: absolute;
+        left: 50%;
+        top: 33%;
+        transform: translate(-50%, -50%);
+        width: 100%;
+        display: grid;
+        place-items: center;
+      }
+      #start .logo-wrap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 54%;
+        transform: translate(-50%, -50%);
+        width: min(774px, 76.5vw);
+        height: min(261px, 27vw);
+        background: radial-gradient(
+          ellipse at center,
+          rgba(12, 7, 3, 0.5),
+          rgba(12, 7, 3, 0.16) 58%,
+          rgba(12, 7, 3, 0.02) 82%,
+          rgba(12, 7, 3, 0) 100%
+        );
+        filter: blur(14px);
+        z-index: 0;
+      }
+      #start .logo-img {
+        width: clamp(468px, 61vw, 1008px);
+        height: auto;
+        display: block;
+        position: relative;
+        z-index: 1;
+        filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.55));
+      }
+      #start .actions {
+        position: absolute;
+        left: 50%;
+        top: 77%;
+        transform: translate(-50%, -50%);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 30px;
+        width: min(515px, calc(100vw - 150px));
+      }
+      #start .option-art {
+        position: relative;
+      }
+      #start .option-img {
+        width: 100%;
+        height: auto;
+        display: block;
+        pointer-events: none;
+        user-select: none;
+        filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.34));
+        transition: transform 120ms ease, filter 120ms ease;
+      }
+      #start .option-art:hover .option-img {
+        transform: translateY(-2px);
+        filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.44)) brightness(1.03);
+      }
+      #start .actions .hit {
+        position: absolute;
+        inset: 0;
+        border: 0;
+        background: transparent;
+        color: transparent;
+        font-size: 0;
+        border-radius: 24px;
+        cursor: pointer;
+        pointer-events: auto;
+      }
+      #start .actions .hit:focus-visible {
+        outline: 2px solid rgba(255, 236, 198, 0.85);
+        outline-offset: 1px;
+        box-shadow: 0 0 0 4px rgba(27, 12, 4, 0.58);
+      }
+      @media (max-width: 820px) {
+        #start .panel {
+          width: calc(100vw - 24px);
+        }
+        #mute-toggle-btn {
+          top: calc(10px + env(safe-area-inset-top));
+          right: calc(10px + env(safe-area-inset-right));
+          width: clamp(80px, 20vw, 118px);
+        }
+        #start .logo-wrap {
+          top: 31%;
+        }
+        #start .logo-img {
+          width: min(98vw, 780px);
+          max-width: calc(100vw - 18px);
+        }
+        #start .actions {
+          gap: 18px;
+          top: 75%;
+          width: min(420px, calc(100vw - 26px));
+        }
+      }
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      #mode-banner {
+        position: absolute;
+        left: 50%;
+        top: 14px;
+        transform: translateX(-50%);
+        border: 1px solid rgba(255, 225, 173, 0.58);
+        background: rgba(20, 8, 2, 0.72);
+        color: #ffd9ac;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        opacity: 0;
+        transition: opacity 120ms ease-in-out;
+      }
+      #mode-banner.show {
+        opacity: 1;
+      }
+      #crosshair {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 12px;
+        height: 12px;
+        transform: translate(-50%, -50%);
+        opacity: 0.95;
+      }
+      #crosshair::before,
+      #crosshair::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        background: rgba(255, 255, 255, 0.95);
+        transform: translate(-50%, -50%);
+      }
+      #crosshair::before {
+        width: 12px;
+        height: 2px;
+      }
+      #crosshair::after {
+        width: 2px;
+        height: 12px;
+      }
+      #status {
+        position: absolute;
+        left: 14px;
+        bottom: 12px;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+      #feed {
+        position: absolute;
+        right: 14px;
+        top: 12px;
+        width: min(360px, calc(100vw - 28px));
+        display: grid;
+        gap: 6px;
+        font-size: 12px;
+        letter-spacing: 0.02em;
+      }
+      .feed-row {
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 6px 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="c"></canvas>
+      <div id="overlay">
+        <div id="start">
+          <div class="panel">
+            <button
+              id="mute-toggle-btn"
+              class="is-unmuted"
+              type="button"
+              aria-label="Mute loading ambience"
+              aria-pressed="false"
+            >
+              <img class="mute-icon" src="/ui/mute-toggle.png" alt="" aria-hidden="true" />
+            </button>
+            <div class="logo-wrap">
+              <img class="logo-img" src="/ClawdStriker_Logo.png" alt="Clawd Strike Logo" />
+            </div>
+            <div class="actions">
+              <div class="option-art">
+                <img class="option-img" src="/ui/button-human.png" alt="" aria-hidden="true" />
+                <button id="single-player-btn" class="hit" aria-label="Human">Human</button>
+              </div>
+              <div class="option-art">
+                <img class="option-img" src="/ui/button-agent.png" alt="" aria-hidden="true" />
+                <button id="multi-player-btn" class="hit" aria-label="Agent">Agent</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="hud">
+          <div id="mode-banner">This mode is under development</div>
+          <div id="crosshair"></div>
+          <div id="status"></div>
+          <div id="feed"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

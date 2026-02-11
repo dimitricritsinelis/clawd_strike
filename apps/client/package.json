@@ -1,0 +1,17 @@
+{
+  "name": "@clawd-strike/client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@clawd-strike/engine": "workspace:*",
+    "@clawd-strike/shared": "workspace:*",
+    "colyseus.js": "0.16.22",
+    "three": "0.182.0"
+  }
+}
