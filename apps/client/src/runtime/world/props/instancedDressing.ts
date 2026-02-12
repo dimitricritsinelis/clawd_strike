@@ -134,89 +134,97 @@ function createAmphoraGeometry(): THREE.BufferGeometry {
   return new THREE.LatheGeometry(points, 12);
 }
 
-export function addInstancedDressing(scene: THREE.Scene, map: MapDef, materials: MaterialLibrary): DressingSet {
+export function addInstancedDressing(
+  scene: THREE.Scene,
+  map: MapDef,
+  materials: MaterialLibrary,
+  detailFactor = 1
+): DressingSet {
   const meshes: THREE.Object3D[] = [];
+  const density = THREE.MathUtils.clamp(detailFactor, 0.2, 1);
+  const scaledCount = (baseCount: number, minCount: number): number => Math.max(minCount, Math.floor(baseCount * density));
+  const scaledPerPoint = (basePerPoint: number): number => Math.max(1, Math.floor(basePerPoint * density));
 
   // Slatted crates
   const crateMat = materials.get("wood", "dressing:crate", 1.2, 1.2);
   const crateGeom = createCrateGeometry();
-  const crates = new THREE.InstancedMesh(crateGeom, crateMat, map.points.length * 3);
+  const crates = new THREE.InstancedMesh(crateGeom, crateMat, scaledCount(map.points.length * 3, map.points.length));
   crates.castShadow = true;
   crates.receiveShadow = true;
   crates.userData.ignoreImpactRay = true;
-  placeInstanced(crates, map, "dressing:crates", 2.8, 0.56, 3, includeMarket, 0.85, 1.15);
+  placeInstanced(crates, map, "dressing:crates", 2.8, 0.56, scaledPerPoint(3), includeMarket, 0.85, 1.15);
   scene.add(crates);
   meshes.push(crates);
 
   // Metal-hooped barrels
   const barrelMat = materials.get("metal", "dressing:barrel", 0.8, 1.4);
   const barrelGeom = createBarrelGeometry();
-  const barrels = new THREE.InstancedMesh(barrelGeom, barrelMat, map.points.length * 2);
+  const barrels = new THREE.InstancedMesh(barrelGeom, barrelMat, scaledCount(map.points.length * 2, map.points.length));
   barrels.castShadow = true;
   barrels.receiveShadow = true;
   barrels.userData.ignoreImpactRay = true;
-  placeInstanced(barrels, map, "dressing:barrels", 2.6, 0.55, 2, includeMarket, 0.9, 1.1);
+  placeInstanced(barrels, map, "dressing:barrels", 2.6, 0.55, scaledPerPoint(2), includeMarket, 0.9, 1.1);
   scene.add(barrels);
   meshes.push(barrels);
 
   // Wicker baskets (tapered)
   const wickerMat = materials.get("reed", "dressing:wicker", 1.1, 1.1);
   const wickerGeom = new THREE.CylinderGeometry(0.48, 0.32, 0.38, 18);
-  const baskets = new THREE.InstancedMesh(wickerGeom, wickerMat, map.points.length * 2);
+  const baskets = new THREE.InstancedMesh(wickerGeom, wickerMat, scaledCount(map.points.length * 2, map.points.length));
   baskets.castShadow = true;
   baskets.receiveShadow = true;
   baskets.userData.ignoreImpactRay = true;
-  placeInstanced(baskets, map, "dressing:baskets", 2.2, 0.2, 2, includeBazaarStreet, 0.8, 1.25);
+  placeInstanced(baskets, map, "dressing:baskets", 2.2, 0.2, scaledPerPoint(2), includeBazaarStreet, 0.8, 1.25);
   scene.add(baskets);
   meshes.push(baskets);
 
   // Mixed pottery: spherical pots + amphora
   const potteryMat = materials.get("ceramic", "dressing:pots", 0.9, 0.9);
   const potteryGeom = new THREE.SphereGeometry(0.34, 14, 10);
-  const pottery = new THREE.InstancedMesh(potteryGeom, potteryMat, map.points.length * 2);
+  const pottery = new THREE.InstancedMesh(potteryGeom, potteryMat, scaledCount(map.points.length * 2, map.points.length));
   pottery.castShadow = true;
   pottery.receiveShadow = true;
   pottery.userData.ignoreImpactRay = true;
-  placeInstanced(pottery, map, "dressing:pots", 2.5, 0.34, 2, includeBazaarStreet, 0.7, 1.3);
+  placeInstanced(pottery, map, "dressing:pots", 2.5, 0.34, scaledPerPoint(2), includeBazaarStreet, 0.7, 1.3);
   scene.add(pottery);
   meshes.push(pottery);
 
   // Amphora pottery
   const amphoraGeom = createAmphoraGeometry();
-  const amphorae = new THREE.InstancedMesh(amphoraGeom, potteryMat, map.points.length * 2);
+  const amphorae = new THREE.InstancedMesh(amphoraGeom, potteryMat, scaledCount(map.points.length * 2, map.points.length));
   amphorae.castShadow = true;
   amphorae.receiveShadow = true;
   amphorae.userData.ignoreImpactRay = true;
-  placeInstanced(amphorae, map, "dressing:amphora", 2.2, 0, 2, includeBazaarStreet, 0.5, 0.8);
+  placeInstanced(amphorae, map, "dressing:amphora", 2.2, 0, scaledPerPoint(2), includeBazaarStreet, 0.5, 0.8);
   scene.add(amphorae);
   meshes.push(amphorae);
 
   // Sandbags
   const sandbagMat = materials.get("sand", "dressing:sandbags", 0.7, 0.7);
   const sandbagGeom = new THREE.BoxGeometry(1.15, 0.46, 0.68);
-  const sandbags = new THREE.InstancedMesh(sandbagGeom, sandbagMat, map.points.length * 4);
+  const sandbags = new THREE.InstancedMesh(sandbagGeom, sandbagMat, scaledCount(map.points.length * 4, map.points.length));
   sandbags.castShadow = true;
   sandbags.receiveShadow = true;
   sandbags.userData.ignoreImpactRay = true;
-  placeInstanced(sandbags, map, "dressing:sandbags", 3.1, 0.23, 4, includeAll, 0.8, 1.2);
+  placeInstanced(sandbags, map, "dressing:sandbags", 3.1, 0.23, scaledPerPoint(4), includeAll, 0.8, 1.2);
   scene.add(sandbags);
   meshes.push(sandbags);
 
   // Wooden planks
   const plankMat = materials.get("wood", "dressing:planks", 2.2, 1);
   const plankGeom = new THREE.BoxGeometry(2.4, 0.18, 0.44);
-  const planks = new THREE.InstancedMesh(plankGeom, plankMat, map.points.length * 3);
+  const planks = new THREE.InstancedMesh(plankGeom, plankMat, scaledCount(map.points.length * 3, map.points.length));
   planks.castShadow = true;
   planks.receiveShadow = true;
   planks.userData.ignoreImpactRay = true;
-  placeInstanced(planks, map, "dressing:planks", 2.8, 0.11, 3, includeMarket, 0.7, 1.2);
+  placeInstanced(planks, map, "dressing:planks", 2.8, 0.11, scaledPerPoint(3), includeMarket, 0.7, 1.2);
   scene.add(planks);
   meshes.push(planks);
 
   // Rugs (standing and flat)
   const rugMat = materials.get("rug", "dressing:rugs", 1.5, 1.5);
   const rugGeom = new THREE.PlaneGeometry(1.8, 1.2);
-  const rugCount = map.points.length * 2;
+  const rugCount = scaledCount(map.points.length * 2, map.points.length);
   const rugs = new THREE.InstancedMesh(rugGeom, rugMat, rugCount);
   rugs.castShadow = false;
   rugs.receiveShadow = true;
@@ -230,7 +238,7 @@ export function addInstancedDressing(scene: THREE.Scene, map: MapDef, materials:
     let idx = 0;
     for (const point of map.points) {
       if (!includeBazaarStreet(point.id)) continue;
-      for (let i = 0; i < 2 && idx < rugCount; i++) {
+      for (let i = 0; i < scaledPerPoint(2) && idx < rugCount; i++) {
         const stand = rand01(next) > 0.65;
         if (stand) {
           p.set(point.pos.x + randomSigned(next) * 2.4, 1.1 + rand01(next) * 0.8, point.pos.z + randomSigned(next) * 2.4);
@@ -255,29 +263,29 @@ export function addInstancedDressing(scene: THREE.Scene, map: MapDef, materials:
   // Produce (fruits)
   const produceMat = materials.get("produce", "dressing:produce", 0.9, 0.9);
   const produceGeom = new THREE.SphereGeometry(0.22, 12, 10);
-  const produce = new THREE.InstancedMesh(produceGeom, produceMat, map.points.length * 8);
+  const produce = new THREE.InstancedMesh(produceGeom, produceMat, scaledCount(map.points.length * 8, map.points.length * 2));
   produce.castShadow = true;
   produce.receiveShadow = true;
   produce.userData.ignoreImpactRay = true;
-  placeInstanced(produce, map, "dressing:produce", 2.1, 0.22, 8, includeBazaarStreet, 0.65, 1.25);
+  placeInstanced(produce, map, "dressing:produce", 2.1, 0.22, scaledPerPoint(8), includeBazaarStreet, 0.65, 1.25);
   scene.add(produce);
   meshes.push(produce);
 
   // Spice piles (smoother cones)
   const spiceMat = materials.get("spice", "dressing:spice", 0.8, 0.8);
   const spiceGeom = new THREE.ConeGeometry(0.26, 0.24, 14);
-  const spice = new THREE.InstancedMesh(spiceGeom, spiceMat, map.points.length * 7);
+  const spice = new THREE.InstancedMesh(spiceGeom, spiceMat, scaledCount(map.points.length * 7, map.points.length * 2));
   spice.castShadow = true;
   spice.receiveShadow = true;
   spice.userData.ignoreImpactRay = true;
-  placeInstanced(spice, map, "dressing:spice", 2.0, 0.12, 7, includeBazaarStreet, 0.7, 1.2);
+  placeInstanced(spice, map, "dressing:spice", 2.0, 0.12, scaledPerPoint(7), includeBazaarStreet, 0.7, 1.2);
   scene.add(spice);
   meshes.push(spice);
 
   // AC units
   const acMat = materials.get("metal", "dressing:ac", 1.2, 1.2);
   const acGeom = new THREE.BoxGeometry(1, 0.7, 0.8);
-  const acCount = Math.max(12, Math.floor(map.points.length * 1.2));
+  const acCount = scaledCount(Math.max(12, Math.floor(map.points.length * 1.2)), Math.max(6, Math.floor(map.points.length / 2)));
   const ac = new THREE.InstancedMesh(acGeom, acMat, acCount);
   ac.castShadow = true;
   ac.receiveShadow = true;
@@ -289,18 +297,18 @@ export function addInstancedDressing(scene: THREE.Scene, map: MapDef, materials:
   // Herbs
   const herbsMat = materials.get("produce", "dressing:herbs", 1.1, 1.1);
   const herbsGeom = new THREE.ConeGeometry(0.12, 0.48, 8);
-  const herbs = new THREE.InstancedMesh(herbsGeom, herbsMat, map.points.length * 4);
+  const herbs = new THREE.InstancedMesh(herbsGeom, herbsMat, scaledCount(map.points.length * 4, map.points.length));
   herbs.castShadow = true;
   herbs.receiveShadow = true;
   herbs.userData.ignoreImpactRay = true;
-  placeInstanced(herbs, map, "dressing:herbs", 2.1, 2.3, 4, includeBazaarStreet, 0.8, 1.2);
+  placeInstanced(herbs, map, "dressing:herbs", 2.1, 2.3, scaledPerPoint(4), includeBazaarStreet, 0.8, 1.2);
   scene.add(herbs);
   meshes.push(herbs);
 
   // Rope coils
   const ropeMat = materials.get("cloth", "dressing:rope", 1, 1);
   const ropeGeo = new THREE.TorusGeometry(0.2, 0.035, 6, 14);
-  const ropeCount = map.points.length * 2;
+  const ropeCount = scaledCount(map.points.length * 2, map.points.length);
   const ropes = new THREE.InstancedMesh(ropeGeo, ropeMat, ropeCount);
   ropes.castShadow = true;
   ropes.receiveShadow = true;
@@ -314,7 +322,7 @@ export function addInstancedDressing(scene: THREE.Scene, map: MapDef, materials:
     let idx = 0;
     for (const point of map.points) {
       if (!includeMarket(point.id)) continue;
-      for (let i = 0; i < 2 && idx < ropeCount; i++) {
+      for (let i = 0; i < scaledPerPoint(2) && idx < ropeCount; i++) {
         p.set(point.pos.x + randomSigned(next) * 3, 0.05, point.pos.z + randomSigned(next) * 3);
         q.setFromEuler(new THREE.Euler(-Math.PI * 0.5, rand01(next) * Math.PI * 2, 0));
         const sc = 0.8 + rand01(next) * 0.5;

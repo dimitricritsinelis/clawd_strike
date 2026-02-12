@@ -4,6 +4,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
+import { SMAAPass } from "three/examples/jsm/postprocessing/SMAAPass.js";
 
 const CinematicGradeShader = {
   uniforms: {
@@ -74,25 +75,45 @@ export class PostPipeline {
   private readonly bloom: UnrealBloomPass;
   private readonly gradePass: ShaderPass;
 
-  constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, width: number, height: number) {
+  constructor(
+    renderer: THREE.WebGLRenderer,
+    scene: THREE.Scene,
+    camera: THREE.Camera,
+    width: number,
+    height: number,
+    highQuality: boolean
+  ) {
     this.composer = new EffectComposer(renderer);
     this.composer.addPass(new RenderPass(scene, camera));
 
-    // SSAO: screen-space ambient occlusion for depth and grounding
-    const ssao = new SSAOPass(scene, camera as THREE.PerspectiveCamera, width, height);
-    ssao.kernelRadius = 0.5;
-    ssao.minDistance = 0.001;
-    ssao.maxDistance = 0.15;
-    ssao.output = SSAOPass.OUTPUT.Default;
-    this.composer.addPass(ssao);
+    if (highQuality) {
+      // SSAO: screen-space ambient occlusion for depth and grounding
+      const ssao = new SSAOPass(scene, camera as THREE.PerspectiveCamera, width, height);
+      ssao.kernelRadius = 0.5;
+      ssao.minDistance = 0.001;
+      ssao.maxDistance = 0.15;
+      ssao.output = SSAOPass.OUTPUT.Default;
+      this.composer.addPass(ssao);
 
-    // Bloom: glow on lanterns and sun-lit surfaces
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.25, 0.38, 0.82);
+      // Bloom: glow on lanterns and sun-lit surfaces
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.25, 0.38, 0.82);
+    } else {
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(width, height), 0.06, 0.2, 0.96);
+    }
     this.composer.addPass(this.bloom);
 
     // Cinematic color grading with vignette and film grain
     this.gradePass = new ShaderPass(CinematicGradeShader);
+    if (!highQuality) {
+      this.gradePass.uniforms["grainIntensity"]!.value = 0.012;
+      this.gradePass.uniforms["vignetteStrength"]!.value = 0.24;
+      this.gradePass.uniforms["contrast"]!.value = 1.03;
+    }
     this.composer.addPass(this.gradePass);
+
+    if (highQuality) {
+      this.composer.addPass(new SMAAPass(width, height));
+    }
   }
 
   updateTime(time: number) {

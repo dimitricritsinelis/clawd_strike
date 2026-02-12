@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/favicon.png?v=1" />
+    <link rel="preload" as="audio" href="/loading-screen/ClawdStriker_Audio.mp3" type="audio/mpeg" />
     <title>Clawd Strike</title>
     <style>
       html,
@@ -40,7 +41,7 @@
         background-image:
           radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
           linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
-          url("/Loading_Screen_Background_4K.png");
+          url("/loading-screen/Loading_Screen_Background_4K.png");
         background-size: cover;
         background-position: center center;
         pointer-events: auto;
@@ -53,8 +54,8 @@
       #mute-toggle-btn {
         position: absolute;
         top: calc(18px + env(safe-area-inset-top));
-        right: calc(18px + env(safe-area-inset-right));
-        width: clamp(88px, 9vw, 140px);
+        right: calc(49.86px + env(safe-area-inset-right));
+        width: clamp(72px, 7.5vw, 114px);
         aspect-ratio: 466 / 340;
         display: grid;
         place-items: center;
@@ -67,18 +68,7 @@
         pointer-events: auto;
         z-index: 4;
         transform-origin: center;
-        transition: transform 120ms ease, filter 140ms ease;
-      }
-      #mute-toggle-btn::after {
-        content: "";
-        position: absolute;
-        inset: -8px;
-        border-radius: 22px;
-        background: radial-gradient(circle, rgba(255, 205, 126, 0.36), rgba(76, 35, 12, 0) 70%);
-        opacity: 0;
-        transform: scale(0.9);
-        pointer-events: none;
-        transition: opacity 100ms ease, transform 140ms ease;
+        transition: transform 120ms ease;
       }
       #mute-toggle-btn .mute-icon {
         width: 100%;
@@ -87,46 +77,38 @@
         display: block;
         pointer-events: none;
         user-select: none;
-        transition: opacity 140ms ease, filter 140ms ease;
-      }
-      #mute-toggle-btn.is-unmuted .mute-icon {
-        opacity: 1;
-        filter: saturate(1) brightness(1) drop-shadow(0 10px 18px rgba(0, 0, 0, 0.46));
+        transform-origin: center;
+        filter: none;
+        transition: transform 120ms ease, filter 120ms ease;
       }
       #mute-toggle-btn.is-muted .mute-icon {
-        opacity: 0.46;
-        filter: saturate(0.7) brightness(0.78) drop-shadow(0 8px 16px rgba(0, 0, 0, 0.28));
+        filter: grayscale(1);
+      }
+      #mute-toggle-btn.is-unmuted .mute-icon {
+        filter: none;
       }
       #mute-toggle-btn:hover {
         transform: translateY(-2px) scale(1.04);
       }
-      #mute-toggle-btn:hover::after {
-        opacity: 0.52;
-        transform: scale(1);
-      }
       #mute-toggle-btn:active {
         transform: translateY(1px) scale(0.93);
       }
-      #mute-toggle-btn:active::after {
-        opacity: 0.72;
-        transform: scale(1.06);
+      #mute-toggle-btn:active .mute-icon {
+        transform: scale(0.98);
       }
       #mute-toggle-btn:focus-visible {
         outline: 2px solid rgba(255, 236, 198, 0.95);
         outline-offset: 2px;
-        box-shadow: 0 0 0 5px rgba(24, 9, 3, 0.54);
       }
-      #mute-toggle-btn.flash::after {
+      #mute-toggle-btn.flash {
         animation: mute-pulse 180ms ease-out;
       }
       @keyframes mute-pulse {
         0% {
-          opacity: 0.86;
-          transform: scale(0.92);
+          transform: translateY(-1px) scale(1.02);
         }
         100% {
-          opacity: 0;
-          transform: scale(1.14);
+          transform: translateY(0) scale(1);
         }
       }
       #start .logo-wrap {
@@ -211,9 +193,9 @@
           width: calc(100vw - 24px);
         }
         #mute-toggle-btn {
-          top: calc(10px + env(safe-area-inset-top));
-          right: calc(10px + env(safe-area-inset-right));
-          width: clamp(80px, 20vw, 118px);
+          top: calc(8px + env(safe-area-inset-top));
+          right: calc(5.25px + env(safe-area-inset-right));
+          width: clamp(65px, 16.5vw, 99px);
         }
         #start .logo-wrap {
           top: 31%;
@@ -312,26 +294,26 @@
       <canvas id="c"></canvas>
       <div id="overlay">
         <div id="start">
+          <button
+            id="mute-toggle-btn"
+            class="is-unmuted"
+            type="button"
+            aria-label="Mute loading ambience"
+            aria-pressed="false"
+          >
+            <img class="mute-icon" src="/loading-screen/mute-toggle.png?v=4" alt="" aria-hidden="true" />
+          </button>
           <div class="panel">
-            <button
-              id="mute-toggle-btn"
-              class="is-unmuted"
-              type="button"
-              aria-label="Mute loading ambience"
-              aria-pressed="false"
-            >
-              <img class="mute-icon" src="/ui/mute-toggle.png" alt="" aria-hidden="true" />
-            </button>
             <div class="logo-wrap">
-              <img class="logo-img" src="/ClawdStriker_Logo.png" alt="Clawd Strike Logo" />
+              <img class="logo-img" src="/loading-screen/ClawdStriker_Logo.png" alt="Clawd Strike Logo" />
             </div>
             <div class="actions">
               <div class="option-art">
-                <img class="option-img" src="/ui/button-human.png" alt="" aria-hidden="true" />
+                <img class="option-img" src="/loading-screen/button-human.png" alt="" aria-hidden="true" />
                 <button id="single-player-btn" class="hit" aria-label="Human">Human</button>
               </div>
               <div class="option-art">
-                <img class="option-img" src="/ui/button-agent.png" alt="" aria-hidden="true" />
+                <img class="option-img" src="/loading-screen/button-agent.png" alt="" aria-hidden="true" />
                 <button id="multi-player-btn" class="hit" aria-label="Agent">Agent</button>
               </div>
             </div>

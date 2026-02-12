@@ -11,9 +11,13 @@ const targets = [
   "apps/client/node_modules/.cache",
   "apps/server/node_modules/.cache",
   "packages/engine/node_modules/.cache",
-  "packages/shared/node_modules/.cache",
-  "apps/client/node_modules/.vite"
+  "packages/shared/node_modules/.cache"
 ];
+
+// Keep Vite prebundle cache by default for faster iterative startup.
+if (process.env.CLEAN_VITE_CACHE === "1") {
+  targets.push("apps/client/node_modules/.vite");
+}
 
 for (const rel of targets) {
   const target = path.join(root, rel);

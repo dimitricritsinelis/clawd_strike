@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 import type { MapDef } from "@clawd-strike/shared";
 import type { ClientInput, EntitySnapshot, KillMsg, SnapshotMsg, SurfaceTag } from "@clawd-strike/shared";
-import { clampPitch, simMove } from "@clawd-strike/engine";
+import { DT, TICK_RATE, clampPitch, simMove } from "@clawd-strike/engine";
 
 import { WorldRenderer } from "./world/WorldRenderer";
 
@@ -13,6 +13,7 @@ type GameArgs = {
   map: MapDef;
   statusEl: HTMLDivElement;
   feedEl: HTMLDivElement;
+  highQuality: boolean;
 };
 
 type LocalControls = {
@@ -67,10 +68,12 @@ export class Game {
   private readonly renderer: THREE.WebGLRenderer | null;
   private readonly fallback2d: CanvasRenderingContext2D | null;
   private readonly useFallback2d: boolean;
+  private readonly highQuality: boolean;
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
-  private readonly clock = new THREE.Clock();
   private readonly world: WorldRenderer | null;
+  private readonly lookDir = new THREE.Vector3();
+  private readonly lookTarget = new THREE.Vector3();
 
   private sendInput: SendInputFn | null = null;
 
@@ -106,6 +109,9 @@ export class Game {
   private aliveT = 0;
   private aliveCT = 0;
   private disposed = false;
+  private hudFps = TICK_RATE;
+  private hudDiagnostics = { drawCalls: 0, triangles: 0, materials: 0 };
+  private nextHudSampleMs = 0;
 
   private readonly onResize = () => {
     if (this.useFallback2d) {
@@ -161,20 +167,26 @@ export class Game {
     this.map = args.map;
     this.statusEl = args.statusEl;
     this.feedEl = args.feedEl;
+    this.highQuality = args.highQuality;
 
     let renderer: THREE.WebGLRenderer | null = null;
     let fallback2d: CanvasRenderingContext2D | null = null;
     let useFallback2d = false;
 
     try {
-      renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: "high-performance" });
-      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+      renderer = new THREE.WebGLRenderer({
+        canvas: this.canvas,
+        antialias: this.highQuality,
+        powerPreference: "high-performance"
+      });
+      const maxPixelRatio = this.highQuality ? 1.5 : 1;
+      renderer.setPixelRatio(Math.min(maxPixelRatio, window.devicePixelRatio));
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.shadowMap.type = this.highQuality ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.08;
+      renderer.toneMappingExposure = this.highQuality ? 1.08 : 1;
     } catch {
       useFallback2d = true;
       fallback2d = this.canvas.getContext("2d");
@@ -191,7 +203,7 @@ export class Game {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xd7bf94);
-    this.scene.fog = new THREE.Fog(0xd6bd90, 56, 190);
+    this.scene.fog = new THREE.FogExp2(0xd6bd90, 0.0085);
 
     this.camera = new THREE.PerspectiveCamera(76, window.innerWidth / window.innerHeight, 0.05, 400);
     this.camera.position.set(this.localPos.x, 1.55, this.localPos.z);
@@ -199,13 +211,19 @@ export class Game {
     this.scene.add(this.camera);
 
     if (!this.useFallback2d && this.renderer) {
-      this.world = new WorldRenderer({ renderer: this.renderer, scene: this.scene, camera: this.camera, map: this.map });
+      this.world = new WorldRenderer({
+        renderer: this.renderer,
+        scene: this.scene,
+        camera: this.camera,
+        map: this.map,
+        highQuality: this.highQuality
+      });
     } else {
       this.world = null;
     }
 
     this.bindInput();
-    this.updateHud();
+    this.updateHud(performance.now(), DT);
   }
 
   setSendInput(fn: SendInputFn) {
@@ -263,7 +281,7 @@ export class Game {
     if (nowMs > this.shotCooldownMs + 60) this.shotCooldownMs = 0;
 
     this.trimFeed(nowMs);
-    this.updateHud();
+    this.updateHud(nowMs, dt);
   }
 
   render() {
@@ -274,8 +292,9 @@ export class Game {
 
     this.camera.position.set(this.localPos.x, 1.55, this.localPos.z);
     const cp = Math.cos(this.localPitch);
-    const lookDir = new THREE.Vector3(Math.sin(this.localYaw) * cp, Math.sin(this.localPitch), Math.cos(this.localYaw) * cp);
-    this.camera.lookAt(this.camera.position.clone().add(lookDir));
+    this.lookDir.set(Math.sin(this.localYaw) * cp, Math.sin(this.localPitch), Math.cos(this.localYaw) * cp);
+    this.lookTarget.copy(this.camera.position).add(this.lookDir);
+    this.camera.lookAt(this.lookTarget);
 
     this.world?.render();
   }
@@ -393,7 +412,7 @@ export class Game {
       z: Number(v.tz.toFixed(2))
     }));
 
-    const diagnostics = this.world?.diagnostics() ?? { drawCalls: 0, triangles: 0, materials: 0 };
+    const diagnostics = this.hudDiagnostics;
 
     return JSON.stringify({
       coordinate_system: {
@@ -405,7 +424,8 @@ export class Game {
       render: {
         drawCalls: diagnostics.drawCalls,
         triangles: diagnostics.triangles,
-        materials: diagnostics.materials
+        materials: diagnostics.materials,
+        quality: this.highQuality ? "high" : "low"
       },
       serverTick: this.serverTick,
       player: {
@@ -643,14 +663,20 @@ export class Game {
     }
   }
 
-  private updateHud() {
-    const fps = 1 / Math.max(1e-6, this.clock.getDelta());
-    const d = this.world?.diagnostics() ?? { drawCalls: 0, triangles: 0, materials: 0 };
+  private updateHud(nowMs: number, dt: number) {
+    const instantFps = 1 / Math.max(1e-6, dt);
+    this.hudFps = this.hudFps * 0.9 + instantFps * 0.1;
+    if (nowMs >= this.nextHudSampleMs) {
+      this.nextHudSampleMs = nowMs + 500;
+      this.hudDiagnostics = this.world?.diagnostics() ?? { drawCalls: 0, triangles: 0, materials: 0 };
+    }
+
+    const d = this.hudDiagnostics;
     this.statusEl.textContent =
       `HP ${this.localHp.toString().padStart(3, " ")} | ` +
       `Ammo ${this.localAmmo.toString().padStart(2, "0")} | ` +
       `T ${this.scoreT} (${this.aliveT}) : CT ${this.scoreCT} (${this.aliveCT}) | ` +
-      `${fps.toFixed(0)} FPS | DC ${d.drawCalls}`;
+      `${this.hudFps.toFixed(0)} FPS | DC ${d.drawCalls} | ${this.highQuality ? "HQ" : "LQ"}`;
   }
 
   private renderFallback2d() {

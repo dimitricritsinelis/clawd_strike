@@ -21,7 +21,14 @@ if (!canvasEl || !startEl || !muteToggleBtnEl || !singlePlayerBtnEl || !multiPla
   throw new Error("Missing required DOM elements.");
 }
 
+function resolveHighQualityMode(): boolean {
+  const query = new URLSearchParams(window.location.search).get("quality");
+  return query === "high";
+}
+
 const client = new Client("ws://localhost:2567");
+const isVirtualTime = typeof window.__vt_pending !== "undefined";
+const highQualityMode = resolveHighQualityMode();
 
 const canvas = canvasEl;
 const start = startEl;
@@ -32,17 +39,39 @@ const modeBanner = modeBannerEl;
 const status = statusEl;
 const feed = feedEl;
 
-const game = new Game({ canvas: canvasEl, map: dust2Slice, statusEl: status, feedEl: feed });
-const loadingAmbient = new LoadingAmbientAudio();
+const loadingAmbient = new LoadingAmbientAudio({
+  src: "/loading-screen/ClawdStriker_Audio.mp3",
+  playFromSec: 0,
+  loopStartSec: 0,
+  loopEndSec: Number.POSITIVE_INFINITY,
+  crossfadeSec: 0.22,
+  gain: 0.45,
+});
 
+let game: Game | null = null;
 let room: Room | null = null;
 let gameStarted = false;
 let bannerTimer: number | null = null;
 let disposed = false;
+let loopStarted = false;
+let loopLastMs = performance.now();
+let loopAccumulator = 0;
 
 // Hide gameplay HUD status while the loading/menu screen is visible.
 status.style.display = "none";
 loadingAmbient.setMuted(false);
+
+function ensureGame(): Game {
+  if (game) return game;
+  game = new Game({
+    canvas,
+    map: dust2Slice,
+    statusEl: status,
+    feedEl: feed,
+    highQuality: highQualityMode,
+  });
+  return game;
+}
 
 function syncMuteButtonState() {
   const muted = loadingAmbient.isMuted();
@@ -69,12 +98,12 @@ async function connect() {
   }
   room = joinedRoom;
   room.onMessage("snapshot", (msg: SnapshotMsg) => {
-    game.onSnapshot(msg);
+    game?.onSnapshot(msg);
   });
   room.onMessage("kill", (msg: KillMsg) => {
-    game.onKill(msg);
+    game?.onKill(msg);
   });
-  game.setSendInput((input) => {
+  ensureGame().setSendInput((input) => {
     room?.send("input", input);
   });
 }
@@ -89,23 +118,57 @@ function requestPointerLock() {
 function onPointerLockChange() {
   const locked = document.pointerLockElement === canvas;
   if (!gameStarted) start.style.display = locked ? "none" : "grid";
-  game.setPointerLocked(locked);
+  game?.setPointerLocked(locked);
 }
 
 document.addEventListener("pointerlockchange", onPointerLockChange);
 
 function warmupLoadingAmbientAudio() {
-  if (gameStarted) return;
+  if (gameStarted || disposed) return;
   void loadingAmbient.start();
 }
 
 start.addEventListener("pointerdown", warmupLoadingAmbientAudio, { passive: true });
 window.addEventListener("keydown", warmupLoadingAmbientAudio);
-void loadingAmbient.start();
 syncMuteButtonState();
+void loadingAmbient.start();
+
+function frame(now: number) {
+  if (!loopStarted || disposed) return;
+  const runtimeGame = game;
+  if (!runtimeGame) {
+    requestAnimationFrame(frame);
+    return;
+  }
+
+  const dtMs = now - loopLastMs;
+  loopLastMs = now;
+  loopAccumulator += dtMs / 1000;
+
+  const maxSteps = 5;
+  let steps = 0;
+  while (loopAccumulator >= DT && steps < maxSteps) {
+    runtimeGame.step(DT);
+    loopAccumulator -= DT;
+    steps++;
+  }
+
+  runtimeGame.render();
+  requestAnimationFrame(frame);
+}
+
+function startRuntimeLoop() {
+  if (loopStarted || isVirtualTime) return;
+  loopStarted = true;
+  loopLastMs = performance.now();
+  loopAccumulator = 0;
+  requestAnimationFrame(frame);
+}
 
 function startGame(showMultiplayerWarning: boolean) {
-  if (disposed) return;
+  if (disposed || gameStarted) return;
+  const runtimeGame = ensureGame();
+
   gameStarted = true;
   loadingAmbient.stop();
   start.style.display = "none";
@@ -123,10 +186,13 @@ function startGame(showMultiplayerWarning: boolean) {
   }
 
   if (isVirtualTime) {
-    game.setPointerLocked(true);
+    runtimeGame.setPointerLocked(true);
+    runtimeGame.render();
   } else {
     requestPointerLock();
+    startRuntimeLoop();
   }
+
   void connect();
 }
 
@@ -156,6 +222,7 @@ multiPlayerBtn.addEventListener("click", onMultiPlayerClick);
 function teardown() {
   if (disposed) return;
   disposed = true;
+  loopStarted = false;
 
   if (bannerTimer !== null) {
     window.clearTimeout(bannerTimer);
@@ -170,7 +237,9 @@ function teardown() {
   multiPlayerBtn.removeEventListener("click", onMultiPlayerClick);
 
   loadingAmbient.stop();
-  game.dispose();
+  game?.dispose();
+  game = null;
+
   if (room) {
     const activeRoom = room;
     room = null;
@@ -184,36 +253,51 @@ window.addEventListener("pagehide", teardown);
 window.addEventListener("beforeunload", teardown);
 
 // Deterministic stepping hook for Playwright.
-const isVirtualTime = typeof window.__vt_pending !== "undefined";
 if (isVirtualTime) {
   window.advanceTime = async (ms: number) => {
     if (disposed) return;
+    const runtimeGame = game;
+    if (!runtimeGame) return;
+
     const steps = Math.max(1, Math.round(ms / (1000 / TICK_RATE)));
-    for (let i = 0; i < steps; i++) game.step(DT);
-    game.render();
+    for (let i = 0; i < steps; i++) runtimeGame.step(DT);
+    runtimeGame.render();
   };
-  // In virtual-time runs, kick the game once so the canvas isn't blank.
-  game.render();
-} else {
-  let last = performance.now();
-  let acc = 0;
-  function frame(now: number) {
-    if (disposed) return;
-    const dtMs = now - last;
-    last = now;
-    acc += dtMs / 1000;
-    const maxSteps = 5;
-    let steps = 0;
-    while (acc >= DT && steps < maxSteps) {
-      game.step(DT);
-      acc -= DT;
-      steps++;
-    }
-    game.render();
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
 }
 
 // Required by the develop-web-game skill for automated inspection.
-window.render_game_to_text = () => game.renderGameToText();
+window.render_game_to_text = () => {
+  if (game) return game.renderGameToText();
+
+  return JSON.stringify({
+    coordinate_system: {
+      origin: "map center at (0,0,0)",
+      axes: "x right/left, y up, z forward/back",
+    },
+    mode: "menu",
+    fallbackMode: false,
+    render: {
+      drawCalls: 0,
+      triangles: 0,
+      materials: 0,
+      quality: highQualityMode ? "high" : "low",
+    },
+    serverTick: 0,
+    player: {
+      id: null,
+      team: "T",
+      alive: true,
+      hp: 100,
+      ammo: 30,
+      pos: { x: -40, y: 0, z: -16 },
+      vel: { x: 0, y: 0, z: 0 },
+      yaw: 0,
+      pitch: 0,
+    },
+    teams: {
+      score: { T: 0, CT: 0 },
+      alive: { T: 0, CT: 0 },
+    },
+    entities: [],
+  });
+};

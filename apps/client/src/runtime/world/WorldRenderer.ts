@@ -23,6 +23,7 @@ type WorldRendererArgs = Readonly<{
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   map: MapDef;
+  highQuality: boolean;
 }>;
 
 function isArchitecturalMass(id: string, height: number): boolean {
@@ -181,38 +182,53 @@ export class WorldRenderer {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
   private readonly map: MapDef;
+  private readonly highQuality: boolean;
 
-  private readonly materials = new MaterialLibrary();
+  private readonly materials: MaterialLibrary;
   private readonly worldMeshes: THREE.Object3D[] = [];
   private readonly transientMaterials: THREE.Material[] = [];
   private readonly transientTextures: THREE.Texture[] = [];
   private readonly post: PostPipeline;
   private readonly viewmodel: AkViewmodel;
   private readonly dressing: DressingSet;
+  private materialCount = 0;
   private elapsedTime = 0;
+  private dustParticles: THREE.Points | null = null;
 
   constructor(args: WorldRendererArgs) {
     this.renderer = args.renderer;
     this.scene = args.scene;
     this.camera = args.camera;
     this.map = args.map;
+    this.highQuality = args.highQuality;
+    this.materials = new MaterialLibrary(this.highQuality);
 
-    createLightingRig(this.scene);
+    createLightingRig(this.scene, this.highQuality);
 
     const plan = createWorldBuildPlan(this.map);
     this.buildCollisionMeshes(plan.blocks);
-    this.buildStreetLayer();
-    this.buildFacadeLayers(plan.blocks);
-    this.buildMarketBooths();
-    this.buildProps(plan.props);
-
-    this.dressing = addInstancedDressing(this.scene, this.map, this.materials);
-    this.buildAtmosphere();
+    this.buildStreetLayer(this.highQuality ? 1 : 0.35);
+    if (this.highQuality) {
+      this.buildFacadeLayers(plan.blocks);
+      this.buildMarketBooths();
+      this.buildProps(plan.props);
+      this.dressing = addInstancedDressing(this.scene, this.map, this.materials, 1);
+      this.buildAtmosphere();
+      this.buildLandmarkArch();
+      this.buildPerimeterBuildings();
+      this.buildWallDecals();
+    } else {
+      this.buildProps(this.filterLowDetailProps(plan.props));
+      this.dressing = addInstancedDressing(this.scene, this.map, this.materials, 0.35);
+    }
 
     this.viewmodel = new AkViewmodel(this.camera);
-    this.post = new PostPipeline(this.renderer, this.scene, this.camera, window.innerWidth, window.innerHeight);
+    this.post = new PostPipeline(this.renderer, this.scene, this.camera, window.innerWidth, window.innerHeight, this.highQuality);
 
     this.buildSky();
+    this.generateEnvironmentMap();
+    this.disableDecorativeShadowCasting();
+    this.materialCount = this.countSceneMaterials();
   }
 
   private buildSky() {
@@ -222,7 +238,7 @@ export class WorldRenderer {
       side: THREE.BackSide,
       depthWrite: false,
       uniforms: {
-        sunDir: { value: new THREE.Vector3(48, 48, 18).normalize() }
+        sunDir: { value: new THREE.Vector3(48, 22, 18).normalize() }
       },
       vertexShader: `
         varying vec3 vWorldPos;
@@ -285,6 +301,59 @@ export class WorldRenderer {
     this.transientMaterials.push(cloudMat);
   }
 
+  private generateEnvironmentMap() {
+    const pmremGen = new THREE.PMREMGenerator(this.renderer);
+    pmremGen.compileCubemapShader();
+
+    // Render sky into a small cubemap for IBL
+    const envScene = new THREE.Scene();
+    const skyGeo = new THREE.SphereGeometry(10, 32, 16);
+    const sunDir = new THREE.Vector3(48, 22, 18).normalize();
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: { sunDir: { value: sunDir } },
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 sunDir;
+        varying vec3 vDir;
+        void main() {
+          float y = vDir.y;
+          vec3 horizon = vec3(0.84, 0.74, 0.56);
+          vec3 midSky  = vec3(0.72, 0.65, 0.50);
+          vec3 zenith  = vec3(0.55, 0.58, 0.52);
+          vec3 sky = mix(horizon, midSky, smoothstep(0.0, 0.15, y));
+          sky = mix(sky, zenith, smoothstep(0.15, 0.6, y));
+          float sunDot = dot(vDir, sunDir);
+          sky += vec3(1.0, 0.9, 0.7) * pow(max(0.0, sunDot), 64.0) * 1.2;
+          sky += vec3(1.0, 0.85, 0.6) * pow(max(0.0, sunDot), 8.0) * 0.25;
+          sky = mix(sky, horizon * 0.7, smoothstep(0.0, -0.05, y));
+          gl_FragColor = vec4(sky, 1.0);
+        }
+      `
+    });
+    const envSky = new THREE.Mesh(skyGeo, skyMat);
+    envScene.add(envSky);
+
+    const cubeRT = new THREE.WebGLCubeRenderTarget(256);
+    const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRT);
+    cubeCamera.update(this.renderer, envScene);
+
+    const envTexture = pmremGen.fromCubemap(cubeRT.texture).texture;
+    this.scene.environment = envTexture;
+
+    // Clean up temporary resources
+    skyMat.dispose();
+    skyGeo.dispose();
+    cubeRT.dispose();
+    pmremGen.dispose();
+  }
+
   private buildCollisionMeshes(blocks: readonly VisualBlock[]) {
     for (const block of blocks) {
       const sx = block.max.x - block.min.x;
@@ -322,7 +391,7 @@ export class WorldRenderer {
     }
   }
 
-  private buildStreetLayer() {
+  private buildStreetLayer(detailFactor: number) {
     const cobbleMat = this.materials.get("cobble", "street:cobble", 16, 5);
     const sandMat = this.materials.get("sand", "street:sand", 14, 5);
     const oilMat = new THREE.MeshStandardMaterial({ color: 0x3f3122, roughness: 0.98, metalness: 0.02, transparent: true, opacity: 0.3 });
@@ -337,7 +406,8 @@ export class WorldRenderer {
       { x: -20, z: -42, w: 16, h: 30, rot: -0.01 }
     ];
 
-    for (const s of strips) {
+    const stripCount = Math.max(1, Math.floor(strips.length * detailFactor));
+    for (const s of strips.slice(0, stripCount)) {
       const g = new THREE.PlaneGeometry(s.w, s.h, 16, 24);
       const uv = g.getAttribute("uv");
       if (uv) {
@@ -358,8 +428,9 @@ export class WorldRenderer {
 
     // Sand drifts: more variation
     const driftGeom = new THREE.PlaneGeometry(5.2, 2.8, 5, 3);
-    for (let i = 0; i < 28; i++) {
-      const t = i / 28;
+    const driftCount = Math.max(8, Math.floor(28 * detailFactor));
+    for (let i = 0; i < driftCount; i++) {
+      const t = i / driftCount;
       const x = -64 + t * 128 + Math.sin(t * 19) * 4;
       const z = -58 + Math.cos(t * 11) * 22;
       const drift = new THREE.Mesh(driftGeom, sandMat);
@@ -374,6 +445,7 @@ export class WorldRenderer {
 
     // Sand accumulation along wall bases (wedge strips)
     const wallSandMat = this.materials.get("sand", "street:wallsand", 8, 2);
+    let wallSandIndex = 0;
     for (const collider of this.map.colliders) {
       const sy = collider.max.y - collider.min.y;
       if (sy < 3) continue; // Only along tall walls
@@ -396,13 +468,20 @@ export class WorldRenderer {
         sandStrip.rotation.z = Math.PI * 0.5;
       }
       sandStrip.userData.ignoreImpactRay = true;
-      this.scene.add(sandStrip);
-      this.worldMeshes.push(sandStrip);
+      const keep = detailFactor >= 1 || (wallSandIndex % Math.max(1, Math.round(1 / Math.max(0.001, detailFactor)))) === 0;
+      wallSandIndex++;
+      if (keep) {
+        this.scene.add(sandStrip);
+        this.worldMeshes.push(sandStrip);
+      } else {
+        sandStrip.geometry.dispose();
+      }
     }
 
     // Oil stains with varied shapes
     const stainGeom = new THREE.CircleGeometry(1, 24);
-    for (let i = 0; i < 22; i++) {
+    const stainCount = Math.max(6, Math.floor(22 * detailFactor));
+    for (let i = 0; i < stainCount; i++) {
       const x = -52 + (i % 7) * 16 + Math.sin(i * 2.3) * 3;
       const z = -34 + Math.floor(i / 7) * 20 + Math.cos(i * 1.9) * 3;
       const stain = new THREE.Mesh(stainGeom, oilMat);
@@ -418,7 +497,8 @@ export class WorldRenderer {
     const rutMat = new THREE.MeshStandardMaterial({ color: 0x6b5840, roughness: 0.95, metalness: 0, transparent: true, opacity: 0.2 });
     this.transientMaterials.push(rutMat);
     const rutGeom = new THREE.PlaneGeometry(0.15, 40);
-    for (let i = 0; i < 4; i++) {
+    const rutCount = Math.max(2, Math.floor(4 * detailFactor));
+    for (let i = 0; i < rutCount; i++) {
       const rut = new THREE.Mesh(rutGeom, rutMat);
       rut.rotation.x = -Math.PI * 0.5;
       rut.position.set(-4 + i * 2.8, 0.022, 5 + i * 3);
@@ -427,17 +507,68 @@ export class WorldRenderer {
       this.scene.add(rut);
       this.worldMeshes.push(rut);
     }
+
+    // Wall-base contact shadow darkening
+    const aoMat = new THREE.MeshBasicMaterial({
+      color: 0x1a1008,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    this.transientMaterials.push(aoMat);
+    for (const collider of this.map.colliders) {
+      const sy = collider.max.y - collider.min.y;
+      if (sy < 3) continue;
+      const sx = collider.max.x - collider.min.x;
+      const sz = collider.max.z - collider.min.z;
+      const aoWidth = 2.0;
+
+      // Place dark quads along each long face
+      if (sx >= 2) {
+        // +Z face
+        const aoN = new THREE.Mesh(new THREE.PlaneGeometry(sx, aoWidth), aoMat);
+        aoN.rotation.x = -Math.PI * 0.5;
+        aoN.position.set((collider.min.x + collider.max.x) * 0.5, 0.016, collider.max.z + aoWidth * 0.5);
+        aoN.userData.ignoreImpactRay = true;
+        this.scene.add(aoN);
+        this.worldMeshes.push(aoN);
+        // -Z face
+        const aoS = new THREE.Mesh(new THREE.PlaneGeometry(sx, aoWidth), aoMat);
+        aoS.rotation.x = -Math.PI * 0.5;
+        aoS.position.set((collider.min.x + collider.max.x) * 0.5, 0.016, collider.min.z - aoWidth * 0.5);
+        aoS.userData.ignoreImpactRay = true;
+        this.scene.add(aoS);
+        this.worldMeshes.push(aoS);
+      }
+      if (sz >= 2) {
+        // +X face
+        const aoE = new THREE.Mesh(new THREE.PlaneGeometry(aoWidth, sz), aoMat);
+        aoE.rotation.x = -Math.PI * 0.5;
+        aoE.position.set(collider.max.x + aoWidth * 0.5, 0.016, (collider.min.z + collider.max.z) * 0.5);
+        aoE.userData.ignoreImpactRay = true;
+        this.scene.add(aoE);
+        this.worldMeshes.push(aoE);
+        // -X face
+        const aoW = new THREE.Mesh(new THREE.PlaneGeometry(aoWidth, sz), aoMat);
+        aoW.rotation.x = -Math.PI * 0.5;
+        aoW.position.set(collider.min.x - aoWidth * 0.5, 0.016, (collider.min.z + collider.max.z) * 0.5);
+        aoW.userData.ignoreImpactRay = true;
+        this.scene.add(aoW);
+        this.worldMeshes.push(aoW);
+      }
+    }
   }
 
   private buildFacadeLayers(blocks: readonly VisualBlock[]) {
-    const shutterMat = new THREE.MeshStandardMaterial({ color: 0x5c8f8a, roughness: 0.88, metalness: 0.05 });
+    const shutterColors = [0x5c8f8a, 0x6b8498, 0x9b6b58, 0x7a8a5c, 0xb8a88c];
+    const shutterMats = shutterColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.88, metalness: 0.05 }));
     const barMat = this.materials.get("metal", "facade:bars", 0.9, 0.9);
-    const doorMat = this.materials.get("wood", "facade:doors", 1.2, 1.2);
     const ringMat = this.materials.get("metal", "facade:rings", 1, 1);
     const recessMat = new THREE.MeshStandardMaterial({ color: 0x2a1e14, roughness: 0.95, metalness: 0.01 });
     const sillMat = this.materials.get("concrete", "facade:sills", 1, 1);
     const frameMat = this.materials.get("wood", "facade:frames", 1.4, 1.4);
-    this.transientMaterials.push(shutterMat, recessMat);
+    this.transientMaterials.push(...shutterMats, recessMat);
 
     for (const block of blocks) {
       const sx = block.max.x - block.min.x;
@@ -449,6 +580,10 @@ export class WorldRenderer {
       const cz = (block.min.z + block.max.z) * 0.5;
       const spanX = sx + 0.24;
       const spanZ = sz + 0.24;
+
+      const blockSeed = hashSeed(`shutter:${block.id}`);
+      const shutterMat = shutterMats[Math.abs(blockSeed) % shutterMats.length];
+      const doorMat = this.materials.get("wood", `facade:door:${block.id}`, 1.2, 1.2);
 
       const corniceMat = this.materials.get("plaster", `cornice:${block.id}`, Math.max(1, sx * 0.24), 1.2);
       const trimMat = this.materials.get("trim", `trim:${block.id}`, Math.max(1, sx * 0.52), 1.2);
@@ -811,6 +946,25 @@ export class WorldRenderer {
     }
   }
 
+  private filterLowDetailProps(props: readonly PlanProp[]): readonly PlanProp[] {
+    const filtered: PlanProp[] = [];
+    for (let i = 0; i < props.length; i++) {
+      const prop = props[i]!;
+      if (prop.kind === "cable") {
+        if (i % 2 === 0) filtered.push(prop);
+        continue;
+      }
+      if (prop.kind === "awning" || prop.kind === "tarp") {
+        if (i % 2 === 0) filtered.push(prop);
+        continue;
+      }
+      if (prop.kind === "lantern" && i % 4 === 0) {
+        filtered.push(prop);
+      }
+    }
+    return filtered;
+  }
+
   private buildProps(props: readonly PlanProp[]) {
     const tarpGeom = makeSaggingCloth(1, 1, 10, 6, 0.14);
     const chainMat = this.materials.get("metal", "prop:chain", 1.2, 1.2);
@@ -1083,6 +1237,222 @@ export class WorldRenderer {
         this.worldMeshes.push(herb);
       }
     }
+
+    // Animated dust mote particles
+    const dustCount = 350;
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustNext = lcg(hashSeed("dustMotes"));
+    for (let i = 0; i < dustCount; i++) {
+      dustPositions[i * 3] = (rand01(dustNext) - 0.5) * 120;
+      dustPositions[i * 3 + 1] = rand01(dustNext) * 12;
+      dustPositions[i * 3 + 2] = (rand01(dustNext) - 0.5) * 120;
+    }
+    const dustGeo = new THREE.BufferGeometry();
+    dustGeo.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
+    const dustPointMat = new THREE.PointsMaterial({
+      color: 0xe8d4b0,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    this.transientMaterials.push(dustPointMat);
+    this.dustParticles = new THREE.Points(dustGeo, dustPointMat);
+    this.dustParticles.userData.ignoreImpactRay = true;
+    this.scene.add(this.dustParticles);
+    this.worldMeshes.push(this.dustParticles);
+  }
+
+  private buildLandmarkArch() {
+    const wallMat = this.materials.get("wall", "arch:wall", 1.2, 2.4);
+    const trimMat = this.materials.get("trim", "arch:trim", 2.8, 1.2);
+
+    // Two columns flanking the mid area
+    const colW = 1.2;
+    const colH = 6.0;
+    const colD = 1.2;
+    const archSpan = 5.6;
+    const archY = colH;
+
+    for (const side of [-1, 1]) {
+      const col = new THREE.Mesh(createBeveledBoxGeometry(colW, colH, colD, 0.08, 2), wallMat);
+      col.position.set(side * (archSpan * 0.5 + colW * 0.5), colH * 0.5, 0);
+      col.castShadow = true;
+      col.receiveShadow = true;
+      col.userData.ignoreImpactRay = true;
+      this.scene.add(col);
+      this.worldMeshes.push(col);
+
+      // Column base molding
+      const base = new THREE.Mesh(new THREE.BoxGeometry(colW + 0.2, 0.3, colD + 0.2), trimMat);
+      base.position.set(side * (archSpan * 0.5 + colW * 0.5), 0.15, 0);
+      base.receiveShadow = true;
+      base.userData.ignoreImpactRay = true;
+      this.scene.add(base);
+      this.worldMeshes.push(base);
+
+      // Column capital
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(colW + 0.15, 0.25, colD + 0.15), trimMat);
+      cap.position.set(side * (archSpan * 0.5 + colW * 0.5), archY - 0.12, 0);
+      cap.castShadow = true;
+      cap.receiveShadow = true;
+      cap.userData.ignoreImpactRay = true;
+      this.scene.add(cap);
+      this.worldMeshes.push(cap);
+    }
+
+    // Half-torus arch spanning the columns
+    const archRadius = archSpan * 0.5;
+    const archTube = 0.35;
+    const archGeo = new THREE.TorusGeometry(archRadius, archTube, 12, 24, Math.PI);
+    const arch = new THREE.Mesh(archGeo, wallMat);
+    arch.position.set(0, archY, 0);
+    arch.rotation.set(0, Math.PI * 0.5, 0);
+    arch.castShadow = true;
+    arch.receiveShadow = true;
+    arch.userData.ignoreImpactRay = true;
+    this.scene.add(arch);
+    this.worldMeshes.push(arch);
+
+    // Keystone block at apex
+    const keystone = new THREE.Mesh(createBeveledBoxGeometry(0.5, 0.6, colD, 0.04, 2), trimMat);
+    keystone.position.set(0, archY + archRadius - 0.1, 0);
+    keystone.castShadow = true;
+    keystone.receiveShadow = true;
+    keystone.userData.ignoreImpactRay = true;
+    this.scene.add(keystone);
+    this.worldMeshes.push(keystone);
+
+    // Lintel beam connecting column tops
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(archSpan + colW * 2, 0.4, colD + 0.1), wallMat);
+    lintel.position.set(0, archY + 0.2, 0);
+    lintel.castShadow = true;
+    lintel.receiveShadow = true;
+    lintel.userData.ignoreImpactRay = true;
+    this.scene.add(lintel);
+    this.worldMeshes.push(lintel);
+
+    // Decorative trim band below arch
+    const trimBand = new THREE.Mesh(new THREE.BoxGeometry(archSpan + colW * 2 + 0.2, 0.18, colD + 0.2), trimMat);
+    trimBand.position.set(0, archY - 0.3, 0);
+    trimBand.castShadow = false;
+    trimBand.receiveShadow = true;
+    trimBand.userData.ignoreImpactRay = true;
+    this.scene.add(trimBand);
+    this.worldMeshes.push(trimBand);
+  }
+
+  private buildPerimeterBuildings() {
+    const next = lcg(hashSeed(`${this.map.id}:perimeter`));
+    const wallMat = this.materials.get("wall", "perim:wall", 1.5, 3.0);
+    const bounds = this.map.bounds;
+    const margin = 6;
+    const depth = 8;
+
+    const sides: { x: number; z: number; w: number; d: number; along: "x" | "z" }[] = [];
+    // North edge
+    for (let x = bounds.minX; x < bounds.maxX; x += 10 + rand01(next) * 8) {
+      sides.push({ x, z: bounds.maxZ + margin, w: 6 + rand01(next) * 6, d: depth, along: "x" });
+    }
+    // South edge
+    for (let x = bounds.minX; x < bounds.maxX; x += 10 + rand01(next) * 8) {
+      sides.push({ x, z: bounds.minZ - margin - depth, w: 6 + rand01(next) * 6, d: depth, along: "x" });
+    }
+    // East edge
+    for (let z = bounds.minZ; z < bounds.maxZ; z += 10 + rand01(next) * 8) {
+      sides.push({ x: bounds.maxX + margin, z, w: depth, d: 6 + rand01(next) * 6, along: "z" });
+    }
+    // West edge
+    for (let z = bounds.minZ; z < bounds.maxZ; z += 10 + rand01(next) * 8) {
+      sides.push({ x: bounds.minX - margin - depth, z, w: depth, d: 6 + rand01(next) * 6, along: "z" });
+    }
+
+    for (const s of sides) {
+      const h = 6 + rand01(next) * 7;
+      const geo = createBeveledBoxGeometry(s.w, h, s.d, 0.1, 1);
+      const mesh = new THREE.Mesh(geo, wallMat);
+      mesh.position.set(s.x + s.w * 0.5, h * 0.5, s.z + s.d * 0.5);
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.ignoreImpactRay = true;
+      this.scene.add(mesh);
+      this.worldMeshes.push(mesh);
+    }
+  }
+
+  private buildWallDecals() {
+    const next = lcg(hashSeed(`${this.map.id}:decals`));
+
+    // Water stain material
+    const stainMat = new THREE.MeshBasicMaterial({
+      color: 0x3d3020,
+      transparent: true,
+      opacity: 0.18,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+    // Plaster patch material
+    const patchMat = new THREE.MeshBasicMaterial({
+      color: 0xc8b898,
+      transparent: true,
+      opacity: 0.25,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1
+    });
+    this.transientMaterials.push(stainMat, patchMat);
+
+    for (const collider of this.map.colliders) {
+      const sy = collider.max.y - collider.min.y;
+      if (sy < 4) continue;
+      const sx = collider.max.x - collider.min.x;
+      const sz = collider.max.z - collider.min.z;
+
+      const normal = facadeNormal(
+        (collider.min.x + collider.max.x) * 0.5,
+        (collider.min.z + collider.max.z) * 0.5
+      );
+
+      const decalCount = 1 + Math.floor(rand01(next) * 3);
+      for (let d = 0; d < decalCount; d++) {
+        const isStain = rand01(next) > 0.4;
+        const mat = isStain ? stainMat : patchMat;
+        const w = 0.6 + rand01(next) * 1.4;
+        const h = isStain ? 1.0 + rand01(next) * 2.5 : 0.5 + rand01(next) * 1.0;
+        const geo = new THREE.PlaneGeometry(w, h);
+        const decal = new THREE.Mesh(geo, mat);
+
+        const dy = 0.8 + rand01(next) * (sy - 2);
+        const offset = 0.02;
+
+        if (normal === "z+") {
+          const dx = collider.min.x + rand01(next) * sx;
+          decal.position.set(dx, collider.min.y + dy, collider.max.z + offset);
+        } else if (normal === "z-") {
+          const dx = collider.min.x + rand01(next) * sx;
+          decal.position.set(dx, collider.min.y + dy, collider.min.z - offset);
+          decal.rotation.y = Math.PI;
+        } else if (normal === "x+") {
+          const dz = collider.min.z + rand01(next) * sz;
+          decal.position.set(collider.max.x + offset, collider.min.y + dy, dz);
+          decal.rotation.y = Math.PI * 0.5;
+        } else {
+          const dz = collider.min.z + rand01(next) * sz;
+          decal.position.set(collider.min.x - offset, collider.min.y + dy, dz);
+          decal.rotation.y = -Math.PI * 0.5;
+        }
+
+        decal.userData.ignoreImpactRay = true;
+        this.scene.add(decal);
+        this.worldMeshes.push(decal);
+      }
+    }
   }
 
   update(dt: number, velocityMagnitude: number, pointerLocked: boolean) {
@@ -1090,6 +1460,18 @@ export class WorldRenderer {
     this.viewmodel.update(dt, velocityMagnitude);
     this.elapsedTime += dt;
     this.post.updateTime(this.elapsedTime);
+
+    if (this.dustParticles) {
+      const pos = this.dustParticles.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        let y = pos.getY(i) + dt * 0.12;
+        const x = pos.getX(i) + Math.sin(this.elapsedTime * 0.3 + i * 0.7) * dt * 0.15;
+        if (y > 12) y = 0;
+        pos.setX(i, x);
+        pos.setY(i, y);
+      }
+      pos.needsUpdate = true;
+    }
   }
 
   onLocalShot() {
@@ -1104,9 +1486,17 @@ export class WorldRenderer {
     this.post.setSize(width, height);
   }
 
-  diagnostics(): RenderDiagnostics {
+  private disableDecorativeShadowCasting() {
+    for (const obj of this.worldMeshes) {
+      if (!(obj instanceof THREE.Mesh || obj instanceof THREE.InstancedMesh)) continue;
+      if (!obj.userData.ignoreImpactRay) continue;
+      obj.castShadow = false;
+    }
+  }
+
+  private countSceneMaterials(): number {
     const mats = new Set<string>();
-    this.scene.traverse((obj) => {
+    this.scene.traverse((obj: THREE.Object3D) => {
       if (!(obj instanceof THREE.Mesh)) return;
       if (Array.isArray(obj.material)) {
         for (const m of obj.material) mats.add(m.uuid);
@@ -1114,10 +1504,14 @@ export class WorldRenderer {
         mats.add(obj.material.uuid);
       }
     });
+    return mats.size;
+  }
+
+  diagnostics(): RenderDiagnostics {
     return {
       drawCalls: this.renderer.info.render.calls,
       triangles: this.renderer.info.render.triangles,
-      materials: mats.size
+      materials: this.materialCount
     };
   }
 

@@ -173,3 +173,195 @@ Next TODO (required)
   - Playwright smoke via `$WEB_GAME_CLIENT` against `http://localhost:5173` ✅
   - Capture reviewed at `output/web-game-loading-audio-swap/shot-0.png`.
 - Note: root `pnpm typecheck` still reports pre-existing unrelated three.js typing errors in this workspace.
+
+## 2026-02-11 (chunk 9: configurable intro->loop window with smooth transition)
+- Reworked `apps/client/src/runtime/audio/LoadingAmbientAudio.ts` into a WebAudio buffer player with configurable loop points:
+  - `playFromSec`: initial start position
+  - `loopStartSec`: where each subsequent loop begins
+  - `loopEndSec`: where loop window ends before restarting at `loopStartSec`
+  - `crossfadeSec`: smooth overlap duration between outgoing/incoming loop segments
+  - `gain`: master volume
+- Implemented timed crossfade scheduler so transitions are seamless instead of hard cuts.
+- Updated instantiation in `apps/client/src/main.ts` to pass explicit audio config constants in one place.
+- Validation:
+  - `pnpm --filter @clawd-strike/client build` ✅
+  - Playwright smoke run with existing dev server ✅
+  - Artifacts: `output/web-game-loading-loop-controls/`
+- Note: This environment still logs pre-existing WebGL context errors in Playwright fallback mode; audio code path exercised without new audio runtime exceptions.
+
+## 2026-02-11 (chunk 10: startup/runtime performance pass)
+- Implemented requested performance improvements (no gameplay logic changes):
+
+### Startup / iteration speed
+- Updated cleanup behavior in `scripts/clean-generated.mjs`:
+  - Vite prebundle cache is now preserved by default.
+  - Added opt-in env switch `CLEAN_VITE_CACHE=1` to clear `apps/client/node_modules/.vite` only when explicitly requested.
+
+### Lazy initialization to avoid menu-time stalls
+- Refactored `apps/client/src/main.ts` to defer heavy game init:
+  - `Game` instance is no longer created at module load.
+  - `Game` is lazily created only when user starts a mode (`single-player` / `multi-player`).
+  - Runtime loop only starts after game start.
+  - `render_game_to_text` now returns a valid menu-state payload before game init.
+- Kept deterministic virtual-time compatibility for Playwright by exposing `window.advanceTime` once game exists.
+
+### Loading audio path optimization
+- Replaced WebAudio full-buffer decode path in `apps/client/src/runtime/audio/LoadingAmbientAudio.ts`:
+  - Removed eager `fetch + decodeAudioData` behavior that decoded full 43MB MP3.
+  - Switched to `HTMLAudioElement` streaming-style playback with `preload="none"`.
+  - Preserved public API (`start`, `stop`, `setMuted`, `isMuted`) and finite-loop behavior via `timeupdate` seek window.
+
+### Renderer + frame-loop cost reduction
+- Extended `Game` constructor to accept `highQuality` toggle and passed it from URL query (`?quality=high` opt-in):
+  - Default path is low-quality for faster startup/frame-time.
+- `apps/client/src/runtime/Game.ts` optimizations:
+  - Lower default DPR cap (low quality: 1.0; high quality: 1.5).
+  - Low-quality shadow type uses cheaper `PCFShadowMap`.
+  - Removed per-frame vector allocations for camera look direction.
+  - Reworked HUD FPS + diagnostics sampling:
+    - FPS now uses dt smoothing instead of `THREE.Clock.getDelta()` each frame.
+    - Expensive diagnostics are sampled every 500ms instead of every tick.
+  - Added render quality flag to `render_game_to_text` output.
+
+### World rendering cost controls
+- Updated `apps/client/src/runtime/world/WorldRenderer.ts` with quality-aware build path:
+  - Constructor now receives `highQuality`.
+  - Low-quality mode skips heaviest geometry passes (`buildFacadeLayers`, `buildMarketBooths`, full atmosphere).
+  - Low-quality mode uses filtered prop subset and reduced instanced dressing density.
+  - `buildStreetLayer` now accepts detail factor and scales strip/drift/stain/rut counts down in low quality.
+  - Decorative `ignoreImpactRay` meshes now have shadow casting disabled post-build.
+  - Material count for diagnostics is cached once instead of recomputed via scene traversal each call.
+
+### Lighting + post-processing defaults
+- `apps/client/src/runtime/world/lighting/lightingRig.ts`:
+  - Added `highQuality` argument.
+  - Low quality uses 2048 directional shadow map and fewer fill lights.
+- `apps/client/src/runtime/world/postfx/postPipeline.ts`:
+  - Added `highQuality` argument.
+  - SSAO only enabled in high quality.
+  - Bloom strength + grading grain/vignette/contrast reduced in low quality.
+
+### Procedural material generation reductions
+- `apps/client/src/runtime/world/materials/materialLibrary.ts`:
+  - Added constructor `highQuality` and wired in `WorldRenderer`.
+  - Quantized UV repeat cache keys (coarser in low quality) to increase material reuse.
+  - Lowered procedural texture tile size in low quality (`256` vs `512`).
+
+### Instanced dressing density scaling
+- `apps/client/src/runtime/world/props/instancedDressing.ts`:
+  - Added `detailFactor` parameter.
+  - Scaled instance counts and per-point spawn counts across all dressing sets.
+  - Hooked into `WorldRenderer` high/low quality paths.
+
+Validation
+- `pnpm lint` ✅
+- `pnpm test` ✅
+- `pnpm typecheck` ❌ (pre-existing three.js declaration errors in current workspace environment; unaffected by this change set, consistent with earlier notes)
+- Playwright smoke (`$WEB_GAME_CLIENT`) with click-through start path:
+  - Command used: `--click-selector #single-player-btn --iterations 2 --screenshot-dir output/web-game-perf-pass`
+  - Artifacts generated and reviewed:
+    - `output/web-game-perf-pass/shot-0.png`
+    - `output/web-game-perf-pass/state-0.json`
+    - `output/web-game-perf-pass/errors-0.json`
+  - Result: game enters play mode and server state advances in fallback 2D mode.
+  - Environment limitation persists: headless WebGL context creation fails (ANGLE/SwiftShader), so 3D/GPU-path visual perf could not be validated here.
+
+Follow-up TODOs
+- Run manual GPU-backed browser test on target machine to validate actual 3D performance gains and visual quality in both default and `?quality=high` modes.
+- If desired, add runtime quality toggle UI (menu button) to avoid query-param usage.
+- Consider moving procedural texture generation to worker/off-main-thread for further startup gains while preserving high-quality path.
+
+## 2026-02-11 (chunk 9: mute visual polish)
+- Refined mute toggle visual treatment in `apps/client/index.html` per UI feedback:
+  - `Muted` state now preserves original icon fidelity (full art, no dimming).
+  - `Unmuted` state now has distinct, more professional treatment (teal-tinted/soft-desaturated look) to clearly differ from muted.
+  - Upgraded button chrome with subtle border plate and clearer hover/press/focus feedback while reducing harsh opacity effect.
+- Validation captures:
+  - `output/web-game-mute-toggle-polish/mute-unmuted.png`
+  - `output/web-game-mute-toggle-polish/mute-muted.png`
+  - `output/web-game-mute-toggle-polish/state.json`
+
+## 2026-02-11 (chunk 10: mute icon full opacity)
+- Removed icon transparency in both mute states in `apps/client/index.html`:
+  - `#mute-toggle-btn.is-unmuted .mute-icon` now `opacity: 1`.
+  - `#mute-toggle-btn.is-muted .mute-icon` remains `opacity: 1`.
+- Preserved interactive button treatment (hover/active/focus/pulse) unchanged.
+- Validation captures:
+  - `output/web-game-mute-toggle-no-opacity/unmuted.png`
+  - `output/web-game-mute-toggle-no-opacity/muted.png`
+
+## 2026-02-11 (chunk 11: loading-screen assets consolidated)
+- Moved all loading-screen image assets into one folder for organization:
+  - `apps/client/public/loading-screen/ClawdStriker_Logo.png`
+  - `apps/client/public/loading-screen/Loading_Screen_Background_4K.png`
+  - `apps/client/public/loading-screen/button-human.png`
+  - `apps/client/public/loading-screen/button-agent.png`
+  - `apps/client/public/loading-screen/mute-toggle.png`
+- Updated all loading-screen image references in `apps/client/index.html` to use `/loading-screen/...` paths.
+- Validation:
+  - `pnpm --filter @clawd-strike/client build` ✅
+
+## 2026-02-11 (chunk 12: loading-screen audio asset consolidated)
+- Moved loading-screen music file into the same asset folder:
+  - from `apps/client/public/ClawdStriker_Audio.mp3`
+  - to `apps/client/public/loading-screen/ClawdStriker_Audio.mp3`
+- Updated menu ambient audio source paths:
+  - `apps/client/src/runtime/audio/LoadingAmbientAudio.ts`
+  - `apps/client/src/main.ts`
+  - new path: `/loading-screen/ClawdStriker_Audio.mp3`
+- Validation:
+  - `pnpm --filter @clawd-strike/client build` ✅
+
+## 2026-02-11 (chunk 13: mute icon uses original artwork as-is)
+- Removed mute-button icon visual manipulation in `apps/client/index.html`:
+  - No icon opacity styling for mute states.
+  - No icon filter styling for mute states.
+- Preserved interactive behavior with structural button feedback (hover lift, press scale, focus ring, pulse) without altering icon image rendering.
+- Validation captures:
+  - `output/web-game-mute-toggle-original-icon/unmuted-original-icon.png`
+  - `output/web-game-mute-toggle-original-icon/muted-original-icon.png`
+
+## 2026-02-11 (chunk 14: mute button smaller + tighter top-right)
+- Updated mute button layout in `apps/client/index.html`:
+  - Desktop: `top/right -> 10px + safe-area`, `width clamp(68px, 7vw, 108px)`.
+  - Mobile: `top/right -> 6px + safe-area`, `width clamp(62px, 16vw, 94px)`.
+- Validation:
+  - `pnpm --filter @clawd-strike/client build` ✅
+
+## 2026-02-11 (chunk 15: mute icon replacement + top-right reduction)
+- Ensured replaced mute icon is used by adding a cache-busting query to the loading-screen image ref:
+  - `src="/loading-screen/mute-toggle.png?v=2"`
+- Reduced mute toggle size by ~30% and moved to true top-right corner:
+  - Desktop: `top/right: 0 + safe-area`, `width: clamp(48px, 5vw, 76px)`
+  - Mobile: `top/right: 0 + safe-area`, `width: clamp(43px, 11vw, 66px)`
+- Validation:
+  - `pnpm --filter @clawd-strike/client build` ✅
+  - Verified rendered icon source: `/loading-screen/mute-toggle.png?v=2`
+  - Screenshot: `output/web-game-mute-toggle-replaced-icon/menu-top-right-small-mute.png`
+
+## 2026-02-11 (chunk 16: replaced mute icon asset)
+- Replaced loading-screen mute icon file with newly attached artwork:
+  - source: `~/Downloads/ChatGPT Image Feb 11, 2026, 01_30_40 PM.png`
+  - destination/renamed: `apps/client/public/loading-screen/mute-toggle.png`
+- Updated icon cache-buster in `apps/client/index.html`:
+  - `/loading-screen/mute-toggle.png?v=3`
+- Validation:
+  - `pnpm --filter @clawd-strike/client build` ✅
+  - Verified rendered src: `/loading-screen/mute-toggle.png?v=3`
+  - Screenshot: `output/web-game-mute-toggle-replaced-final/menu-with-replaced-mute.png`
+
+## 2026-02-11 (chunk 10: faster loading-audio startup)
+- Root cause found for delayed loading-screen audio start:
+  - `LoadingAmbientAudio` used `audio.preload = "none"`, delaying network fetch until `play()`.
+  - Auto-start on initial page load had been removed from `main.ts`; only user interaction triggered start.
+- Changes made:
+  - `apps/client/src/runtime/audio/LoadingAmbientAudio.ts`
+    - Changed preload policy to `audio.preload = "auto"`.
+    - Added eager `audio.load()` after element creation to start buffering immediately.
+  - `apps/client/src/main.ts`
+    - Restored startup attempt on page load: `void loadingAmbient.start();`
+  - `apps/client/index.html`
+    - Added `<link rel="preload" as="audio" href="/loading-screen/ClawdStriker_Audio.mp3" type="audio/mpeg" />`.
+- Validation:
+  - `pnpm --filter @clawd-strike/client build` ✅
+  - Playwright smoke capture: `output/web-game-audio-autostart/shot-0.png` ✅
