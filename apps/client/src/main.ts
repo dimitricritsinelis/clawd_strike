@@ -23,7 +23,7 @@ const loadingAmbient = new LoadingAmbientAudio({
   loopEndSec: Number.POSITIVE_INFINITY,
   crossfadeSec: 0.22,
   gain: 0.45,
-  startDelayMs: 5000,
+  startDelayMs: 10000,
 });
 
 let disposed = false;
