@@ -5,6 +5,7 @@ export type LoadingAmbientAudioOptions = {
   loopStartSec: number;
   loopEndSec: number;
   crossfadeSec: number;
+  startDelayMs: number;
 };
 
 const DEFAULT_OPTIONS: LoadingAmbientAudioOptions = {
@@ -14,6 +15,7 @@ const DEFAULT_OPTIONS: LoadingAmbientAudioOptions = {
   loopStartSec: 0,
   loopEndSec: Number.POSITIVE_INFINITY,
   crossfadeSec: 0.22,
+  startDelayMs: 0,
 };
 
 export class LoadingAmbientAudio {
@@ -22,6 +24,35 @@ export class LoadingAmbientAudio {
   private muted = false;
   private running = false;
   private startedOnce = false;
+  private pendingStartDelayId: ReturnType<typeof setTimeout> | null = null;
+
+  private getOrCreateAudio(): HTMLAudioElement {
+    if (this.audio) return this.audio;
+
+    const audio = new Audio(this.options.src);
+    audio.preload = "auto";
+    audio.loop = !Number.isFinite(this.options.loopEndSec);
+    audio.muted = this.muted;
+    audio.volume = this.muted ? 0 : this.options.gain;
+
+    if (Number.isFinite(this.options.loopEndSec)) {
+      audio.addEventListener("timeupdate", this.onTimeUpdate);
+    }
+
+    // Start buffering immediately so first audible frame arrives faster.
+    audio.load();
+
+    this.audio = audio;
+    return audio;
+  }
+
+  private clearPendingStartDelay() {
+    if (this.pendingStartDelayId !== null) {
+      clearTimeout(this.pendingStartDelayId);
+      this.pendingStartDelayId = null;
+    }
+  }
+
   private readonly onTimeUpdate = () => {
     const audio = this.audio;
     if (!audio) return;
@@ -60,6 +91,23 @@ export class LoadingAmbientAudio {
     const audio = this.getOrCreateAudio();
     this.running = true;
 
+    if (this.pendingStartDelayId !== null) return;
+
+    const delayMs = Math.max(0, this.options.startDelayMs);
+    if (delayMs > 0) {
+      this.pendingStartDelayId = setTimeout(() => {
+        this.pendingStartDelayId = null;
+        if (!this.running) return;
+        void this.startPlayback(audio);
+      }, delayMs);
+      return;
+    }
+    await this.startPlayback(audio);
+  }
+
+  private async startPlayback(audio: HTMLAudioElement): Promise<void> {
+    if (!this.running) return;
+
     if (!this.startedOnce) {
       this.startedOnce = true;
       const startAt = Math.max(0, this.options.playFromSec);
@@ -82,6 +130,7 @@ export class LoadingAmbientAudio {
   }
 
   stop() {
+    this.clearPendingStartDelay();
     this.running = false;
     const audio = this.audio;
     if (!audio) return;
@@ -92,25 +141,5 @@ export class LoadingAmbientAudio {
     } catch {
       // Ignore if seek is not currently allowed.
     }
-  }
-
-  private getOrCreateAudio(): HTMLAudioElement {
-    if (this.audio) return this.audio;
-
-    const audio = new Audio(this.options.src);
-    audio.preload = "auto";
-    audio.loop = !Number.isFinite(this.options.loopEndSec);
-    audio.muted = this.muted;
-    audio.volume = this.muted ? 0 : this.options.gain;
-
-    if (Number.isFinite(this.options.loopEndSec)) {
-      audio.addEventListener("timeupdate", this.onTimeUpdate);
-    }
-
-    // Start buffering immediately so first audible frame arrives faster.
-    audio.load();
-
-    this.audio = audio;
-    return audio;
   }
 }
