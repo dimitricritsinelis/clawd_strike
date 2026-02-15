@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(pnpm --filter client build:*)",
-      "Bash(npx tsc:*)",
-      "Bash(timeout 8 pnpm:*)"
-    ]
-  }
-}

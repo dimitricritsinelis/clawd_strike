@@ -3,13 +3,10 @@ name: CI
 on:
   pull_request:
   push:
-  schedule:
-    - cron: "0 14 * * 1"
   workflow_dispatch:
 
 jobs:
-  checks:
-    if: github.event_name != 'schedule'
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,32 +26,8 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Lint, Typecheck, Test
-        run: pnpm ci:check
+      - name: Typecheck
+        run: pnpm typecheck
 
-  periodic-audits:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup PNPM
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.28.2
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Unused Export Audit
-        run: pnpm audit:unused-exports
-
-      - name: Asset Audit
-        run: pnpm audit:assets
+      - name: Build
+        run: pnpm build

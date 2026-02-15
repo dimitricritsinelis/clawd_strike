@@ -6,6 +6,9 @@ dist/
 **/.vite/
 **/.cache/
 .DS_Store
+.clawdstrike-dev.log
+.claude/
+art-source/
 output/
 coverage/
 *.tsbuildinfo
