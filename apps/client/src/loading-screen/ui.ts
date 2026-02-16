@@ -9,6 +9,7 @@ type LoadingScreenUICallbacks = {
 export type LoadingScreenUI = {
   show: () => void;
   dispose: () => void;
+  setAssetReady: (ready: boolean) => void;
   setMuteState: (muted: boolean) => void;
   flashMuteToggle: () => void;
   showBanner: (message: string) => void;
@@ -70,6 +71,11 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     show() {
       start.style.display = "grid";
     },
+    setAssetReady(ready) {
+      const nextValue = ready ? "true" : "false";
+      if (start.dataset.assetsReady === nextValue) return;
+      start.dataset.assetsReady = nextValue;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -110,4 +116,3 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     },
   };
 }
-

@@ -1,4 +1,5 @@
 import { LoadingAmbientAudio } from "./audio";
+import { preloadCriticalLoadingAssets } from "./assets";
 import type { LoadingAmbientAudioOptions } from "./audio";
 import type { LoadingScreenHandoff, LoadingScreenMode } from "./types";
 import { createLoadingScreenUI } from "./ui";
@@ -52,9 +53,13 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
         void loadingAmbient.start();
       }
 
-      // Placeholder until the game runtime is reintroduced.
-      ui.showBanner("Map rebuild in progress");
-      void options.handoff?.transitionToGame?.();
+      const transitionToGame = options.handoff?.transitionToGame;
+      if (transitionToGame) {
+        void transitionToGame();
+        return;
+      }
+
+      ui.showBanner("Runtime unavailable");
     },
   });
 
@@ -75,6 +80,13 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
   loadingAmbient.setMuted(false);
   ui.setMuteState(loadingAmbient.isMuted());
   ui.show();
+  ui.setAssetReady(false);
+
+  void preloadCriticalLoadingAssets().finally(() => {
+    if (disposed) return;
+    ui.setAssetReady(true);
+  });
+
   void loadingAmbient.start();
 
   if (isVirtualTime) {
