@@ -1,0 +1,869 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              14.0,
+              0.0
+            ],
+            [
+              36.0,
+              0.0
+            ],
+            [
+              36.0,
+              14.0
+            ],
+            [
+              14.0,
+              14.0
+            ],
+            [
+              14.0,
+              0.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "SPAWN_A_COURTYARD",
+        "type": "spawn_plaza",
+        "label": "Spawn A \u2014 Courtyard",
+        "notes": "Spawn safety cover + quick access to all lanes via bazaar center and side connectors."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              14.0,
+              68.0
+            ],
+            [
+              36.0,
+              68.0
+            ],
+            [
+              36.0,
+              82.0
+            ],
+            [
+              14.0,
+              82.0
+            ],
+            [
+              14.0,
+              68.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "SPAWN_B_GATE_PLAZA",
+        "type": "spawn_plaza",
+        "label": "Spawn B \u2014 Gate Plaza",
+        "notes": "Spawn safety cover + landmark arch threshold into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.25,
+              14.0
+            ],
+            [
+              29.75,
+              14.0
+            ],
+            [
+              29.75,
+              32.0
+            ],
+            [
+              20.25,
+              32.0
+            ],
+            [
+              20.25,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "BZ_M1",
+        "type": "main_lane_segment",
+        "label": "Bazaar Main \u2014 BZ-M1",
+        "notes": "Wide bazaar segment. Stall strips on edges only."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              22.75,
+              32.0
+            ],
+            [
+              31.25,
+              32.0
+            ],
+            [
+              31.25,
+              50.0
+            ],
+            [
+              22.75,
+              50.0
+            ],
+            [
+              22.75,
+              32.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "BZ_M2_JOG",
+        "type": "main_lane_segment",
+        "label": "Bazaar Main \u2014 BZ-M2 (JOG)",
+        "notes": "Jog segment offsets lane center +2.0m East to break long LoS."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.25,
+              50.0
+            ],
+            [
+              29.75,
+              50.0
+            ],
+            [
+              29.75,
+              68.0
+            ],
+            [
+              20.25,
+              68.0
+            ],
+            [
+              20.25,
+              50.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "BZ_M3",
+        "type": "main_lane_segment",
+        "label": "Bazaar Main \u2014 BZ-M3",
+        "notes": "North bazaar segment leading to hero arch + gate plaza."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              4.75,
+              10.0
+            ],
+            [
+              9.25,
+              10.0
+            ],
+            [
+              9.25,
+              72.0
+            ],
+            [
+              4.75,
+              72.0
+            ],
+            [
+              4.75,
+              10.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "SH_W",
+        "type": "side_hall",
+        "label": "West Side Hall",
+        "notes": "Narrow service alley flank lane; use prop pockets on corners; keep ~3.0m clear."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              40.75,
+              10.0
+            ],
+            [
+              45.25,
+              10.0
+            ],
+            [
+              45.25,
+              72.0
+            ],
+            [
+              40.75,
+              72.0
+            ],
+            [
+              40.75,
+              10.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "SH_E",
+        "type": "side_hall",
+        "label": "East Side Hall",
+        "notes": "Narrow service alley flank lane; use prop pockets on corners; keep ~3.0m clear."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              9.25,
+              8.0
+            ],
+            [
+              14.0,
+              8.0
+            ],
+            [
+              14.0,
+              12.0
+            ],
+            [
+              9.25,
+              12.0
+            ],
+            [
+              9.25,
+              8.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CONN_SW",
+        "type": "connector",
+        "label": "Spawn A \u2194 West Hall Connector",
+        "notes": "Short connector; maintain quick flank access."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              36.0,
+              8.0
+            ],
+            [
+              40.75,
+              8.0
+            ],
+            [
+              40.75,
+              12.0
+            ],
+            [
+              36.0,
+              12.0
+            ],
+            [
+              36.0,
+              8.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CONN_SE",
+        "type": "connector",
+        "label": "Spawn A \u2194 East Hall Connector",
+        "notes": "Short connector; maintain quick flank access."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              9.25,
+              70.0
+            ],
+            [
+              14.0,
+              70.0
+            ],
+            [
+              14.0,
+              74.0
+            ],
+            [
+              9.25,
+              74.0
+            ],
+            [
+              9.25,
+              70.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CONN_NW",
+        "type": "connector",
+        "label": "Spawn B \u2194 West Hall Connector",
+        "notes": "Short connector; maintain quick flank access."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              36.0,
+              70.0
+            ],
+            [
+              40.75,
+              70.0
+            ],
+            [
+              40.75,
+              74.0
+            ],
+            [
+              36.0,
+              74.0
+            ],
+            [
+              36.0,
+              70.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CONN_NE",
+        "type": "connector",
+        "label": "Spawn B \u2194 East Hall Connector",
+        "notes": "Short connector; maintain quick flank access."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              9.25,
+              24.5
+            ],
+            [
+              20.25,
+              24.5
+            ],
+            [
+              20.25,
+              27.5
+            ],
+            [
+              9.25,
+              27.5
+            ],
+            [
+              9.25,
+              24.5
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CUT_W_MID",
+        "type": "cut",
+        "label": "Mid Cut (West)",
+        "notes": "Rotation between west hall and main lane."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              29.75,
+              24.5
+            ],
+            [
+              40.75,
+              24.5
+            ],
+            [
+              40.75,
+              27.5
+            ],
+            [
+              29.75,
+              27.5
+            ],
+            [
+              29.75,
+              24.5
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CUT_E_MID",
+        "type": "cut",
+        "label": "Mid Cut (East)",
+        "notes": "Rotation between east hall and main lane."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              9.25,
+              56.0
+            ],
+            [
+              20.25,
+              56.0
+            ],
+            [
+              20.25,
+              59.0
+            ],
+            [
+              9.25,
+              59.0
+            ],
+            [
+              9.25,
+              56.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CUT_W_NORTH",
+        "type": "cut",
+        "label": "North Cut (West)",
+        "notes": "Rotation between west hall and main lane."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              29.75,
+              56.0
+            ],
+            [
+              40.75,
+              56.0
+            ],
+            [
+              40.75,
+              59.0
+            ],
+            [
+              29.75,
+              59.0
+            ],
+            [
+              29.75,
+              56.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CUT_E_NORTH",
+        "type": "cut",
+        "label": "North Cut (East)",
+        "notes": "Rotation between east hall and main lane."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              22.0,
+              14.0
+            ],
+            [
+              28.0,
+              14.0
+            ],
+            [
+              28.0,
+              32.0
+            ],
+            [
+              22.0,
+              32.0
+            ],
+            [
+              22.0,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CLEAR_M1",
+        "type": "clear_travel_zone",
+        "label": "Clear Travel Zone \u2014 M1",
+        "notes": "NO props/shops."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              24.0,
+              32.0
+            ],
+            [
+              30.0,
+              32.0
+            ],
+            [
+              30.0,
+              50.0
+            ],
+            [
+              24.0,
+              50.0
+            ],
+            [
+              24.0,
+              32.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CLEAR_M2",
+        "type": "clear_travel_zone",
+        "label": "Clear Travel Zone \u2014 M2",
+        "notes": "NO props/shops."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              22.0,
+              50.0
+            ],
+            [
+              28.0,
+              50.0
+            ],
+            [
+              28.0,
+              68.0
+            ],
+            [
+              22.0,
+              68.0
+            ],
+            [
+              22.0,
+              50.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CLEAR_M3",
+        "type": "clear_travel_zone",
+        "label": "Clear Travel Zone \u2014 M3",
+        "notes": "NO props/shops."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.25,
+              14.0
+            ],
+            [
+              22.0,
+              14.0
+            ],
+            [
+              22.0,
+              32.0
+            ],
+            [
+              20.25,
+              32.0
+            ],
+            [
+              20.25,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "STALL_M1_L",
+        "type": "stall_strip",
+        "label": "Stall Strip M1 (L)",
+        "notes": "Edge-only decor + stalls; never intrude into CLEAR_M1."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              28.0,
+              14.0
+            ],
+            [
+              29.75,
+              14.0
+            ],
+            [
+              29.75,
+              32.0
+            ],
+            [
+              28.0,
+              32.0
+            ],
+            [
+              28.0,
+              14.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "STALL_M1_R",
+        "type": "stall_strip",
+        "label": "Stall Strip M1 (R)",
+        "notes": "Edge-only decor + stalls; never intrude into CLEAR_M1."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              22.75,
+              32.0
+            ],
+            [
+              24.0,
+              32.0
+            ],
+            [
+              24.0,
+              50.0
+            ],
+            [
+              22.75,
+              50.0
+            ],
+            [
+              22.75,
+              32.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "STALL_M2_L",
+        "type": "stall_strip",
+        "label": "Stall Strip M2 (L)",
+        "notes": "Edge-only decor + stalls; never intrude into CLEAR_M2."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              30.0,
+              32.0
+            ],
+            [
+              31.25,
+              32.0
+            ],
+            [
+              31.25,
+              50.0
+            ],
+            [
+              30.0,
+              50.0
+            ],
+            [
+              30.0,
+              32.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "STALL_M2_R",
+        "type": "stall_strip",
+        "label": "Stall Strip M2 (R)",
+        "notes": "Edge-only decor + stalls; never intrude into CLEAR_M2."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              20.25,
+              50.0
+            ],
+            [
+              22.0,
+              50.0
+            ],
+            [
+              22.0,
+              68.0
+            ],
+            [
+              20.25,
+              68.0
+            ],
+            [
+              20.25,
+              50.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "STALL_M3_L",
+        "type": "stall_strip",
+        "label": "Stall Strip M3 (L)",
+        "notes": "Edge-only decor + stalls; never intrude into CLEAR_M3."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              28.0,
+              50.0
+            ],
+            [
+              29.75,
+              50.0
+            ],
+            [
+              29.75,
+              68.0
+            ],
+            [
+              28.0,
+              68.0
+            ],
+            [
+              28.0,
+              50.0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "STALL_M3_R",
+        "type": "stall_strip",
+        "label": "Stall Strip M3 (R)",
+        "notes": "Edge-only decor + stalls; never intrude into CLEAR_M3."
+      }
+    }
+  ]
+}

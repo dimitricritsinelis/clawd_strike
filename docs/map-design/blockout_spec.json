@@ -1,0 +1,377 @@
+{
+  "metadata": {
+    "mapId": "bazaar-map",
+    "name": "bazaar-map",
+    "version": "2.2",
+    "created_utc": "2026-02-16T00:32:10Z",
+    "units": "meters",
+    "playerCountTarget": 10,
+    "gamePerspective": "first_person",
+    "coordinateSystem": {
+      "origin": "southwest_corner_of_playable_boundary",
+      "axes": {
+        "x": "east(+)",
+        "y": "north(+)",
+        "z": "up(+)"
+      },
+      "yaw_degrees": "0=+Y(north), 90=+X(east), 180=-Y(south), 270=-X(west)"
+    },
+    "notes": [
+      "MVP runtime blockout spec for bazaar-map. Source-of-truth dims derived from signed-off birds-eye v2.2.",
+      "All rectangles use lower-left origin (x,y) in meters; z is vertical (up)."
+    ]
+  },
+  "global": {
+    "playableBoundary": {
+      "shape": "rect",
+      "x": 0.0,
+      "y": 0.0,
+      "w": 50.0,
+      "h": 82.0
+    },
+    "defaults": {
+      "ceilingHeight": 8.0,
+      "wallHeight": 6.0,
+      "floorHeight": 0.0
+    }
+  },
+  "lanes": {
+    "main_bazaar_lane": {
+      "type": "primary",
+      "segments": [
+        "BZ_M1",
+        "BZ_M2_JOG",
+        "BZ_M3"
+      ],
+      "clear_travel_zone_width": 6.0,
+      "notes": "Shops/props confined to stall strips and marked prop pockets. Keep center 6.0m continuously navigable."
+    },
+    "west_side_hall": {
+      "type": "secondary",
+      "segment": "SH_W",
+      "clear_width_target": 3.0
+    },
+    "east_side_hall": {
+      "type": "secondary",
+      "segment": "SH_E",
+      "clear_width_target": 3.0
+    }
+  },
+  "zones": [
+    {
+      "id": "SPAWN_A_COURTYARD",
+      "type": "spawn_plaza",
+      "rect": {
+        "x": 14.0,
+        "y": 0.0,
+        "w": 22.0,
+        "h": 14.0
+      },
+      "label": "Spawn A — Courtyard",
+      "notes": "Spawn safety cover + quick access to all lanes via bazaar center and side connectors."
+    },
+    {
+      "id": "SPAWN_B_GATE_PLAZA",
+      "type": "spawn_plaza",
+      "rect": {
+        "x": 14.0,
+        "y": 68.0,
+        "w": 22.0,
+        "h": 14.0
+      },
+      "label": "Spawn B — Gate Plaza",
+      "notes": "Spawn safety cover + landmark arch threshold into bazaar."
+    },
+    {
+      "id": "BZ_M1",
+      "type": "main_lane_segment",
+      "rect": {
+        "x": 20.25,
+        "y": 14.0,
+        "w": 9.5,
+        "h": 18.0
+      },
+      "label": "Bazaar Main — BZ-M1",
+      "notes": "Wide bazaar segment. Stall strips on edges only."
+    },
+    {
+      "id": "BZ_M2_JOG",
+      "type": "main_lane_segment",
+      "rect": {
+        "x": 22.75,
+        "y": 32.0,
+        "w": 8.5,
+        "h": 18.0
+      },
+      "label": "Bazaar Main — BZ-M2 (JOG)",
+      "notes": "Jog segment offsets lane center +2.0m East to break long LoS."
+    },
+    {
+      "id": "BZ_M3",
+      "type": "main_lane_segment",
+      "rect": {
+        "x": 20.25,
+        "y": 50.0,
+        "w": 9.5,
+        "h": 18.0
+      },
+      "label": "Bazaar Main — BZ-M3",
+      "notes": "North bazaar segment leading to hero arch + gate plaza."
+    },
+    {
+      "id": "SH_W",
+      "type": "side_hall",
+      "rect": {
+        "x": 4.75,
+        "y": 10.0,
+        "w": 4.5,
+        "h": 62.0
+      },
+      "label": "West Side Hall",
+      "notes": "Narrow service alley flank lane; use prop pockets on corners; keep ~3.0m clear."
+    },
+    {
+      "id": "SH_E",
+      "type": "side_hall",
+      "rect": {
+        "x": 40.75,
+        "y": 10.0,
+        "w": 4.5,
+        "h": 62.0
+      },
+      "label": "East Side Hall",
+      "notes": "Narrow service alley flank lane; use prop pockets on corners; keep ~3.0m clear."
+    },
+    {
+      "id": "CONN_SW",
+      "type": "connector",
+      "rect": {
+        "x": 9.25,
+        "y": 8.0,
+        "w": 4.75,
+        "h": 4.0
+      },
+      "label": "Spawn A ↔ West Hall Connector",
+      "notes": "Short connector; maintain quick flank access."
+    },
+    {
+      "id": "CONN_SE",
+      "type": "connector",
+      "rect": {
+        "x": 36.0,
+        "y": 8.0,
+        "w": 4.75,
+        "h": 4.0
+      },
+      "label": "Spawn A ↔ East Hall Connector",
+      "notes": "Short connector; maintain quick flank access."
+    },
+    {
+      "id": "CONN_NW",
+      "type": "connector",
+      "rect": {
+        "x": 9.25,
+        "y": 70.0,
+        "w": 4.75,
+        "h": 4.0
+      },
+      "label": "Spawn B ↔ West Hall Connector",
+      "notes": "Short connector; maintain quick flank access."
+    },
+    {
+      "id": "CONN_NE",
+      "type": "connector",
+      "rect": {
+        "x": 36.0,
+        "y": 70.0,
+        "w": 4.75,
+        "h": 4.0
+      },
+      "label": "Spawn B ↔ East Hall Connector",
+      "notes": "Short connector; maintain quick flank access."
+    },
+    {
+      "id": "CUT_W_MID",
+      "type": "cut",
+      "rect": {
+        "x": 9.25,
+        "y": 24.5,
+        "w": 11.0,
+        "h": 3.0
+      },
+      "label": "Mid Cut (West)",
+      "notes": "Rotation between west hall and main lane."
+    },
+    {
+      "id": "CUT_E_MID",
+      "type": "cut",
+      "rect": {
+        "x": 29.75,
+        "y": 24.5,
+        "w": 11.0,
+        "h": 3.0
+      },
+      "label": "Mid Cut (East)",
+      "notes": "Rotation between east hall and main lane."
+    },
+    {
+      "id": "CUT_W_NORTH",
+      "type": "cut",
+      "rect": {
+        "x": 9.25,
+        "y": 56.0,
+        "w": 11.0,
+        "h": 3.0
+      },
+      "label": "North Cut (West)",
+      "notes": "Rotation between west hall and main lane."
+    },
+    {
+      "id": "CUT_E_NORTH",
+      "type": "cut",
+      "rect": {
+        "x": 29.75,
+        "y": 56.0,
+        "w": 11.0,
+        "h": 3.0
+      },
+      "label": "North Cut (East)",
+      "notes": "Rotation between east hall and main lane."
+    },
+    {
+      "id": "CLEAR_M1",
+      "type": "clear_travel_zone",
+      "rect": {
+        "x": 22.0,
+        "y": 14.0,
+        "w": 6.0,
+        "h": 18.0
+      },
+      "label": "Clear Travel Zone — M1",
+      "notes": "NO props/shops."
+    },
+    {
+      "id": "CLEAR_M2",
+      "type": "clear_travel_zone",
+      "rect": {
+        "x": 24.0,
+        "y": 32.0,
+        "w": 6.0,
+        "h": 18.0
+      },
+      "label": "Clear Travel Zone — M2",
+      "notes": "NO props/shops."
+    },
+    {
+      "id": "CLEAR_M3",
+      "type": "clear_travel_zone",
+      "rect": {
+        "x": 22.0,
+        "y": 50.0,
+        "w": 6.0,
+        "h": 18.0
+      },
+      "label": "Clear Travel Zone — M3",
+      "notes": "NO props/shops."
+    },
+    {
+      "id": "STALL_M1_L",
+      "type": "stall_strip",
+      "rect": {
+        "x": 20.25,
+        "y": 14.0,
+        "w": 1.75,
+        "h": 18.0
+      },
+      "label": "Stall Strip M1 (L)",
+      "notes": "Edge-only decor + stalls; never intrude into CLEAR_M1."
+    },
+    {
+      "id": "STALL_M1_R",
+      "type": "stall_strip",
+      "rect": {
+        "x": 28.0,
+        "y": 14.0,
+        "w": 1.75,
+        "h": 18.0
+      },
+      "label": "Stall Strip M1 (R)",
+      "notes": "Edge-only decor + stalls; never intrude into CLEAR_M1."
+    },
+    {
+      "id": "STALL_M2_L",
+      "type": "stall_strip",
+      "rect": {
+        "x": 22.75,
+        "y": 32.0,
+        "w": 1.25,
+        "h": 18.0
+      },
+      "label": "Stall Strip M2 (L)",
+      "notes": "Edge-only decor + stalls; never intrude into CLEAR_M2."
+    },
+    {
+      "id": "STALL_M2_R",
+      "type": "stall_strip",
+      "rect": {
+        "x": 30.0,
+        "y": 32.0,
+        "w": 1.25,
+        "h": 18.0
+      },
+      "label": "Stall Strip M2 (R)",
+      "notes": "Edge-only decor + stalls; never intrude into CLEAR_M2."
+    },
+    {
+      "id": "STALL_M3_L",
+      "type": "stall_strip",
+      "rect": {
+        "x": 20.25,
+        "y": 50.0,
+        "w": 1.75,
+        "h": 18.0
+      },
+      "label": "Stall Strip M3 (L)",
+      "notes": "Edge-only decor + stalls; never intrude into CLEAR_M3."
+    },
+    {
+      "id": "STALL_M3_R",
+      "type": "stall_strip",
+      "rect": {
+        "x": 28.0,
+        "y": 50.0,
+        "w": 1.75,
+        "h": 18.0
+      },
+      "label": "Stall Strip M3 (R)",
+      "notes": "Edge-only decor + stalls; never intrude into CLEAR_M3."
+    }
+  ],
+  "connectivity": {
+    "cuts": [
+      "CUT_W_MID",
+      "CUT_E_MID",
+      "CUT_W_NORTH",
+      "CUT_E_NORTH"
+    ],
+    "spawn_side_connectors": [
+      "CONN_SW",
+      "CONN_SE",
+      "CONN_NW",
+      "CONN_NE"
+    ]
+  },
+  "landmarks": {
+    "hero_arch_gate": {
+      "anchor_id": "LMK_HERO_ARCH_01"
+    },
+    "mid_landmark": {
+      "anchor_id": "LMK_MID_WELL_01"
+    }
+  },
+  "constraints": {
+    "no_block_zone": "Clear travel zones must remain unobstructed by props/shops. Temporary gameplay items only (e.g., pickups) allowed if they do not block.",
+    "min_path_width_main_lane": 6.0,
+    "min_path_width_side_halls": 3.0
+  }
+}

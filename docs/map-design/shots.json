@@ -1,0 +1,208 @@
+{
+  "metadata": {
+    "mapId": "bazaar-map",
+    "name": "bazaar-map",
+    "version": "2.2",
+    "units": "meters",
+    "coordinateSystem": {
+      "origin": "southwest_corner_of_playable_boundary",
+      "axes": {
+        "x": "east(+)",
+        "y": "north(+)",
+        "z": "up(+)"
+      },
+      "yaw_degrees": "0=+Y(north), 90=+X(east), 180=-Y(south), 270=-X(west)"
+    },
+    "shotCount": 8,
+    "notes": [
+      "MVP shot list for previews/validation. Shots are optional at runtime but useful for automated capture and QA.",
+      "All shot positions are approximate and may be adjusted once blockout exists in-engine."
+    ]
+  },
+  "shots": [
+    {
+      "id": "SHOT_01_TOPDOWN_ESTABLISHING",
+      "label": "Topdown establishing",
+      "description": "High topdown for quick layout verification (lanes, cuts, spawns).",
+      "camera": {
+        "pos": {
+          "x": 25.0,
+          "y": 41.0,
+          "z": 55.0
+        },
+        "lookAt": {
+          "x": 25.0,
+          "y": 41.0,
+          "z": 0.0
+        },
+        "fovDeg": 60.0
+      },
+      "durationSec": 3.0,
+      "tags": [
+        "debug",
+        "overview"
+      ]
+    },
+    {
+      "id": "SHOT_02_SPAWN_A_TO_BAZAAR",
+      "label": "Spawn A -> Bazaar",
+      "description": "Player-eye view from Spawn A Courtyard looking north into Bazaar Main.",
+      "camera": {
+        "pos": {
+          "x": 25.0,
+          "y": 7.0,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 25.0,
+          "y": 20.0,
+          "z": 1.7
+        },
+        "fovDeg": 75.0
+      },
+      "durationSec": 4.0,
+      "tags": [
+        "gameplay",
+        "spawnA"
+      ]
+    },
+    {
+      "id": "SHOT_03_SPAWN_B_TO_BAZAAR",
+      "label": "Spawn B -> Bazaar",
+      "description": "Player-eye view from Spawn B Gate Plaza looking south through the Hero Arch into Bazaar Main.",
+      "camera": {
+        "pos": {
+          "x": 25.0,
+          "y": 75.0,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 25.0,
+          "y": 64.0,
+          "z": 1.7
+        },
+        "fovDeg": 75.0
+      },
+      "durationSec": 4.0,
+      "tags": [
+        "gameplay",
+        "spawnB"
+      ]
+    },
+    {
+      "id": "SHOT_04_MAIN_MID_JOG_NORTH",
+      "label": "Main lane mid (jog) north",
+      "description": "Player-eye view in jog segment to confirm broken long LoS and cover rhythm.",
+      "camera": {
+        "pos": {
+          "x": 27.0,
+          "y": 41.0,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 27.0,
+          "y": 55.0,
+          "z": 1.7
+        },
+        "fovDeg": 75.0
+      },
+      "durationSec": 4.0,
+      "tags": [
+        "gameplay",
+        "mainLane"
+      ]
+    },
+    {
+      "id": "SHOT_05_WEST_HALL_MID",
+      "label": "West side hall mid",
+      "description": "Flank lane verification: width, cover pockets, and cut visibility.",
+      "camera": {
+        "pos": {
+          "x": 7.0,
+          "y": 41.0,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 7.0,
+          "y": 56.0,
+          "z": 1.7
+        },
+        "fovDeg": 75.0
+      },
+      "durationSec": 4.0,
+      "tags": [
+        "gameplay",
+        "westHall"
+      ]
+    },
+    {
+      "id": "SHOT_06_EAST_HALL_MID",
+      "label": "East side hall mid",
+      "description": "Flank lane verification: width, cover pockets, and cut visibility.",
+      "camera": {
+        "pos": {
+          "x": 43.0,
+          "y": 41.0,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 43.0,
+          "y": 56.0,
+          "z": 1.7
+        },
+        "fovDeg": 75.0
+      },
+      "durationSec": 4.0,
+      "tags": [
+        "gameplay",
+        "eastHall"
+      ]
+    },
+    {
+      "id": "SHOT_07_HERO_ARCH_APPROACH",
+      "label": "Hero arch approach",
+      "description": "Approach to hero arch landmark from inside BZ-M3; confirms landmark framing and sightline control.",
+      "camera": {
+        "pos": {
+          "x": 25.0,
+          "y": 61.0,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 25.0,
+          "y": 68.0,
+          "z": 1.7
+        },
+        "fovDeg": 70.0
+      },
+      "durationSec": 4.0,
+      "tags": [
+        "visual",
+        "landmark"
+      ]
+    },
+    {
+      "id": "SHOT_08_CANOPY_BEAT",
+      "label": "Canopy beat (look up)",
+      "description": "Bazaar canopy beat: camera pitches up slightly (lookAt z>pos z) to validate cloth spans + lighting variation.",
+      "camera": {
+        "pos": {
+          "x": 25.0,
+          "y": 20.0,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 25.0,
+          "y": 20.0,
+          "z": 6.0
+        },
+        "fovDeg": 80.0
+      },
+      "durationSec": 3.5,
+      "tags": [
+        "visual",
+        "canopy"
+      ]
+    }
+  ]
+}

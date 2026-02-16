@@ -1,0 +1,12 @@
+Item,Dimension,Value (m),Notes
+Overall footprint,W x L,50 x 82,Playable boundary.
+Spawn plazas (A/B),W x L,22 x 14,Primary spawn/safety zones.
+Main bazaar segments (BZ-M1/BZ-M3),W x L,9.5 x 18 (each),Wide bazaar with edge stall strips.
+Jog segment (BZ-M2),W x L,8.5 x 18,Centerline offset +2.0m east.
+Jog centerline offset,ΔX,+2.0,Relative to BZ-M1/BZ-M3 centerline.
+Clear travel zone (bazaar),W,6.0,Must remain unobstructed end-to-end.
+Stall strips (M1/M3),W each side,1.75,Edge decor only.
+Stall strips (M2),W each side,1.25,Edge decor only.
+Side halls (W/E),W x L,4.5 x 62 (each),Target 3.0m clear through path.
+"Cuts (mid + north, W/E)",W x L,11 x 3 (each),Rotation connectors between lanes.
+Spawn↔Side connectors (4),W x L,4.75 x 4.0 (each),Short lane access connectors.

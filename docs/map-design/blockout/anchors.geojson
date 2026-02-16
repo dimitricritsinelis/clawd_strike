@@ -1,0 +1,2086 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          16.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_L_01",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          16.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_R_01",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          16.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_L_01",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          16.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_R_01",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          19.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_L_02",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          19.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_R_02",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          19.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_L_02",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          19.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_R_02",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          22.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_L_03",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          22.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_R_03",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          22.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_L_03",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          22.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_R_03",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          25.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_L_04",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          25.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_R_04",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          25.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_L_04",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          25.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_R_04",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          28.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_L_05",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          28.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_R_05",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          28.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_L_05",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          28.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_R_05",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          31.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_L_06",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          31.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M1_SHOP_R_06",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          31.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_L_06",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          31.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M1_SIGN_R_06",
+        "type": "signage_anchor",
+        "zone": "BZ_M1",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          34.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_L_01",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          34.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_R_01",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          34.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_L_01",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          34.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_R_01",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          37.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_L_02",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          37.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_R_02",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          37.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_L_02",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          37.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_R_02",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          40.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_L_03",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          40.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_R_03",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          40.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_L_03",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          40.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_R_03",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          43.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_L_04",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          43.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_R_04",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          43.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_L_04",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          43.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_R_04",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          46.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_L_05",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          46.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_R_05",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          46.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_L_05",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          46.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_R_05",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          49.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_L_06",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          49.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M2_SHOP_R_06",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.375,
+          49.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_L_06",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.625,
+          49.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M2_SIGN_R_06",
+        "type": "signage_anchor",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          52.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_L_01",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          52.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_R_01",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          52.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_L_01",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          52.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_R_01",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          55.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_L_02",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          55.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_R_02",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          55.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_L_02",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          55.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_R_02",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          58.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_L_03",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          58.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_R_03",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          58.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_L_03",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          58.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_R_03",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          61.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_L_04",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          61.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_R_04",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          61.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_L_04",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          61.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_R_04",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          64.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_L_05",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          64.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_R_05",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          64.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_L_05",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          64.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_R_05",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          67.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_L_06",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          67.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "M3_SHOP_R_06",
+        "type": "shopfront_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Place shutter/door module in stall strip; face into bazaar."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.125,
+          67.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_L_06",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.875,
+          67.0,
+          3.2
+        ]
+      },
+      "properties": {
+        "id": "M3_SIGN_R_06",
+        "type": "signage_anchor",
+        "zone": "BZ_M3",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hanging sign/awning anchor above shopfront."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.75,
+          14.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHW_DOOR_01",
+        "type": "service_door_anchor",
+        "zone": "SH_W",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of west hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.75,
+          26.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHW_DOOR_02",
+        "type": "service_door_anchor",
+        "zone": "SH_W",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of west hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.75,
+          38.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHW_DOOR_03",
+        "type": "service_door_anchor",
+        "zone": "SH_W",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of west hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.75,
+          50.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHW_DOOR_04",
+        "type": "service_door_anchor",
+        "zone": "SH_W",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of west hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.75,
+          62.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHW_DOOR_05",
+        "type": "service_door_anchor",
+        "zone": "SH_W",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of west hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.75,
+          70.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHW_DOOR_06",
+        "type": "service_door_anchor",
+        "zone": "SH_W",
+        "yaw_deg": 270.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of west hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          41.25,
+          14.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHE_DOOR_01",
+        "type": "service_door_anchor",
+        "zone": "SH_E",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of east hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          41.25,
+          26.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHE_DOOR_02",
+        "type": "service_door_anchor",
+        "zone": "SH_E",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of east hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          41.25,
+          38.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHE_DOOR_03",
+        "type": "service_door_anchor",
+        "zone": "SH_E",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of east hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          41.25,
+          50.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHE_DOOR_04",
+        "type": "service_door_anchor",
+        "zone": "SH_E",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of east hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          41.25,
+          62.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHE_DOOR_05",
+        "type": "service_door_anchor",
+        "zone": "SH_E",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of east hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          41.25,
+          70.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "SHE_DOOR_06",
+        "type": "service_door_anchor",
+        "zone": "SH_E",
+        "yaw_deg": 90.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Service door/alcove anchor along inner wall of east hall."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          25.0,
+          68.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "LMK_HERO_ARCH_01",
+        "type": "hero_landmark",
+        "zone": "BZ_M3",
+        "yaw_deg": 0.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Hero arch/gate threshold between BZ_M3 and Spawn B Gate Plaza. Ensure ~6m vertical clearance."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27.0,
+          41.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "LMK_MID_WELL_01",
+        "type": "landmark",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": 0.0,
+        "width_m": "",
+        "height_m": "",
+        "notes": "Mid landmark (well/fountain) used to break LoS; keep clear travel zone intact (place in stall strip edge or shallow recess)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.0,
+          8.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SPAWN_A_01",
+        "type": "spawn_cover",
+        "zone": "SPAWN_A_COURTYARD",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Crates + planters (spawn safety)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.0,
+          8.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SPAWN_A_02",
+        "type": "spawn_cover",
+        "zone": "SPAWN_A_COURTYARD",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Low cover (bags/rugs) near exit; do not block main push."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.0,
+          74.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SPAWN_B_01",
+        "type": "spawn_cover",
+        "zone": "SPAWN_B_GATE_PLAZA",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Crates + half-walls (spawn safety)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.0,
+          74.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SPAWN_B_02",
+        "type": "spawn_cover",
+        "zone": "SPAWN_B_GATE_PLAZA",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Low cover near arch approach; avoid headglitch dominance."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.0,
+          24.5,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_M1_WEST_NEAR_CUT",
+        "type": "cover_cluster",
+        "zone": "BZ_M1",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Edge cover near west mid cut entrance (carts/barrels)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.0,
+          24.5,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_M1_EAST_NEAR_CUT",
+        "type": "cover_cluster",
+        "zone": "BZ_M1",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Edge cover near east mid cut entrance (crates/pottery)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.0,
+          38.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_M2_WEST_NEAR_JOG",
+        "type": "cover_cluster",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Jog-side cover; break mid-lane LoS without blocking."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          31.0,
+          44.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_M2_EAST_NEAR_JOG",
+        "type": "cover_cluster",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Jog-side cover; asymmetric placement for rhythm."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.0,
+          56.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_M3_WEST_NEAR_CUT",
+        "type": "cover_cluster",
+        "zone": "BZ_M3",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Edge cover near west north cut entrance."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.0,
+          56.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_M3_EAST_NEAR_CUT",
+        "type": "cover_cluster",
+        "zone": "BZ_M3",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Edge cover near east north cut entrance."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.0,
+          26.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SHW_MID",
+        "type": "cover_cluster",
+        "zone": "SH_W",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Side hall cover at mid cut approach."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          43.0,
+          26.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SHE_MID",
+        "type": "cover_cluster",
+        "zone": "SH_E",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Side hall cover at mid cut approach."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.0,
+          58.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SHW_NORTH",
+        "type": "cover_cluster",
+        "zone": "SH_W",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Side hall cover at north cut approach."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          43.0,
+          58.0,
+          0.0
+        ]
+      },
+      "properties": {
+        "id": "PP_SHE_NORTH",
+        "type": "cover_cluster",
+        "zone": "SH_E",
+        "yaw_deg": "",
+        "width_m": "",
+        "height_m": "",
+        "notes": "Side hall cover at north cut approach."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            20.25,
+            20.0,
+            6.0
+          ],
+          [
+            29.75,
+            20.0,
+            6.0
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CLOTH_SPAN_01",
+        "type": "cloth_canopy_span",
+        "zone": "BZ_M1",
+        "yaw_deg": "",
+        "width_m": 9.5,
+        "height_m": 6.0,
+        "notes": "Overhead cloth canopy span. Add slight sag and torn edges; supports at signage anchors."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            22.75,
+            41.0,
+            6.0
+          ],
+          [
+            31.25,
+            41.0,
+            6.0
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CLOTH_SPAN_02",
+        "type": "cloth_canopy_span",
+        "zone": "BZ_M2_JOG",
+        "yaw_deg": "",
+        "width_m": 8.5,
+        "height_m": 6.0,
+        "notes": "Overhead cloth canopy span over jog segment. Use mixed opacity cloth for lighting variation."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            20.25,
+            62.0,
+            6.0
+          ],
+          [
+            29.75,
+            62.0,
+            6.0
+          ]
+        ]
+      },
+      "properties": {
+        "id": "CLOTH_SPAN_03",
+        "type": "cloth_canopy_span",
+        "zone": "BZ_M3",
+        "yaw_deg": "",
+        "width_m": 9.5,
+        "height_m": 6.0,
+        "notes": "Overhead cloth canopy span near north segment. Coordinate with hero arch sightline."
+      }
+    }
+  ]
+}

@@ -1,0 +1,1283 @@
+{
+  "metadata": {
+    "mapId": "bazaar-map",
+    "name": "bazaar-map",
+    "version": "2.2",
+    "units": "meters",
+    "coordinateSystem": {
+      "origin": "southwest_corner_of_playable_boundary",
+      "axes": {
+        "x": "east(+)",
+        "y": "north(+)",
+        "z": "up(+)"
+      },
+      "yaw_degrees": "0=+Y(north), 90=+X(east), 180=-Y(south), 270=-X(west)"
+    },
+    "anchorCount": 103
+  },
+  "anchors": [
+    {
+      "id": "M1_SHOP_L_01",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 16.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SHOP_R_01",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 16.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SIGN_L_01",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 16.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SIGN_R_01",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 16.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SHOP_L_02",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 19.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SHOP_R_02",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 19.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SIGN_L_02",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 19.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SIGN_R_02",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 19.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SHOP_L_03",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 22.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SHOP_R_03",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 22.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SIGN_L_03",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 22.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SIGN_R_03",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 22.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SHOP_L_04",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 25.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SHOP_R_04",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 25.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SIGN_L_04",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 25.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SIGN_R_04",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 25.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SHOP_L_05",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 28.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SHOP_R_05",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 28.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SIGN_L_05",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 28.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SIGN_R_05",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 28.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SHOP_L_06",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 31.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SHOP_R_06",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 31.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M1_SIGN_L_06",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.125,
+        "y": 31.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M1_SIGN_R_06",
+      "type": "signage_anchor",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 28.875,
+        "y": 31.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SHOP_L_01",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 34.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SHOP_R_01",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 34.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SIGN_L_01",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 34.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SIGN_R_01",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 34.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SHOP_L_02",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 37.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SHOP_R_02",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 37.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SIGN_L_02",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 37.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SIGN_R_02",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 37.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SHOP_L_03",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 40.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SHOP_R_03",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 40.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SIGN_L_03",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 40.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SIGN_R_03",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 40.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SHOP_L_04",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 43.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SHOP_R_04",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 43.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SIGN_L_04",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 43.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SIGN_R_04",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 43.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SHOP_L_05",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 46.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SHOP_R_05",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 46.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SIGN_L_05",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 46.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SIGN_R_05",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 46.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SHOP_L_06",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 49.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SHOP_R_06",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 49.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M2_SIGN_L_06",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.375,
+        "y": 49.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M2_SIGN_R_06",
+      "type": "signage_anchor",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 30.625,
+        "y": 49.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SHOP_L_01",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 52.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SHOP_R_01",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 52.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SIGN_L_01",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 52.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SIGN_R_01",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 52.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SHOP_L_02",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 55.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SHOP_R_02",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 55.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SIGN_L_02",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 55.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SIGN_R_02",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 55.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SHOP_L_03",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 58.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SHOP_R_03",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 58.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SIGN_L_03",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 58.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SIGN_R_03",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 58.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SHOP_L_04",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 61.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SHOP_R_04",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 61.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SIGN_L_04",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 61.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SIGN_R_04",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 61.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SHOP_L_05",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 64.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SHOP_R_05",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 64.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SIGN_L_05",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 64.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SIGN_R_05",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 64.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SHOP_L_06",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 67.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SHOP_R_06",
+      "type": "shopfront_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 67.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Place shutter/door module in stall strip; face into bazaar."
+    },
+    {
+      "id": "M3_SIGN_L_06",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.125,
+        "y": 67.0,
+        "z": 3.2
+      },
+      "yawDeg": 90.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "M3_SIGN_R_06",
+      "type": "signage_anchor",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 28.875,
+        "y": 67.0,
+        "z": 3.2
+      },
+      "yawDeg": 270.0,
+      "notes": "Hanging sign/awning anchor above shopfront."
+    },
+    {
+      "id": "SHW_DOOR_01",
+      "type": "service_door_anchor",
+      "zone": "SH_W",
+      "pos": {
+        "x": 8.75,
+        "y": 14.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Service door/alcove anchor along inner wall of west hall."
+    },
+    {
+      "id": "SHW_DOOR_02",
+      "type": "service_door_anchor",
+      "zone": "SH_W",
+      "pos": {
+        "x": 8.75,
+        "y": 26.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Service door/alcove anchor along inner wall of west hall."
+    },
+    {
+      "id": "SHW_DOOR_03",
+      "type": "service_door_anchor",
+      "zone": "SH_W",
+      "pos": {
+        "x": 8.75,
+        "y": 38.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Service door/alcove anchor along inner wall of west hall."
+    },
+    {
+      "id": "SHW_DOOR_04",
+      "type": "service_door_anchor",
+      "zone": "SH_W",
+      "pos": {
+        "x": 8.75,
+        "y": 50.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Service door/alcove anchor along inner wall of west hall."
+    },
+    {
+      "id": "SHW_DOOR_05",
+      "type": "service_door_anchor",
+      "zone": "SH_W",
+      "pos": {
+        "x": 8.75,
+        "y": 62.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Service door/alcove anchor along inner wall of west hall."
+    },
+    {
+      "id": "SHW_DOOR_06",
+      "type": "service_door_anchor",
+      "zone": "SH_W",
+      "pos": {
+        "x": 8.75,
+        "y": 70.0,
+        "z": 0.0
+      },
+      "yawDeg": 270.0,
+      "notes": "Service door/alcove anchor along inner wall of west hall."
+    },
+    {
+      "id": "SHE_DOOR_01",
+      "type": "service_door_anchor",
+      "zone": "SH_E",
+      "pos": {
+        "x": 41.25,
+        "y": 14.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Service door/alcove anchor along inner wall of east hall."
+    },
+    {
+      "id": "SHE_DOOR_02",
+      "type": "service_door_anchor",
+      "zone": "SH_E",
+      "pos": {
+        "x": 41.25,
+        "y": 26.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Service door/alcove anchor along inner wall of east hall."
+    },
+    {
+      "id": "SHE_DOOR_03",
+      "type": "service_door_anchor",
+      "zone": "SH_E",
+      "pos": {
+        "x": 41.25,
+        "y": 38.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Service door/alcove anchor along inner wall of east hall."
+    },
+    {
+      "id": "SHE_DOOR_04",
+      "type": "service_door_anchor",
+      "zone": "SH_E",
+      "pos": {
+        "x": 41.25,
+        "y": 50.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Service door/alcove anchor along inner wall of east hall."
+    },
+    {
+      "id": "SHE_DOOR_05",
+      "type": "service_door_anchor",
+      "zone": "SH_E",
+      "pos": {
+        "x": 41.25,
+        "y": 62.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Service door/alcove anchor along inner wall of east hall."
+    },
+    {
+      "id": "SHE_DOOR_06",
+      "type": "service_door_anchor",
+      "zone": "SH_E",
+      "pos": {
+        "x": 41.25,
+        "y": 70.0,
+        "z": 0.0
+      },
+      "yawDeg": 90.0,
+      "notes": "Service door/alcove anchor along inner wall of east hall."
+    },
+    {
+      "id": "LMK_HERO_ARCH_01",
+      "type": "hero_landmark",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 25.0,
+        "y": 68.0,
+        "z": 0.0
+      },
+      "yawDeg": 0.0,
+      "notes": "Hero arch/gate threshold between BZ_M3 and Spawn B Gate Plaza. Ensure ~6m vertical clearance."
+    },
+    {
+      "id": "LMK_MID_WELL_01",
+      "type": "landmark",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 27.0,
+        "y": 41.0,
+        "z": 0.0
+      },
+      "yawDeg": 0.0,
+      "notes": "Mid landmark (well/fountain) used to break LoS; keep clear travel zone intact (place in stall strip edge or shallow recess)."
+    },
+    {
+      "id": "PP_SPAWN_A_01",
+      "type": "spawn_cover",
+      "zone": "SPAWN_A_COURTYARD",
+      "pos": {
+        "x": 20.0,
+        "y": 8.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Crates + planters (spawn safety)."
+    },
+    {
+      "id": "PP_SPAWN_A_02",
+      "type": "spawn_cover",
+      "zone": "SPAWN_A_COURTYARD",
+      "pos": {
+        "x": 30.0,
+        "y": 8.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Low cover (bags/rugs) near exit; do not block main push."
+    },
+    {
+      "id": "PP_SPAWN_B_01",
+      "type": "spawn_cover",
+      "zone": "SPAWN_B_GATE_PLAZA",
+      "pos": {
+        "x": 20.0,
+        "y": 74.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Crates + half-walls (spawn safety)."
+    },
+    {
+      "id": "PP_SPAWN_B_02",
+      "type": "spawn_cover",
+      "zone": "SPAWN_B_GATE_PLAZA",
+      "pos": {
+        "x": 30.0,
+        "y": 74.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Low cover near arch approach; avoid headglitch dominance."
+    },
+    {
+      "id": "PP_M1_WEST_NEAR_CUT",
+      "type": "cover_cluster",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 21.0,
+        "y": 24.5,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Edge cover near west mid cut entrance (carts/barrels)."
+    },
+    {
+      "id": "PP_M1_EAST_NEAR_CUT",
+      "type": "cover_cluster",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 29.0,
+        "y": 24.5,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Edge cover near east mid cut entrance (crates/pottery)."
+    },
+    {
+      "id": "PP_M2_WEST_NEAR_JOG",
+      "type": "cover_cluster",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 23.0,
+        "y": 38.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Jog-side cover; break mid-lane LoS without blocking."
+    },
+    {
+      "id": "PP_M2_EAST_NEAR_JOG",
+      "type": "cover_cluster",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 31.0,
+        "y": 44.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Jog-side cover; asymmetric placement for rhythm."
+    },
+    {
+      "id": "PP_M3_WEST_NEAR_CUT",
+      "type": "cover_cluster",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 21.0,
+        "y": 56.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Edge cover near west north cut entrance."
+    },
+    {
+      "id": "PP_M3_EAST_NEAR_CUT",
+      "type": "cover_cluster",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 29.0,
+        "y": 56.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Edge cover near east north cut entrance."
+    },
+    {
+      "id": "PP_SHW_MID",
+      "type": "cover_cluster",
+      "zone": "SH_W",
+      "pos": {
+        "x": 7.0,
+        "y": 26.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Side hall cover at mid cut approach."
+    },
+    {
+      "id": "PP_SHE_MID",
+      "type": "cover_cluster",
+      "zone": "SH_E",
+      "pos": {
+        "x": 43.0,
+        "y": 26.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Side hall cover at mid cut approach."
+    },
+    {
+      "id": "PP_SHW_NORTH",
+      "type": "cover_cluster",
+      "zone": "SH_W",
+      "pos": {
+        "x": 7.0,
+        "y": 58.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Side hall cover at north cut approach."
+    },
+    {
+      "id": "PP_SHE_NORTH",
+      "type": "cover_cluster",
+      "zone": "SH_E",
+      "pos": {
+        "x": 43.0,
+        "y": 58.0,
+        "z": 0.0
+      },
+      "yawDeg": null,
+      "notes": "Side hall cover at north cut approach."
+    },
+    {
+      "id": "CLOTH_SPAN_01",
+      "type": "cloth_canopy_span",
+      "zone": "BZ_M1",
+      "pos": {
+        "x": 20.25,
+        "y": 20.0,
+        "z": 6.0
+      },
+      "yawDeg": null,
+      "endPos": {
+        "x": 29.75,
+        "y": 20.0,
+        "z": 6.0
+      },
+      "span": {
+        "widthM": 9.5,
+        "heightM": 6.0
+      },
+      "notes": "Overhead cloth canopy span. Add slight sag and torn edges; supports at signage anchors."
+    },
+    {
+      "id": "CLOTH_SPAN_02",
+      "type": "cloth_canopy_span",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 22.75,
+        "y": 41.0,
+        "z": 6.0
+      },
+      "yawDeg": null,
+      "endPos": {
+        "x": 31.25,
+        "y": 41.0,
+        "z": 6.0
+      },
+      "span": {
+        "widthM": 8.5,
+        "heightM": 6.0
+      },
+      "notes": "Overhead cloth canopy span over jog segment. Use mixed opacity cloth for lighting variation."
+    },
+    {
+      "id": "CLOTH_SPAN_03",
+      "type": "cloth_canopy_span",
+      "zone": "BZ_M3",
+      "pos": {
+        "x": 20.25,
+        "y": 62.0,
+        "z": 6.0
+      },
+      "yawDeg": null,
+      "endPos": {
+        "x": 29.75,
+        "y": 62.0,
+        "z": 6.0
+      },
+      "span": {
+        "widthM": 9.5,
+        "heightM": 6.0
+      },
+      "notes": "Overhead cloth canopy span near north segment. Coordinate with hero arch sightline."
+    }
+  ]
+}

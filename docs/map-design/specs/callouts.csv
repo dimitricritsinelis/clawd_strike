@@ -1,0 +1,18 @@
+Callout ID,Name,Zone ID,Description
+C01,Courtyard Spawn,SPAWN_A_COURTYARD,South spawn plaza; open courtyard with planters/crates.
+C02,Gate Plaza Spawn,SPAWN_B_GATE_PLAZA,North spawn plaza; gate approach.
+C03,Bazaar South,BZ_M1,South bazaar entry (first engagement beat).
+C04,Mid Cut West,CUT_W_MID,Rotation cut from west hall to bazaar M1/M2 boundary.
+C05,Mid Cut East,CUT_E_MID,Rotation cut from east hall to bazaar M1/M2 boundary.
+C06,Jog,BZ_M2_JOG,Center segment offset; primary LoS break.
+C07,Well,BZ_M2_JOG,Mid landmark area (well/fountain).
+C08,Bazaar North,BZ_M3,North bazaar segment approaching arch.
+C09,Hero Arch,BZ_M3,Arch/gate threshold into Gate Plaza.
+C10,West Hall South,SH_W,West service alley near Courtyard connector.
+C11,West Hall Mid,SH_W,West alley mid beat near Mid Cut.
+C12,West Hall North,SH_W,West alley near Gate connector / North Cut.
+C13,East Hall South,SH_E,East service alley near Courtyard connector.
+C14,East Hall Mid,SH_E,East alley mid beat near Mid Cut.
+C15,East Hall North,SH_E,East alley near Gate connector / North Cut.
+C16,North Cut West,CUT_W_NORTH,Rotation cut into bazaar near M3.
+C17,North Cut East,CUT_E_NORTH,Rotation cut into bazaar near M3.
