@@ -1,27 +1,35 @@
-# Clawd Strike (Loading Screen Only)
+# Clawd Strike (Bazaar Blockout MVP)
 
-This branch intentionally contains only the loading-screen runtime + assets.
+Web-based FPS client with a playable, deterministic full-map blockout for the Bazaar slice.
 
 ## Run
-
 ```bash
 pnpm install
 pnpm dev
 ```
 
-## Boot / Handoff Contract
+## Canonical Playtest URL
+- `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
 
-The loading screen is implemented as a small boot layer that can later hand off
-to the game runtime without rewrites:
+Open the URL, then click `Human` on the loading screen to enter the gameplay runtime.
 
-- `onLoadingReady()`
-- `onGameRuntimeReady()`
-- `transitionToGame()`
+## MVP Scope (Current)
+- Pointer lock + full-screen canvas runtime
+- WASD + mouse-look, Shift walk, Space jump
+- Stable AABB-only collision + sliding
+- Bright blockout palette + placeholder props (instanced primitives)
+- Deterministic compare camera via `shot=compare`
 
-See `apps/client/src/loading-screen/types.ts`.
+## Useful URL Toggles
+- `debug=1` HUD
+- `anchors=1&labels=1` anchor overlay (optional `anchorTypes=...`)
+- `seed=<int>` deterministic prop variation
+- `highvis=1` extra-bright palette override
+- `perf=1` perf HUD
+- `vm=0` hide weapon viewmodel
 
-## Where Game Code Goes Next
-
-- Loading screen: `apps/client/src/loading-screen/`
-- Future runtime (renderer/sim/input, etc.): `apps/client/src/runtime/` (reintroduced later)
-
+## Other Commands
+```bash
+pnpm typecheck
+pnpm build
+```

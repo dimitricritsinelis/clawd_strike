@@ -199,6 +199,12 @@ We will create a small runtime copy under the client’s public/static directory
 
 Anchors are read from `map_spec.json` (anchors are embedded there).
 
+Runtime-ready 3D assets (models) live under the client public directory, for example:
+- `apps/client/public/assets/models/weapons/ak47/ak47.glb`
+
+Runtime-ready textures live alongside assets, for example:
+- `apps/client/public/assets/textures/weapons/ak47/`
+
 If the repo uses a different static path, Codex must adapt and document it in `progress.md`.
 
 ---
