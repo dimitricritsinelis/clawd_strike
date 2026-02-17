@@ -28,12 +28,12 @@ const scriptFile = fileURLToPath(import.meta.url);
 const scriptDir = path.dirname(scriptFile);
 const repoRoot = path.resolve(scriptDir, "../../..");
 
+// Source-of-truth inputs from the design packet.
 const mapSpecPath = path.join(repoRoot, "docs/map-design/specs/map_spec.json");
 const designShotsPath = path.join(repoRoot, "docs/map-design/shots.json");
 const runtimeDir = path.join(repoRoot, "apps/client/public/maps", MAP_ID);
 
-const blockoutOutPath = path.join(runtimeDir, "blockout_spec.json");
-const anchorsOutPath = path.join(runtimeDir, "anchors.json");
+const mapSpecOutPath = path.join(runtimeDir, "map_spec.json");
 const shotsOutPath = path.join(runtimeDir, "shots.json");
 
 function fail(message) {
@@ -347,15 +347,14 @@ async function main() {
   warnAnchorsInClearZones(anchors, zones);
 
   const blockoutSpec = deriveBlockoutSpec(mapSpec, zones);
-  const anchorsRuntime = {
-    mapId: MAP_ID,
+  const mapSpecRuntime = {
+    ...blockoutSpec,
     anchors,
   };
   const shotsRuntime = deriveShotsRuntime(designShots);
 
   await mkdir(runtimeDir, { recursive: true });
-  await writeJson(blockoutOutPath, blockoutSpec);
-  await writeJson(anchorsOutPath, anchorsRuntime);
+  await writeJson(mapSpecOutPath, mapSpecRuntime);
   await writeJson(shotsOutPath, shotsRuntime);
 }
 

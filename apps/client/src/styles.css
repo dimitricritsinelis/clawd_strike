@@ -1,0 +1,265 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0b0b0b;
+  color: #f2f2f2;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+#overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+
+  background-image:
+    radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
+    linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
+    url("/loading-screen/assets/loading-bg-desktop.png");
+
+  background-image:
+    radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
+    linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
+    url("/loading-screen/assets/loading-bg-desktop.webp");
+
+  background-size: cover;
+  background-position: center center;
+}
+#start .panel {
+  width: min(1080px, calc(100vw - 52px));
+  height: 100%;
+  position: relative;
+}
+#start #mute-toggle-btn,
+#start .logo-wrap,
+#start .actions {
+  transition: opacity 120ms ease;
+}
+#start[data-assets-ready="false"] #mute-toggle-btn,
+#start[data-assets-ready="false"] .logo-wrap,
+#start[data-assets-ready="false"] .actions {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+#start[data-assets-ready="true"] #mute-toggle-btn,
+#start[data-assets-ready="true"] .logo-wrap,
+#start[data-assets-ready="true"] .actions {
+  opacity: 1;
+  visibility: visible;
+}
+#mute-toggle-btn {
+  position: absolute;
+  top: calc(18px + env(safe-area-inset-top));
+  right: calc(49.86px + env(safe-area-inset-right));
+  width: clamp(72px, 7.5vw, 114px);
+  aspect-ratio: 466 / 340;
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 18px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 4;
+  transform-origin: center;
+  transition: transform 120ms ease;
+}
+#mute-toggle-btn picture {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+#mute-toggle-btn .mute-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: center;
+  filter: none;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+#mute-toggle-btn.is-muted .mute-icon {
+  filter: grayscale(1);
+}
+#mute-toggle-btn.is-unmuted .mute-icon {
+  filter: none;
+}
+#mute-toggle-btn:hover {
+  transform: translateY(-2px) scale(1.04);
+}
+#mute-toggle-btn:active {
+  transform: translateY(1px) scale(0.93);
+}
+#mute-toggle-btn:active .mute-icon {
+  transform: scale(0.98);
+}
+#mute-toggle-btn:focus-visible {
+  outline: 2px solid rgba(255, 236, 198, 0.95);
+  outline-offset: 2px;
+}
+#mute-toggle-btn.flash {
+  animation: mute-pulse 180ms ease-out;
+}
+@keyframes mute-pulse {
+  0% {
+    transform: translateY(-1px) scale(1.02);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+#start .logo-wrap {
+  position: absolute;
+  left: 50%;
+  top: 33%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+#start .logo-wrap::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  transform: translate(-50%, -50%);
+  width: min(774px, 76.5vw);
+  height: min(261px, 27vw);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(12, 7, 3, 0.5),
+    rgba(12, 7, 3, 0.16) 58%,
+    rgba(12, 7, 3, 0.02) 82%,
+    rgba(12, 7, 3, 0) 100%
+  );
+  filter: blur(14px);
+  z-index: 0;
+}
+#start .logo-wrap picture {
+  display: block;
+}
+#start .logo-img {
+  width: clamp(468px, 61vw, 1008px);
+  height: auto;
+  display: block;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.55));
+}
+#start .actions {
+  position: absolute;
+  left: 50%;
+  top: 77%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 30px;
+  width: min(515px, calc(100vw - 150px));
+}
+#start .option-art {
+  position: relative;
+}
+#start .option-art picture {
+  display: block;
+}
+#start .option-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 8px 22px rgba(0, 0, 0, 0.34));
+  transition: transform 120ms ease, filter 120ms ease;
+}
+#start .option-art:hover .option-img {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.44)) brightness(1.03);
+}
+#start .actions .hit {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  border-radius: 24px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+#start .actions .hit:focus-visible {
+  outline: 2px solid rgba(255, 236, 198, 0.85);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(27, 12, 4, 0.58);
+}
+@media (max-width: 820px) {
+  #start .panel {
+    width: calc(100vw - 24px);
+  }
+  #mute-toggle-btn {
+    top: calc(8px + env(safe-area-inset-top));
+    right: calc(5.25px + env(safe-area-inset-right));
+    width: clamp(65px, 16.5vw, 99px);
+  }
+  #start .logo-wrap {
+    top: 31%;
+  }
+  #start .logo-img {
+    width: min(98vw, 780px);
+    max-width: calc(100vw - 18px);
+  }
+  #start .actions {
+    gap: 18px;
+    top: 75%;
+    width: min(420px, calc(100vw - 26px));
+  }
+
+  #start {
+    background-image:
+      radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
+      linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
+      url("/loading-screen/assets/loading-bg-mobile.png");
+
+    background-image:
+      radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
+      linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
+      url("/loading-screen/assets/loading-bg-mobile.webp");
+  }
+}
+#mode-banner {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 225, 173, 0.58);
+  background: rgba(20, 8, 2, 0.72);
+  color: #ffd9ac;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+#mode-banner.show {
+  opacity: 1;
+}

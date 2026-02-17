@@ -6,7 +6,8 @@ import { resolveShot } from "./map/shots";
 import type { RuntimeMapAssets } from "./map/types";
 import { Renderer } from "./render/Renderer";
 import { parseRuntimeUrlParams } from "./utils/UrlParams";
-import { Ak47ViewModel } from "./weapons/Ak47ViewModel";
+
+type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["Ak47ViewModel"]>;
 
 const OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M = 10;
 const PERF_SCENE_SAMPLE_INTERVAL_MS = 300;
@@ -257,26 +258,45 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   }
 
   const renderer = new Renderer(runtimeRoot, { highVis: urlParams.highVis });
+  let disposed = false;
   const viewModelEnabled = urlParams.vm;
-  const viewModel = viewModelEnabled
-    ? new Ak47ViewModel({
-      vmDebug: urlParams.vmDebug && urlParams.debug,
-    })
-    : null;
+  let viewModel: ViewModelInstance | null = null;
+  let viewModelLoadStarted = false;
   let viewModelVisible = false;
 
-  if (viewModel) {
-    viewModel.setAspect(renderer.getAspect());
-    void viewModel.load().catch((error: unknown) => {
+  const appendWarning = (message: string): void => {
+    if (warningOverlay.textContent && warningOverlay.textContent.length > 0) {
+      warningOverlay.textContent = `${warningOverlay.textContent}\n${message}`;
+    } else {
+      warningOverlay.textContent = message;
+    }
+    warningOverlay.style.display = "block";
+  };
+
+  const startViewModelLoad = (): void => {
+    if (!viewModelEnabled || disposed || viewModelLoadStarted || viewModel) {
+      return;
+    }
+
+    viewModelLoadStarted = true;
+    void (async () => {
+      const { Ak47ViewModel } = await import("./weapons/Ak47ViewModel");
+      if (disposed) return;
+
+      const nextViewModel = new Ak47ViewModel({
+        vmDebug: urlParams.vmDebug && urlParams.debug,
+      });
+      nextViewModel.setAspect(renderer.getAspect());
+      viewModel = nextViewModel;
+      await nextViewModel.load();
+    })().catch((error: unknown) => {
       const message = `Failed to load AK47 viewmodel\n${error instanceof Error ? error.message : String(error)}`;
-      if (warningOverlay.textContent && warningOverlay.textContent.length > 0) {
-        warningOverlay.textContent = `${warningOverlay.textContent}\n${message}`;
-      } else {
-        warningOverlay.textContent = message;
-      }
-      warningOverlay.style.display = "block";
+      appendWarning(message);
+      viewModel?.dispose();
+      viewModel = null;
+      viewModelLoadStarted = false;
     });
-  }
+  };
 
   const resolvedShot = mapAssets ? resolveShot(mapAssets.shots, urlParams.shot) : null;
   shotActive = resolvedShot?.active ?? false;
@@ -316,12 +336,16 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     pointerLock = new PointerLockController({
       mountEl: runtimeRoot,
       lockEl: renderer.canvas,
-      onLockChange: (locked) => game.setPointerLocked(locked),
+      onLockChange: (locked) => {
+        game.setPointerLocked(locked);
+        if (locked) {
+          startViewModelLoad();
+        }
+      },
       onMouseDelta: (deltaX, deltaY) => game.onMouseDelta(deltaX, deltaY),
     });
   }
 
-  let disposed = false;
   let rafId = 0;
   let previousFrameTime = performance.now();
   let perfMsPerFrame = 16.67;
@@ -488,23 +512,28 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     }
   };
 
-  return {
-    teardown: () => {
-      if (disposed) return;
-      disposed = true;
+  const teardown = (): void => {
+    if (disposed) return;
+    disposed = true;
 
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", onResize);
+    window.cancelAnimationFrame(rafId);
+    window.removeEventListener("resize", onResize);
+    window.removeEventListener("pagehide", teardown);
+    window.removeEventListener("beforeunload", teardown);
 
-      pointerLock?.dispose();
-      game.teardown();
-      perfHud.dispose();
-      viewModel?.dispose();
-      renderer.dispose();
-      crosshair.remove();
-      warningOverlay.remove();
-      errorOverlay.remove();
-      runtimeRoot.remove();
-    },
+    pointerLock?.dispose();
+    game.teardown();
+    perfHud.dispose();
+    viewModel?.dispose();
+    renderer.dispose();
+    crosshair.remove();
+    warningOverlay.remove();
+    errorOverlay.remove();
+    runtimeRoot.remove();
   };
+
+  window.addEventListener("pagehide", teardown);
+  window.addEventListener("beforeunload", teardown);
+
+  return { teardown };
 }

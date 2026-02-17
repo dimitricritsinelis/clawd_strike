@@ -149,7 +149,7 @@ function parseVec3(value: unknown, source: string): { x: number; y: number; z: n
   };
 }
 
-export function parseBlockoutSpec(value: unknown, source = "blockout_spec.json"): RuntimeBlockoutSpec {
+export function parseBlockoutSpec(value: unknown, source = "map_spec.json"): RuntimeBlockoutSpec {
   const obj = asObject(value, source);
   const zonesRaw = obj.zones;
   if (!Array.isArray(zonesRaw) || zonesRaw.length === 0) {
@@ -192,7 +192,7 @@ export function parseBlockoutSpec(value: unknown, source = "blockout_spec.json")
   };
 }
 
-export function parseAnchorsSpec(value: unknown, source = "anchors.json"): RuntimeAnchorsSpec {
+export function parseAnchorsSpec(value: unknown, source = "map_spec.json"): RuntimeAnchorsSpec {
   const obj = asObject(value, source);
   const anchorsRaw = obj.anchors;
   if (!Array.isArray(anchorsRaw)) {

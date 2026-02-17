@@ -26,6 +26,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Generate runtime maps
+        run: pnpm --filter @clawd-strike/client gen:maps
+
+      - name: Verify runtime maps are up to date
+        run: git diff --exit-code -- apps/client/public/maps
+
       - name: Typecheck
         run: pnpm typecheck
 

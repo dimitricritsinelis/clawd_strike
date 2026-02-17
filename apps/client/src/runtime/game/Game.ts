@@ -1,4 +1,4 @@
-import { AmbientLight, Color, DirectionalLight, HemisphereLight, Material, Mesh, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
+import { AmbientLight, Color, DirectionalLight, HemisphereLight, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
 import { AnchorsDebug, type AnchorsDebugState } from "../debug/AnchorsDebug";
 import { Hud } from "../debug/Hud";
 import { buildBlockout } from "../map/buildBlockout";
@@ -11,6 +11,7 @@ import {
   type PlayerInputState,
 } from "../sim/PlayerController";
 import { type RuntimeColliderAabb, WorldColliders } from "../sim/collision/WorldColliders";
+import { disposeObjectRoot } from "../utils/disposeObjectRoot";
 import type { RuntimePropChaosOptions, RuntimeSpawnId } from "../utils/UrlParams";
 
 const DEFAULT_FOV = 75;
@@ -144,6 +145,16 @@ export class Game {
     this.pressedKeys.delete(event.code);
   };
 
+  private readonly onWindowBlur = (): void => {
+    this.resetInputState();
+  };
+
+  private readonly onVisibilityChange = (): void => {
+    if (document.visibilityState !== "visible") {
+      this.resetInputState();
+    }
+  };
+
   constructor(options: GameOptions) {
     this.scene = new Scene();
 
@@ -189,6 +200,8 @@ export class Game {
 
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
+    window.addEventListener("blur", this.onWindowBlur);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
   }
 
   setAspect(aspect: number): void {
@@ -202,6 +215,9 @@ export class Game {
 
   setPointerLocked(locked: boolean): void {
     this.pointerLocked = locked;
+    if (!locked) {
+      this.resetInputState();
+    }
   }
 
   setFreezeInput(freeze: boolean): void {
@@ -245,11 +261,9 @@ export class Game {
 
   update(deltaSeconds: number): void {
     if (this.worldColliders) {
-      if (!this.freezeInput) {
-        this.updateInputState();
-        this.playerController.step(deltaSeconds, this.frameInput, this.yaw);
-        this.updateCameraFromPlayer();
-      }
+      this.updateInputState();
+      this.playerController.step(deltaSeconds, this.frameInput, this.yaw);
+      this.updateCameraFromPlayer();
     }
     this.anchorsDebug?.update(this.camera);
 
@@ -276,7 +290,9 @@ export class Game {
   teardown(): void {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
-    this.pressedKeys.clear();
+    window.removeEventListener("blur", this.onWindowBlur);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.resetInputState();
     this.hud?.dispose();
     this.hud = null;
     if (this.anchorsDebug) {
@@ -350,11 +366,7 @@ export class Game {
 
   private updateInputState(): void {
     if (!this.pointerLocked || this.freezeInput) {
-      this.frameInput.forward = 0;
-      this.frameInput.right = 0;
-      this.frameInput.walkHeld = false;
-      this.frameInput.jumpPressed = false;
-      this.jumpQueued = false;
+      this.resetFrameInput();
       return;
     }
 
@@ -363,6 +375,19 @@ export class Game {
     this.frameInput.walkHeld = this.pressedKeys.has("ShiftLeft") || this.pressedKeys.has("ShiftRight");
     this.frameInput.jumpPressed = this.jumpQueued;
     this.jumpQueued = false;
+  }
+
+  private resetInputState(): void {
+    this.pressedKeys.clear();
+    this.jumpQueued = false;
+    this.resetFrameInput();
+  }
+
+  private resetFrameInput(): void {
+    this.frameInput.forward = 0;
+    this.frameInput.right = 0;
+    this.frameInput.walkHeld = false;
+    this.frameInput.jumpPressed = false;
   }
 
   private updateCameraFromPlayer(): void {
@@ -469,28 +494,10 @@ export class Game {
     }
   }
 
-  private disposeObjectRoot(root: Object3D): void {
-    root.traverse((child) => {
-      const maybeMesh = child as Mesh;
-      if (maybeMesh.geometry) {
-        maybeMesh.geometry.dispose();
-      }
-
-      const maybeMaterial = (maybeMesh as { material?: Material | Material[] }).material;
-      if (Array.isArray(maybeMaterial)) {
-        for (const material of maybeMaterial) {
-          material.dispose();
-        }
-      } else if (maybeMaterial) {
-        maybeMaterial.dispose();
-      }
-    });
-  }
-
   private clearBlockout(): void {
     if (this.blockoutRoot) {
       this.scene.remove(this.blockoutRoot);
-      this.disposeObjectRoot(this.blockoutRoot);
+      disposeObjectRoot(this.blockoutRoot);
       this.blockoutRoot = null;
     }
     this.worldColliders = null;
@@ -500,7 +507,7 @@ export class Game {
   private clearProps(): void {
     if (this.propsRoot) {
       this.scene.remove(this.propsRoot);
-      this.disposeObjectRoot(this.propsRoot);
+      disposeObjectRoot(this.propsRoot);
       this.propsRoot = null;
     }
     this.propColliders = [];

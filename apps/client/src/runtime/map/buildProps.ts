@@ -11,13 +11,14 @@ import type { RuntimeColliderAabb } from "../sim/collision/WorldColliders";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 import { DeterministicRng, resolveRuntimeSeed } from "../utils/Rng";
 import type { RuntimePropChaosOptions, RuntimePropProfile } from "../utils/UrlParams";
+import { designToWorldVec3, designYawDegToWorldYawRad, type WorldVec3 } from "./coordinateTransforms";
 import type { RuntimeAnchor, RuntimeAnchorsSpec, RuntimeBlockoutSpec, RuntimeRect } from "./types";
 
-const DEG_TO_RAD = Math.PI / 180;
 const CLEAR_ZONE_EPSILON = 0.0001;
 const BOUNDS_EPSILON = 0.0001;
 const GAP_RULE_MIN_PASSAGE_M = 1.7;
 const STALL_FILLER_EDGE_PADDING_M = 0.28;
+const DEG_TO_RAD = designYawDegToWorldYawRad(1);
 
 const PROFILE_DEFAULTS: Record<RuntimePropProfile, { jitter: number; cluster: number; density: number; decorativeDropout: number }> = {
   subtle: { jitter: 0.34, cluster: 0.56, density: 0.44, decorativeDropout: 0.22 },
@@ -48,12 +49,6 @@ type InstanceBatch = {
   color: number;
   createGeometry: () => BufferGeometry;
   instances: InstanceSpec[];
-};
-
-type WorldVec3 = {
-  x: number;
-  y: number;
-  z: number;
 };
 
 type LineRhythmPoint = {
@@ -103,15 +98,11 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function toWorldPosition(anchor: RuntimeAnchor): WorldVec3 {
-  return {
-    x: anchor.pos.x,
-    y: anchor.pos.z,
-    z: anchor.pos.y,
-  };
+  return designToWorldVec3(anchor.pos);
 }
 
 function yawDegToRad(yawDeg: number | undefined): number {
-  return (yawDeg ?? 0) * DEG_TO_RAD;
+  return designYawDegToWorldYawRad(yawDeg);
 }
 
 function overlapsRect2d(collider: RuntimeColliderAabb, rect: RuntimeRect): boolean {

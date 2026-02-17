@@ -2,13 +2,13 @@
 
 ## Current Status (<=10 lines)
 - Runtime: loading screen -> click `Human` -> gameplay runtime (pointer lock + full-screen canvas)
-- Map: `bazaar-map` blockout + deterministic props + AK47 viewmodel (FPS only)
-- Movement: WASD + mouse-look; default run; Shift walk; Space jump; stable AABB sliding
-- Rendering: high-vis palette (floors/walls/landmarks/blockers/clear overlays), no shadows
-- Determinism: `shot=compare` snaps compare camera; `seed` stabilizes prop layout
-- Debug: `debug=1` HUD; `anchors=1&labels=1`; `perf=1` perf HUD; `highvis=1` extra-bright palette
-- Loading UI: critical assets decode-gated; logo/buttons/mute reveal atomically (no transient gray tiles in repeated reload captures)
-- Build: ✅ `pnpm typecheck` | ✅ `pnpm build`
+- Map runtime contract: `/maps/bazaar-map/map_spec.json` + `/maps/bazaar-map/shots.json` (anchors embedded in map spec)
+- Movement/collision: WASD + mouse-look + jump; AABB slide solver now broadphase-assisted and less order-dependent
+- Input safety: key/jump state resets on blur, visibility change, and pointer unlock
+- Loading UI: timeout race fixed; timeout warning only fires if timeout wins; styles moved to `src/styles.css`
+- Build pipeline: `prebuild`/`prepreview` run `gen:maps`; CI now checks generated maps are up-to-date
+- Bundling: runtime and AK47 viewmodel are lazy-loaded; Vite unresolved public-asset warnings removed
+- Validation: ✅ `pnpm typecheck` | ✅ `pnpm build`
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
@@ -24,32 +24,35 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P10_loading_sync_fix`
+- Prompt ID: `P11_repo_stability_cleanup`
 - Summary:
-  - Added critical loading-screen asset preloader with 2500ms fail-open timeout (`webp` targets for active viewport)
-  - Added `data-assets-ready` gating so logo/buttons/mute stay hidden until assets are ready, then reveal together in one frame
-  - Reordered loading-screen `<picture>` sources to `webp` first, then `avif`, then existing PNG fallback `<img>`
-  - Added preload hints for human/agent/mute desktop+mobile assets
-  - Captured deterministic artifacts: `artifacts/screenshots/P10_loading_sync_fix/before.png` and `artifacts/screenshots/P10_loading_sync_fix/after.png`
+  - Fixed preloader timeout race and aligned critical loading assets/background format preference to WebP path
+  - Moved inline loading-screen CSS from `index.html` to `apps/client/src/styles.css` to remove Vite unresolved asset warnings
+  - Switched runtime map loading to `map_spec.json` (anchors embedded), updated generator + loader + CI + package scripts
+  - Added lazy loading for gameplay/runtime bootstrap + AK47 viewmodel path to improve chunking
+  - Added input reset hooks, centralized design->world transforms, improved collision solver stability, and added broadphase query path
+  - Added shared object-disposal utility and repo ergonomics files (`.editorconfig`, `.nvmrc`)
+  - Cleaned tracked tmp screenshot artifacts and removed unused `apps/client/public/models/weapons/.DS_Store`
+  - Captured deterministic artifacts: `artifacts/screenshots/P11_repo_hardening/before.png` and `artifacts/screenshots/P11_repo_hardening/after.png`
 - Files touched:
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/index.html`
   - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/loading-screen/assets.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/loading-screen/bootstrap.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/loading-screen/ui.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/styles.css`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/bootstrap.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/map/loadMap.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/scripts/gen-map-runtime.mjs`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/.github/workflows/ci.yml`
   - `/Users/dimitri/Desktop/ClawdStrike_v2/progress.md`
 - How to test (60s):
   - Run `pnpm dev`
   - Open canonical URL (above)
-  - Perform 5 hard reloads + 5 normal reloads
-  - Confirm no gray placeholder tiles appear and logo/buttons/mute reveal in sync
-  - Click `Human`/`Agent` hit targets to verify interaction remains intact
+  - Confirm loading screen appears without console spam, then click `Human`
+  - Verify pointer lock + move/look + collision; reload once and verify no loading timeout warning on successful preload
 
 ## Next 3 Tasks
-1. Convert loading background `image-set` ordering to `webp` first and verify no visual regression across Chrome/Safari.
-2. Add optional branded low-contrast placeholder silhouettes for ultra-slow networks before `assets-ready=true`.
-3. Investigate and eliminate Vite unresolved public-asset warnings from loading-screen CSS/image-set references.
+1. Validate pointer-lock + movement smoke in a fully interactive local browser session (Playwright pointer-lock had document-lock error).
+2. Decide whether to keep legacy design snapshots (`docs/map-design/anchors.json`, `blockout_spec.json`) or move/delete them.
+3. Evaluate further `three` vendor split/treeshake options if we want to reduce the 545k vendor chunk itself (warning is currently silenced via threshold).
 
 ## Known Issues / Risks
-- Vite build emits unresolved public asset warnings for some loading-screen image references.
-- Bundle chunk size warning (`>500kB`) after minification.
-- `LMK_MID_WELL_01` lies inside `CLEAR_M2` and is intentionally visual-only (non-colliding).
+- Automated Playwright smoke cannot reliably assert pointer lock in this environment (`WrongDocumentError`); manual browser verification still required.
+- `LMK_HERO_ARCH_01` and `LMK_MID_WELL_01` are reported inside clear zones by generator warnings (currently intentional for visual rhythm).

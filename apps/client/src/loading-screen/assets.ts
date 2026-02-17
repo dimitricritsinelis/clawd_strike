@@ -73,12 +73,20 @@ export async function preloadCriticalLoadingAssets(): Promise<void> {
 
   const preloadPromise = Promise.all(urls.map((url) => waitForImage(url))).then(() => undefined);
 
-  const timeoutPromise = new Promise<void>((resolve) => {
-    window.setTimeout(() => {
-      console.warn(`[loading-screen] asset preload timed out after ${PRELOAD_TIMEOUT_MS}ms`);
-      resolve();
+  let timeoutId = 0;
+  const timeoutPromise = new Promise<"timeout">((resolve) => {
+    timeoutId = window.setTimeout(() => {
+      resolve("timeout");
     }, PRELOAD_TIMEOUT_MS);
   });
 
-  await Promise.race([preloadPromise, timeoutPromise]);
+  const preloadOutcome = preloadPromise.then(() => "preload" as const);
+  const winner = await Promise.race([preloadOutcome, timeoutPromise]);
+
+  if (winner === "preload") {
+    window.clearTimeout(timeoutId);
+    return;
+  }
+
+  console.warn(`[loading-screen] asset preload timed out after ${PRELOAD_TIMEOUT_MS}ms`);
 }

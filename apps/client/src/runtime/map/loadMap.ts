@@ -39,20 +39,18 @@ async function fetchJson(url: string): Promise<unknown> {
 }
 
 export async function loadMap(mapId: string): Promise<RuntimeMapAssets> {
-  const blockoutUrl = `/maps/${mapId}/blockout_spec.json`;
-  const anchorsUrl = `/maps/${mapId}/anchors.json`;
+  const mapSpecUrl = `/maps/${mapId}/map_spec.json`;
   const shotsUrl = `/maps/${mapId}/shots.json`;
 
-  const [blockoutJson, anchorsJson, shotsJson] = await Promise.all([
-    fetchJson(blockoutUrl),
-    fetchJson(anchorsUrl),
+  const [mapSpecJson, shotsJson] = await Promise.all([
+    fetchJson(mapSpecUrl),
     fetchJson(shotsUrl),
   ]);
 
   try {
     return {
-      blockout: parseBlockoutSpec(blockoutJson, blockoutUrl),
-      anchors: parseAnchorsSpec(anchorsJson, anchorsUrl),
+      blockout: parseBlockoutSpec(mapSpecJson, mapSpecUrl),
+      anchors: parseAnchorsSpec(mapSpecJson, mapSpecUrl),
       shots: parseShotsSpec(shotsJson, shotsUrl),
     };
   } catch (error) {

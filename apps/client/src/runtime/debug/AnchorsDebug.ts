@@ -8,6 +8,7 @@ import {
   Scene,
   Vector3,
 } from "three";
+import { designToWorldVec3 } from "../map/coordinateTransforms";
 import type { RuntimeAnchorsSpec } from "../map/types";
 
 const DEFAULT_MAX_LABELS = 40;
@@ -193,15 +194,16 @@ export class AnchorsDebug {
         : anchor.pos;
 
       const colorHex = anchorTypeColor(normalizedType);
+      const worldPos = designToWorldVec3(basePos);
       this.anchors.push({
         id: anchor.id,
         type: normalizedType,
         label: `${anchor.id} (${normalizedType})`,
         colorHex,
         colorCss: toCssHex(colorHex),
-        worldX: basePos.x,
-        worldY: basePos.z + 0.2,
-        worldZ: basePos.y,
+        worldX: worldPos.x,
+        worldY: worldPos.y + 0.2,
+        worldZ: worldPos.z,
         markerScale: anchorMarkerScale(normalizedType),
       });
     }

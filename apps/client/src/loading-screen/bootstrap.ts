@@ -91,14 +91,14 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
 
   if (isVirtualTime) {
     window.advanceTime = async (_ms: number) => {
-      // No runtime simulation while this branch is loading-screen-only.
+      // Virtual-time harness: loading-screen mode intentionally has no simulation step.
     };
   }
 
   window.render_game_to_text = () => {
     const uiState = ui.getState();
     return JSON.stringify({
-      mode: "loading-screen-only",
+      mode: "loading-screen",
       ui: {
         visible: true,
         startVisible: uiState.startVisible,
@@ -108,7 +108,7 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
       },
       gameplay: {
         active: false,
-        reason: "runtime stripped for loading-screen-only branch",
+        reason: "runtime not bootstrapped yet",
       },
     });
   };

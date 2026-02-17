@@ -73,24 +73,32 @@ function parseUnitFloat(value: string | null): number | null {
   return Math.max(0, Math.min(1, parsed));
 }
 
+function getParam(params: URLSearchParams, ...keys: string[]): string | null {
+  for (const key of keys) {
+    const value = params.get(key);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
 export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const params = new URLSearchParams(search);
-  const rawMapId = params.get("map");
-  const rawShot = params.get("shot");
-  const rawSpawn = params.get("spawn");
-  const rawDebug = params.get("debug");
-  const rawPerf = params.get("perf");
-  const rawHighVis = params.get("highvis");
-  const rawVm = params.get("vm");
-  const rawVmDebug = params.get("vmDebug");
-  const rawAnchors = params.get("anchors");
-  const rawLabels = params.get("labels");
-  const rawAnchorTypes = params.get("anchorTypes");
-  const rawSeed = params.get("seed");
-  const rawPropProfile = params.get("propProfile");
-  const rawPropJitter = params.get("propJitter");
-  const rawPropCluster = params.get("propCluster");
-  const rawPropDensity = params.get("propDensity");
+  const rawMapId = getParam(params, "map");
+  const rawShot = getParam(params, "shot");
+  const rawSpawn = getParam(params, "spawn");
+  const rawDebug = getParam(params, "debug");
+  const rawPerf = getParam(params, "perf");
+  const rawHighVis = getParam(params, "high-vis", "highvis");
+  const rawVm = getParam(params, "vm");
+  const rawVmDebug = getParam(params, "vm-debug", "vmDebug");
+  const rawAnchors = getParam(params, "anchors");
+  const rawLabels = getParam(params, "labels");
+  const rawAnchorTypes = getParam(params, "anchor-types", "anchorTypes");
+  const rawSeed = getParam(params, "seed");
+  const rawPropProfile = getParam(params, "prop-profile", "propProfile");
+  const rawPropJitter = getParam(params, "prop-jitter", "propJitter");
+  const rawPropCluster = getParam(params, "prop-cluster", "propCluster");
+  const rawPropDensity = getParam(params, "prop-density", "propDensity");
 
   const mapId = rawMapId && rawMapId.trim().length > 0 ? rawMapId.trim() : DEFAULT_MAP_ID;
   const shot = rawShot && rawShot.trim().length > 0 ? rawShot.trim() : null;

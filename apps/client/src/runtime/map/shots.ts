@@ -1,4 +1,5 @@
 import type { CameraPose } from "../game/Game";
+import { designToWorldVec3 } from "./coordinateTransforms";
 import type { RuntimeShotsSpec } from "./types";
 
 const COMPARE_ALIAS = "compare";
@@ -10,8 +11,6 @@ const HARDCODED_COMPARE_CAMERA: CameraPose = {
   fovDeg: 60,
 };
 
-type Vec3 = { x: number; y: number; z: number };
-
 export type ResolvedShot = {
   active: boolean;
   id: string | null;
@@ -20,18 +19,10 @@ export type ResolvedShot = {
   warning: string | null;
 };
 
-function designToWorld(vec: Vec3): Vec3 {
-  return {
-    x: vec.x,
-    y: vec.z,
-    z: vec.y,
-  };
-}
-
 function toCameraPose(shot: RuntimeShotsSpec["shots"][number]): CameraPose {
   return {
-    pos: designToWorld(shot.camera.pos),
-    lookAt: designToWorld(shot.camera.lookAt),
+    pos: designToWorldVec3(shot.camera.pos),
+    lookAt: designToWorldVec3(shot.camera.lookAt),
     fovDeg: shot.camera.fovDeg,
   };
 }

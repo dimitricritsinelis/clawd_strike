@@ -24,6 +24,11 @@ It is intended to be consumed by **Codex** (or a level designer) to produce a bl
 - `object_catalog.csv` — recommended prop types and placement rules.
 - `callouts.csv` — suggested comms callouts.
 
+### Legacy snapshots (read-only; not source-of-truth)
+- `blockout_spec.json` — historical derived runtime snapshot kept for reference only.
+- `anchors.json` — historical derived runtime snapshot kept for reference only.
+- Runtime generation uses `specs/map_spec.json` and `shots.json`; do not edit legacy snapshots for gameplay changes.
+
 ### Blockout assets (`/blockout`)
 - `topdown_layout.svg` — scaled topdown layout (10px/m).
 - `zones.geojson` — zones as polygons (meters).
@@ -43,4 +48,3 @@ It is intended to be consumed by **Codex** (or a level designer) to produce a bl
 ## Non-Goals / Exclusions
 This package **does not** include engine-specific lighting rigs, materials, audio banks, or gameplay scripting.
 It provides the level **layout + placement intent** so those can be generated/implemented consistently.
-

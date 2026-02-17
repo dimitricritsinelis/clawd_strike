@@ -8,7 +8,11 @@ dist/
 .DS_Store
 .clawdstrike-dev.log
 .claude/
-art-source/
 output/
 coverage/
 *.tsbuildinfo
+artifacts/screenshots/**/tmp*/
+artifacts/screenshots/**/smoke/
+artifacts/screenshots/**/errors-*.json
+artifacts/screenshots/**/state-*.json
+artifacts/screenshots/**/shot-*.png

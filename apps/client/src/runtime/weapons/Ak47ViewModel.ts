@@ -15,6 +15,7 @@ import {
   Vector3,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { disposeObjectRoot } from "../utils/disposeObjectRoot";
 
 const VIEWMODEL_FOV_DEG = 54;
 const VIEWMODEL_NEAR = 0.01;
@@ -154,7 +155,7 @@ export class Ak47ViewModel {
     this.axesHelper = null;
 
     if (this.model) {
-      this.disposeObjectRoot(this.model);
+      disposeObjectRoot(this.model);
       this.model.removeFromParent();
       this.model = null;
     }
@@ -208,23 +209,5 @@ export class Ak47ViewModel {
     if (maybeMaterial) {
       applyToMaterial(maybeMaterial);
     }
-  }
-
-  private disposeObjectRoot(root: Object3D): void {
-    root.traverse((child) => {
-      const maybeMesh = child as Mesh;
-      if (maybeMesh.geometry) {
-        maybeMesh.geometry.dispose();
-      }
-
-      const maybeMaterial = (maybeMesh as { material?: Material | Material[] }).material;
-      if (Array.isArray(maybeMaterial)) {
-        for (const material of maybeMaterial) {
-          material.dispose();
-        }
-      } else if (maybeMaterial) {
-        maybeMaterial.dispose();
-      }
-    });
   }
 }

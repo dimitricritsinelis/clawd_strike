@@ -9,14 +9,13 @@ export type LoadingScreenHandoff = {
 
   /**
    * Called when the game runtime finishes initializing (assets loaded, systems ready).
-   * This branch is loading-screen-only, so it will not be invoked yet.
+   * Optional hook for environments that bootstrap gameplay in parallel.
    */
   onGameRuntimeReady?: () => void;
 
   /**
    * Called when it's time to transition from the loading UI into gameplay.
-   * This branch is loading-screen-only, so callers can override to stub/route later.
+   * Callers can stub or override this when gameplay bootstrap is unavailable.
    */
   transitionToGame?: () => Promise<void> | void;
 };
-
