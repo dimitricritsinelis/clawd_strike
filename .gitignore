@@ -11,6 +11,7 @@ dist/
 output/
 coverage/
 *.tsbuildinfo
+artifacts/screenshots/
 artifacts/screenshots/**/tmp*/
 artifacts/screenshots/**/smoke/
 artifacts/screenshots/**/errors-*.json
