@@ -1,17 +1,28 @@
 import {
+  AdditiveBlending,
   AmbientLight,
   AxesHelper,
   Box3,
+  CanvasTexture,
+  ClampToEdgeWrapping,
   DirectionalLight,
   Group,
   HemisphereLight,
   Material,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
+  Matrix4,
   Object3D,
   PerspectiveCamera,
+  PointLight,
   Quaternion,
   Scene,
+  SphereGeometry,
+  Sprite,
+  SpriteMaterial,
+  SRGBColorSpace,
+  Texture,
   Vector3,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -28,8 +39,33 @@ const RAD_TO_DEG = 180 / Math.PI;
 const BARREL_AXIS_LOCAL = new Vector3(1, 0, 0);
 const MODEL_FIXUP_YAW_RAD = Math.PI / 2;
 
-const WEAPON_POSE_POSITION = new Vector3(0.2, -0.18, -0.52);
-const WEAPON_POSE_ROLL_RAD = -0.09;
+const BASE_WEAPON_POSE_POSITION = new Vector3(0.2, -0.18, -0.52);
+const BASE_WEAPON_POSE_ROLL_RAD = -0.09;
+const BASE_WEAPON_POSE_PITCH_RAD = 0;
+const BASE_WEAPON_POSE_YAW_RAD = 0;
+
+const DEFAULT_MUZZLE_OFFSET_WEAPON_SPACE = new Vector3(0.33, -0.095, -0.69);
+const MUZZLE_NODE_HINT_RE = /muzzle|flash|barrel.*end|tip/i;
+const MUZZLE_FORWARD_OFFSET_M = 0.03;
+const MUZZLE_DEBUG_MARKER_RADIUS_M = 0.012;
+const MUZZLE_DEBUG_MARKER_COLOR = 0x4dffd0;
+const MUZZLE_FLASH_SIZE_M = 0.193;
+const MUZZLE_FLASH_DURATION_S = 0.085;
+const MUZZLE_FLASH_DEBUG_DURATION_S = 0.25;
+const MUZZLE_FLASH_PULSE_SCALE = 0.26;
+const MUZZLE_FLASH_PEAK_OPACITY = 1.0;
+
+const MUZZLE_POINT_LIGHT_DISTANCE = 1.6;
+const MUZZLE_POINT_LIGHT_DECAY = 2;
+const MUZZLE_POINT_LIGHT_INTENSITY_MIN = 1.8;
+const MUZZLE_POINT_LIGHT_INTENSITY_MAX = 3.0;
+
+const VIEWMODEL_KICK_IMPULSE_BACK_M = 0.045;
+const VIEWMODEL_KICK_IMPULSE_PITCH_RAD = 0.04;
+const VIEWMODEL_KICK_IMPULSE_YAW_RAD = 0.014;
+const VIEWMODEL_KICK_IMPULSE_ROLL_RAD = 0.012;
+const VIEWMODEL_KICK_SPRING_STIFFNESS = 240;
+const VIEWMODEL_KICK_SPRING_DAMPING = 22;
 
 type Ak47ViewModelOptions = {
   vmDebug: boolean;
@@ -41,6 +77,46 @@ export type WeaponAlignmentSnapshot = {
   angleDeg: number;
 };
 
+type SpringState = {
+  value: number;
+  velocity: number;
+};
+
+function createMuzzleFlashTexture(): Texture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+
+  if (ctx) {
+    const gradient = ctx.createRadialGradient(64, 64, 8, 64, 64, 64);
+    gradient.addColorStop(0, "rgba(255, 250, 214, 1)");
+    gradient.addColorStop(0.22, "rgba(255, 214, 132, 0.98)");
+    gradient.addColorStop(0.65, "rgba(255, 134, 50, 0.44)");
+    gradient.addColorStop(1, "rgba(255, 80, 10, 0)");
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+  }
+
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.wrapS = ClampToEdgeWrapping;
+  texture.wrapT = ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function stepSpring(state: SpringState, target: number, stiffness: number, damping: number, dt: number): void {
+  const clampedDt = Math.max(0, Math.min(0.05, dt));
+  if (clampedDt <= 0) return;
+
+  const accel = (target - state.value) * stiffness - state.velocity * damping;
+  state.velocity += accel * clampedDt;
+  state.value += state.velocity * clampedDt;
+}
+
 export class Ak47ViewModel {
   readonly viewModelScene: Scene;
   readonly viewModelCamera: PerspectiveCamera;
@@ -50,9 +126,17 @@ export class Ak47ViewModel {
   private readonly modelRoot = new Group();
   private readonly cameraForward = new Vector3();
   private readonly barrelForward = new Vector3();
+  private readonly barrelDirWeapon = new Vector3();
   private readonly worldQuaternion = new Quaternion();
   private readonly modelBounds = new Box3();
   private readonly modelBoundsSize = new Vector3();
+  private readonly muzzleFlashBasePosWeaponSpace = new Vector3().copy(DEFAULT_MUZZLE_OFFSET_WEAPON_SPACE);
+  private readonly muzzleWorldBounds = new Box3();
+  private readonly muzzleBestPosWeaponSpace = new Vector3();
+  private readonly muzzleCandidateWorldPos = new Vector3();
+  private readonly muzzleCandidateWeaponPos = new Vector3();
+  private readonly muzzleMeshToWeapon = new Matrix4();
+  private readonly weaponWorldInverse = new Matrix4();
   private readonly alignment: WeaponAlignmentSnapshot = {
     loaded: false,
     dot: -1,
@@ -60,10 +144,39 @@ export class Ak47ViewModel {
   };
   private readonly vmDebug: boolean;
 
+  private readonly muzzleFlashTexture = createMuzzleFlashTexture();
+  private readonly muzzleFlashMaterial = new SpriteMaterial({
+    map: this.muzzleFlashTexture,
+    transparent: true,
+    depthWrite: false,
+    depthTest: false,
+    blending: AdditiveBlending,
+    opacity: MUZZLE_FLASH_PEAK_OPACITY,
+  });
+  private readonly muzzleFlash = new Sprite(this.muzzleFlashMaterial);
+  private readonly muzzleFlashLight = new PointLight(
+    0xffd7a0,
+    0,
+    MUZZLE_POINT_LIGHT_DISTANCE,
+    MUZZLE_POINT_LIGHT_DECAY,
+  );
+
+  private readonly kickBack: SpringState = { value: 0, velocity: 0 };
+  private readonly kickPitch: SpringState = { value: 0, velocity: 0 };
+  private readonly kickYaw: SpringState = { value: 0, velocity: 0 };
+  private readonly kickRoll: SpringState = { value: 0, velocity: 0 };
+
   private model: Object3D | null = null;
   private axesHelper: AxesHelper | null = null;
+  private muzzleDebugMarker: Mesh | null = null;
   private loadPromise: Promise<void> | null = null;
   private disposed = false;
+  private muzzleFlashTimerS = 0;
+  private muzzleFlashDurationS = MUZZLE_FLASH_DURATION_S;
+  private muzzleFlashBaseScale = 1;
+  private muzzleFlashLightPeak = MUZZLE_POINT_LIGHT_INTENSITY_MIN;
+  private muzzleFlashRandState = 0x6d2b79f5;
+  private shotFxPhase = 1;
 
   constructor(options: Ak47ViewModelOptions) {
     this.vmDebug = options.vmDebug;
@@ -72,12 +185,20 @@ export class Ak47ViewModel {
     this.viewModelCamera = new PerspectiveCamera(VIEWMODEL_FOV_DEG, 1, VIEWMODEL_NEAR, VIEWMODEL_FAR);
     this.viewModelCamera.rotation.order = "YXZ";
 
-    this.weaponRoot.position.copy(WEAPON_POSE_POSITION);
-    this.weaponRoot.rotation.set(0, 0, WEAPON_POSE_ROLL_RAD);
+    this.weaponRoot.position.copy(BASE_WEAPON_POSE_POSITION);
+    this.weaponRoot.rotation.set(BASE_WEAPON_POSE_PITCH_RAD, BASE_WEAPON_POSE_YAW_RAD, BASE_WEAPON_POSE_ROLL_RAD);
     this.viewModelCamera.add(this.weaponRoot);
 
     this.modelRoot.rotation.set(0, MODEL_FIXUP_YAW_RAD, 0);
     this.weaponRoot.add(this.modelRoot);
+
+    this.muzzleFlash.visible = false;
+    this.muzzleFlash.renderOrder = 100;
+    this.muzzleFlash.scale.setScalar(MUZZLE_FLASH_SIZE_M);
+    this.weaponRoot.add(this.muzzleFlash);
+
+    this.weaponRoot.add(this.muzzleFlashLight);
+    this.applyMuzzleFlashBasePosition();
 
     this.viewModelScene.add(this.viewModelCamera);
 
@@ -110,6 +231,8 @@ export class Ak47ViewModel {
       this.prepareModel(gltf.scene);
       this.fitModelScale(gltf.scene);
       this.modelRoot.add(gltf.scene);
+      this.viewModelCamera.updateMatrixWorld(true);
+      this.resolveMuzzleFlashWeaponSpace(gltf.scene);
 
       if (this.vmDebug) {
         this.axesHelper = new AxesHelper(0.2);
@@ -129,8 +252,9 @@ export class Ak47ViewModel {
     this.viewModelCamera.updateProjectionMatrix();
   }
 
-  updateFromMainCamera(mainCamera: PerspectiveCamera): void {
+  updateFromMainCamera(mainCamera: PerspectiveCamera, deltaSeconds: number): void {
     this.viewModelCamera.quaternion.copy(mainCamera.quaternion);
+    this.updateShotFx(deltaSeconds);
     this.viewModelCamera.updateMatrixWorld(true);
 
     if (!this.alignment.loaded) return;
@@ -143,6 +267,31 @@ export class Ak47ViewModel {
     const dot = Math.min(1, Math.max(-1, this.cameraForward.dot(this.barrelForward)));
     this.alignment.dot = dot;
     this.alignment.angleDeg = Math.acos(dot) * RAD_TO_DEG;
+  }
+
+  triggerShotFx(): void {
+    this.applyMuzzleFlashBasePosition();
+    this.muzzleFlashDurationS = this.vmDebug ? MUZZLE_FLASH_DEBUG_DURATION_S : MUZZLE_FLASH_DURATION_S;
+    this.muzzleFlashTimerS = this.muzzleFlashDurationS;
+    this.muzzleFlash.visible = true;
+
+    this.muzzleFlashBaseScale = 0.9 + this.nextMuzzleRand() * 0.35;
+    this.muzzleFlash.scale.setScalar(MUZZLE_FLASH_SIZE_M * this.muzzleFlashBaseScale);
+    this.muzzleFlashMaterial.rotation = (this.nextMuzzleRand() - 0.5) * Math.PI * 0.7;
+    this.muzzleFlashMaterial.opacity = MUZZLE_FLASH_PEAK_OPACITY;
+
+    this.muzzleFlashLightPeak =
+      MUZZLE_POINT_LIGHT_INTENSITY_MIN +
+      (MUZZLE_POINT_LIGHT_INTENSITY_MAX - MUZZLE_POINT_LIGHT_INTENSITY_MIN) * this.nextMuzzleRand();
+    this.muzzleFlashLight.intensity = this.muzzleFlashLightPeak;
+
+    const side = this.shotFxPhase > 0 ? 1 : -1;
+    this.shotFxPhase *= -1;
+
+    this.kickBack.velocity += VIEWMODEL_KICK_IMPULSE_BACK_M;
+    this.kickPitch.velocity -= VIEWMODEL_KICK_IMPULSE_PITCH_RAD;
+    this.kickYaw.velocity += VIEWMODEL_KICK_IMPULSE_YAW_RAD * side;
+    this.kickRoll.velocity += VIEWMODEL_KICK_IMPULSE_ROLL_RAD * side;
   }
 
   getAlignmentSnapshot(): WeaponAlignmentSnapshot {
@@ -159,6 +308,25 @@ export class Ak47ViewModel {
       this.model.removeFromParent();
       this.model = null;
     }
+
+    if (this.muzzleDebugMarker) {
+      this.muzzleDebugMarker.removeFromParent();
+      this.muzzleDebugMarker.geometry.dispose();
+      const markerMaterial = this.muzzleDebugMarker.material as Material | Material[] | undefined;
+      if (Array.isArray(markerMaterial)) {
+        for (const material of markerMaterial) {
+          material.dispose();
+        }
+      } else {
+        markerMaterial?.dispose();
+      }
+      this.muzzleDebugMarker = null;
+    }
+
+    this.muzzleFlash.removeFromParent();
+    this.muzzleFlashMaterial.dispose();
+    this.muzzleFlashTexture.dispose();
+    this.muzzleFlashLight.removeFromParent();
   }
 
   private fitModelScale(model: Object3D): void {
@@ -175,6 +343,196 @@ export class Ak47ViewModel {
       this.modelRoot.scale.setScalar(uniformScale);
       this.modelRoot.updateMatrixWorld(true);
     }
+  }
+
+  private nextMuzzleRand(): number {
+    this.muzzleFlashRandState = (Math.imul(this.muzzleFlashRandState, 1664525) + 1013904223) >>> 0;
+    return this.muzzleFlashRandState / 0x1_0000_0000;
+  }
+
+  private resolveMuzzleFlashWeaponSpace(model: Object3D): void {
+    this.barrelDirWeapon.copy(BARREL_AXIS_LOCAL).applyQuaternion(this.modelRoot.quaternion).normalize();
+    if (!Number.isFinite(this.barrelDirWeapon.lengthSq()) || this.barrelDirWeapon.lengthSq() < 1e-8) {
+      this.barrelDirWeapon.set(1, 0, 0);
+    }
+
+    const resolvedByName = this.resolveMuzzleFromNamedNode(model, this.barrelDirWeapon);
+    const resolvedByVertex = resolvedByName || this.resolveMuzzleFromVertexScan(model, this.barrelDirWeapon);
+    const resolvedByBounds = resolvedByName || resolvedByVertex || this.resolveMuzzleFromBounds(model, this.barrelDirWeapon);
+
+    if (!resolvedByName && !resolvedByVertex && !resolvedByBounds) {
+      this.muzzleFlashBasePosWeaponSpace.copy(DEFAULT_MUZZLE_OFFSET_WEAPON_SPACE);
+    }
+
+    this.applyMuzzleFlashBasePosition();
+    this.ensureMuzzleDebugMarker();
+  }
+
+  private resolveMuzzleFromNamedNode(model: Object3D, barrelDirWeapon: Vector3): boolean {
+    let found = false;
+    let bestProjection = -Infinity;
+
+    model.traverse((node) => {
+      if (!node.name || !MUZZLE_NODE_HINT_RE.test(node.name)) return;
+
+      node.getWorldPosition(this.muzzleCandidateWorldPos);
+      this.muzzleCandidateWeaponPos.copy(this.muzzleCandidateWorldPos);
+      this.weaponRoot.worldToLocal(this.muzzleCandidateWeaponPos);
+
+      const projection = this.muzzleCandidateWeaponPos.dot(barrelDirWeapon);
+      if (projection > bestProjection) {
+        bestProjection = projection;
+        this.muzzleFlashBasePosWeaponSpace.copy(this.muzzleCandidateWeaponPos);
+        found = true;
+      }
+    });
+
+    return found;
+  }
+
+  private resolveMuzzleFromVertexScan(model: Object3D, barrelDirWeapon: Vector3): boolean {
+    let found = false;
+    let bestProjection = -Infinity;
+
+    this.weaponWorldInverse.copy(this.weaponRoot.matrixWorld).invert();
+
+    model.traverse((node) => {
+      const maybeMesh = node as Mesh;
+      if (!maybeMesh.isMesh) return;
+
+      const geometry = maybeMesh.geometry;
+      if (!geometry) return;
+
+      const position = geometry.getAttribute("position");
+      if (!position || position.count <= 0 || position.itemSize < 3) return;
+
+      this.muzzleMeshToWeapon.multiplyMatrices(this.weaponWorldInverse, maybeMesh.matrixWorld);
+
+      for (let i = 0; i < position.count; i += 1) {
+        this.muzzleCandidateWeaponPos
+          .set(position.getX(i), position.getY(i), position.getZ(i))
+          .applyMatrix4(this.muzzleMeshToWeapon);
+
+        const projection = this.muzzleCandidateWeaponPos.dot(barrelDirWeapon);
+        if (projection > bestProjection) {
+          bestProjection = projection;
+          this.muzzleBestPosWeaponSpace.copy(this.muzzleCandidateWeaponPos);
+          found = true;
+        }
+      }
+    });
+
+    if (!found) {
+      return false;
+    }
+
+    this.muzzleFlashBasePosWeaponSpace
+      .copy(this.muzzleBestPosWeaponSpace)
+      .addScaledVector(barrelDirWeapon, MUZZLE_FORWARD_OFFSET_M);
+    return true;
+  }
+
+  private resolveMuzzleFromBounds(model: Object3D, barrelDirWeapon: Vector3): boolean {
+    this.muzzleWorldBounds.setFromObject(model);
+    if (this.muzzleWorldBounds.isEmpty()) {
+      return false;
+    }
+
+    const min = this.muzzleWorldBounds.min;
+    const max = this.muzzleWorldBounds.max;
+    let found = false;
+    let bestProjection = -Infinity;
+
+    for (let xi = 0; xi < 2; xi += 1) {
+      const x = xi === 0 ? min.x : max.x;
+      for (let yi = 0; yi < 2; yi += 1) {
+        const y = yi === 0 ? min.y : max.y;
+        for (let zi = 0; zi < 2; zi += 1) {
+          const z = zi === 0 ? min.z : max.z;
+
+          this.muzzleCandidateWorldPos.set(x, y, z);
+          this.muzzleCandidateWeaponPos.copy(this.muzzleCandidateWorldPos);
+          this.weaponRoot.worldToLocal(this.muzzleCandidateWeaponPos);
+
+          const projection = this.muzzleCandidateWeaponPos.dot(barrelDirWeapon);
+          if (projection > bestProjection) {
+            bestProjection = projection;
+            this.muzzleBestPosWeaponSpace.copy(this.muzzleCandidateWeaponPos);
+            found = true;
+          }
+        }
+      }
+    }
+
+    if (!found) {
+      return false;
+    }
+
+    this.muzzleFlashBasePosWeaponSpace
+      .copy(this.muzzleBestPosWeaponSpace)
+      .addScaledVector(barrelDirWeapon, MUZZLE_FORWARD_OFFSET_M);
+    return true;
+  }
+
+  private applyMuzzleFlashBasePosition(): void {
+    this.muzzleFlash.position.copy(this.muzzleFlashBasePosWeaponSpace);
+    this.muzzleFlashLight.position.copy(this.muzzleFlashBasePosWeaponSpace);
+    if (this.muzzleDebugMarker) {
+      this.muzzleDebugMarker.position.copy(this.muzzleFlashBasePosWeaponSpace);
+    }
+  }
+
+  private ensureMuzzleDebugMarker(): void {
+    if (!this.vmDebug) return;
+
+    if (!this.muzzleDebugMarker) {
+      const debugGeometry = new SphereGeometry(MUZZLE_DEBUG_MARKER_RADIUS_M, 10, 8);
+      const debugMaterial = new MeshBasicMaterial({
+        color: MUZZLE_DEBUG_MARKER_COLOR,
+        depthTest: false,
+        depthWrite: false,
+      });
+      this.muzzleDebugMarker = new Mesh(debugGeometry, debugMaterial);
+      this.muzzleDebugMarker.renderOrder = 101;
+      this.weaponRoot.add(this.muzzleDebugMarker);
+    }
+
+    this.muzzleDebugMarker.position.copy(this.muzzleFlashBasePosWeaponSpace);
+  }
+
+  private updateShotFx(deltaSeconds: number): void {
+    if (this.muzzleFlashTimerS > 0) {
+      this.muzzleFlashTimerS = Math.max(0, this.muzzleFlashTimerS - Math.max(0, deltaSeconds));
+      const lifeT = this.muzzleFlashDurationS > 0 ? this.muzzleFlashTimerS / this.muzzleFlashDurationS : 0;
+
+      this.muzzleFlash.visible = lifeT > 0;
+      this.muzzleFlashMaterial.opacity = MUZZLE_FLASH_PEAK_OPACITY * lifeT * lifeT;
+      this.muzzleFlash.scale.setScalar(
+        MUZZLE_FLASH_SIZE_M * this.muzzleFlashBaseScale * (1 + (1 - lifeT) * MUZZLE_FLASH_PULSE_SCALE),
+      );
+      this.muzzleFlashLight.intensity = this.muzzleFlashLightPeak * lifeT * lifeT;
+    } else {
+      this.muzzleFlash.visible = false;
+      this.muzzleFlashMaterial.opacity = 0;
+      this.muzzleFlashLight.intensity = 0;
+    }
+
+    stepSpring(this.kickBack, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
+    stepSpring(this.kickPitch, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
+    stepSpring(this.kickYaw, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
+    stepSpring(this.kickRoll, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
+
+    this.weaponRoot.position.set(
+      BASE_WEAPON_POSE_POSITION.x,
+      BASE_WEAPON_POSE_POSITION.y,
+      BASE_WEAPON_POSE_POSITION.z + this.kickBack.value,
+    );
+
+    this.weaponRoot.rotation.set(
+      BASE_WEAPON_POSE_PITCH_RAD + this.kickPitch.value,
+      BASE_WEAPON_POSE_YAW_RAD + this.kickYaw.value,
+      BASE_WEAPON_POSE_ROLL_RAD + this.kickRoll.value,
+    );
   }
 
   private prepareModel(model: Object3D): void {

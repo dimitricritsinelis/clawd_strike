@@ -23,6 +23,12 @@ type HudSnapshot = {
     loaded: boolean;
     dot: number;
     angleDeg: number;
+    shotsFired: number;
+    shotIndex: number;
+    spreadDeg: number;
+    bloomDeg: number;
+    lastShotRecoilPitchDeg: number;
+    lastShotRecoilYawDeg: number;
   };
 };
 
@@ -73,6 +79,12 @@ export class Hud {
       lines.push(`weapon loaded: ${snapshot.weaponStats.loaded ? "yes" : "no"}`);
       lines.push(`weapon align dot: ${snapshot.weaponStats.dot.toFixed(3)}`);
       lines.push(`weapon align angle: ${snapshot.weaponStats.angleDeg.toFixed(2)} deg`);
+      lines.push(`weapon shots/frame: ${snapshot.weaponStats.shotsFired}`);
+      lines.push(`weapon shotIndex: ${snapshot.weaponStats.shotIndex}`);
+      lines.push(`weapon spread/bloom: ${snapshot.weaponStats.spreadDeg.toFixed(2)} / ${snapshot.weaponStats.bloomDeg.toFixed(2)} deg`);
+      lines.push(
+        `weapon recoil last p/y: ${snapshot.weaponStats.lastShotRecoilPitchDeg.toFixed(2)} / ${snapshot.weaponStats.lastShotRecoilYawDeg.toFixed(2)} deg`,
+      );
     }
 
     this.root.textContent = lines.join("\n");
