@@ -5,6 +5,8 @@ import { loadMap, RuntimeMapLoadError } from "./map/loadMap";
 import { resolveShot } from "./map/shots";
 import type { RuntimeMapAssets } from "./map/types";
 import { Renderer } from "./render/Renderer";
+import { WeaponAudio } from "./audio/WeaponAudio";
+import { AmmoHud } from "./ui/AmmoHud";
 import { parseRuntimeUrlParams } from "./utils/UrlParams";
 
 type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["Ak47ViewModel"]>;
@@ -240,6 +242,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   });
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, urlParams.perf);
+  const ammoHud = new AmmoHud(runtimeRoot);
 
   let mapLoaded = false;
   let mapErrorMessage: string | null = null;
@@ -259,6 +262,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
 
   const renderer = new Renderer(runtimeRoot, { highVis: urlParams.highVis });
   let disposed = false;
+  const weaponAudio = new WeaponAudio();
   const viewModelEnabled = urlParams.vm;
   let viewModel: ViewModelInstance | null = null;
   let viewModelLoadStarted = false;
@@ -317,8 +321,16 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       showLabels: urlParams.labels,
       anchorTypes: urlParams.anchorTypes,
     },
+    onWeaponShot: () => {
+      viewModel?.triggerShotFx();
+      weaponAudio.playAk47Shot();
+    },
     ...(urlParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
   });
+
+  // Preload the weapon model at runtime boot so first shots don't miss viewmodel FX.
+  startViewModelLoad();
+
   if (mapAssets) {
     game.setBlockoutSpec(mapAssets.blockout);
     game.setAnchorsSpec(mapAssets.anchors);
@@ -340,6 +352,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
         game.setPointerLocked(locked);
         if (locked) {
           startViewModelLoad();
+          weaponAudio.ensureResumedFromGesture();
         }
       },
       onMouseDelta: (deltaX, deltaY) => game.onMouseDelta(deltaX, deltaY),
@@ -434,9 +447,13 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     const overviewCamera = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
     viewModelVisible = Boolean(viewModelEnabled && viewModel && !overviewCamera);
     crosshair.style.display = overviewCamera ? "none" : "block";
+    ammoHud.setVisible(!overviewCamera);
+    if (!overviewCamera) {
+      ammoHud.update(game.getAmmoSnapshot());
+    }
 
     if (viewModel) {
-      viewModel.updateFromMainCamera(game.camera);
+      viewModel.updateFromMainCamera(game.camera, clampedMs / 1000);
       const weaponDebug = viewModel.getAlignmentSnapshot();
       game.setWeaponDebugSnapshot(weaponDebug.loaded, weaponDebug.dot, weaponDebug.angleDeg);
     } else {
@@ -523,7 +540,9 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
 
     pointerLock?.dispose();
     game.teardown();
+    weaponAudio.dispose();
     perfHud.dispose();
+    ammoHud.dispose();
     viewModel?.dispose();
     renderer.dispose();
     crosshair.remove();

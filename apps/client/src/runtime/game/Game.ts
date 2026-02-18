@@ -11,8 +11,11 @@ import {
   type PlayerInputState,
 } from "../sim/PlayerController";
 import { type RuntimeColliderAabb, WorldColliders } from "../sim/collision/WorldColliders";
+import { resolveRuntimeSeed } from "../utils/Rng";
 import { disposeObjectRoot } from "../utils/disposeObjectRoot";
 import type { RuntimePropChaosOptions, RuntimeSpawnId } from "../utils/UrlParams";
+import type { Ak47ShotEvent } from "../weapons/Ak47FireController";
+import { Ak47Weapon, type Ak47AmmoSnapshot } from "../weapons/Ak47Weapon";
 
 const DEFAULT_FOV = 75;
 const LOOK_SENSITIVITY = 0.002;
@@ -34,6 +37,8 @@ export type CameraPose = {
   fovDeg: number;
 };
 
+export type WeaponShotPayload = Ak47ShotEvent;
+
 type GameOptions = {
   mapId: string;
   seedOverride: number | null;
@@ -49,6 +54,7 @@ type GameOptions = {
     showLabels: boolean;
     anchorTypes: readonly string[];
   };
+  onWeaponShot?: (shot: WeaponShotPayload) => void;
 };
 
 type SpawnPose = {
@@ -63,7 +69,9 @@ export class Game {
 
   private readonly pressedKeys = new Set<string>();
   private readonly lookDirection = new Vector3();
+  private readonly cameraForward = new Vector3();
   private readonly playerController = new PlayerController();
+  private weapon = new Ak47Weapon({ seed: 1 });
   private readonly frameInput: PlayerInputState = {
     forward: 0,
     right: 0,
@@ -74,6 +82,7 @@ export class Game {
   private yaw = 0;
   private pitch = 0;
   private pointerLocked = false;
+  private fireHeld = false;
   private freezeInput = false;
   private jumpQueued = false;
   private spawn: RuntimeSpawnId = "A";
@@ -112,9 +121,16 @@ export class Game {
   private anchorsDebug: AnchorsDebug | null = null;
   private debugHotkeysEnabled = false;
   private onTogglePerfHud: (() => void) | null = null;
+  private onWeaponShot: ((shot: WeaponShotPayload) => void) | null = null;
   private weaponLoaded = false;
   private weaponAlignDot = -1;
   private weaponAlignAngleDeg = 180;
+  private weaponShotsFiredLastFrame = 0;
+  private weaponShotIndex = 0;
+  private weaponSpreadDeg = 0;
+  private weaponBloomDeg = 0;
+  private weaponLastShotRecoilPitchDeg = 0;
+  private weaponLastShotRecoilYawDeg = 0;
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (this.debugHotkeysEnabled) {
@@ -139,6 +155,15 @@ export class Game {
     if (event.code === "Space" && !event.repeat) {
       this.jumpQueued = true;
     }
+    if (
+      event.code === "KeyR" &&
+      !event.repeat &&
+      this.pointerLocked &&
+      !this.freezeInput
+    ) {
+      this.weapon.queueReload();
+      event.preventDefault();
+    }
   };
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
@@ -153,6 +178,23 @@ export class Game {
     if (document.visibilityState !== "visible") {
       this.resetInputState();
     }
+  };
+
+  private readonly onMouseDown = (event: MouseEvent): void => {
+    if (event.button !== 0) return;
+    if (!this.pointerLocked || this.freezeInput) return;
+    this.fireHeld = true;
+    event.preventDefault();
+  };
+
+  private readonly onMouseUp = (event: MouseEvent): void => {
+    if (event.button !== 0) return;
+    this.fireHeld = false;
+  };
+
+  private readonly onContextMenu = (event: MouseEvent): void => {
+    if (!this.pointerLocked) return;
+    event.preventDefault();
   };
 
   constructor(options: GameOptions) {
@@ -173,6 +215,11 @@ export class Game {
     this.spawn = options.spawn ?? "A";
     this.debugHotkeysEnabled = options.debug ?? false;
     this.onTogglePerfHud = options.onTogglePerfHud ?? null;
+    this.onWeaponShot = options.onWeaponShot ?? null;
+
+    const weaponSeed = resolveRuntimeSeed(this.mapId, this.seedOverride);
+    this.weapon = new Ak47Weapon({ seed: weaponSeed });
+
     const palette = resolveBlockoutPalette(this.highVis);
     this.scene.background = new Color(palette.background);
     const mountEl = options.mountEl ?? document.querySelector<HTMLElement>("#runtime-root") ?? document.querySelector<HTMLElement>("#app");
@@ -200,6 +247,9 @@ export class Game {
 
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
+    window.addEventListener("mousedown", this.onMouseDown);
+    window.addEventListener("mouseup", this.onMouseUp);
+    window.addEventListener("contextmenu", this.onContextMenu);
     window.addEventListener("blur", this.onWindowBlur);
     document.addEventListener("visibilitychange", this.onVisibilityChange);
   }
@@ -222,6 +272,10 @@ export class Game {
 
   setFreezeInput(freeze: boolean): void {
     this.freezeInput = freeze;
+    if (freeze) {
+      this.fireHeld = false;
+      this.weapon.cancelTrigger();
+    }
   }
 
   setCameraPose(pose: CameraPose): void {
@@ -264,6 +318,31 @@ export class Game {
       this.updateInputState();
       this.playerController.step(deltaSeconds, this.frameInput, this.yaw);
       this.updateCameraFromPlayer();
+
+      this.camera.getWorldDirection(this.cameraForward);
+      const fireResult = this.weapon.update(
+        {
+          deltaSeconds,
+          fireHeld: this.fireHeld && this.pointerLocked && !this.freezeInput,
+          origin: this.camera.position,
+          forward: this.cameraForward,
+          grounded: this.playerController.getGrounded(),
+          speedMps: this.playerController.getHorizontalSpeedMps(),
+          world: this.worldColliders,
+        },
+        this.onWeaponShot ?? undefined,
+      );
+
+      this.weaponShotsFiredLastFrame = fireResult.shotsFired;
+      this.weaponShotIndex = fireResult.shotIndex;
+      this.weaponSpreadDeg = fireResult.spreadDeg;
+      this.weaponBloomDeg = fireResult.bloomDeg;
+      this.weaponLastShotRecoilPitchDeg = fireResult.lastShotRecoilPitchDeg;
+      this.weaponLastShotRecoilYawDeg = fireResult.lastShotRecoilYawDeg;
+
+      if (fireResult.recoilPitchRad !== 0 || fireResult.recoilYawRad !== 0) {
+        this.setLookAngles(this.yaw + fireResult.recoilYawRad, this.pitch + fireResult.recoilPitchRad);
+      }
     }
     this.anchorsDebug?.update(this.camera);
 
@@ -282,6 +361,12 @@ export class Game {
           loaded: this.weaponLoaded,
           dot: this.weaponAlignDot,
           angleDeg: this.weaponAlignAngleDeg,
+          shotsFired: this.weaponShotsFiredLastFrame,
+          shotIndex: this.weaponShotIndex,
+          spreadDeg: this.weaponSpreadDeg,
+          bloomDeg: this.weaponBloomDeg,
+          lastShotRecoilPitchDeg: this.weaponLastShotRecoilPitchDeg,
+          lastShotRecoilYawDeg: this.weaponLastShotRecoilYawDeg,
         },
       });
     }
@@ -290,6 +375,9 @@ export class Game {
   teardown(): void {
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
+    window.removeEventListener("mousedown", this.onMouseDown);
+    window.removeEventListener("mouseup", this.onMouseUp);
+    window.removeEventListener("contextmenu", this.onContextMenu);
     window.removeEventListener("blur", this.onWindowBlur);
     document.removeEventListener("visibilitychange", this.onVisibilityChange);
     this.resetInputState();
@@ -346,6 +434,10 @@ export class Game {
     };
   }
 
+  getAmmoSnapshot(): Ak47AmmoSnapshot {
+    return this.weapon.getAmmoSnapshot();
+  }
+
   private setupLighting(): void {
     const ambient = new AmbientLight(0xffffff, 1.05);
     const hemi = new HemisphereLight(0xfafcff, 0xf0d7ad, 1.2);
@@ -380,6 +472,8 @@ export class Game {
   private resetInputState(): void {
     this.pressedKeys.clear();
     this.jumpQueued = false;
+    this.fireHeld = false;
+    this.weapon.cancelTrigger();
     this.resetFrameInput();
   }
 

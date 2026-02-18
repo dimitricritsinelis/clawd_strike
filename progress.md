@@ -1,13 +1,12 @@
 # progress.md — MVP Blockout Branch
 
 ## Current Status (<=10 lines)
-- Runtime: loading screen -> click `Human` -> gameplay runtime (pointer lock + full-screen canvas)
-- Map runtime contract: `/maps/bazaar-map/map_spec.json` + `/maps/bazaar-map/shots.json` (anchors embedded in map spec)
-- Movement/collision: WASD + mouse-look + jump; AABB slide solver now broadphase-assisted and less order-dependent
-- Input safety: key/jump state resets on blur, visibility change, and pointer unlock
-- Loading UI: timeout race fixed; timeout warning only fires if timeout wins; styles moved to `src/styles.css`
-- Build pipeline: `prebuild`/`prepreview` run `gen:maps`; CI now checks generated maps are up-to-date
-- Bundling: runtime and AK47 viewmodel are lazy-loaded; Vite unresolved public-asset warnings removed
+- Added CS-style ammo HUD overlay with tabular `mag / reserve`, low-ammo color states, and reload progress bar.
+- Added single-weapon AK ammo/reload wrapper (`30/90`, `R` reload, auto-reload at empty, firing blocked during reload).
+- `Game` now routes fire/reload through `Ak47Weapon` and exposes ammo snapshot for UI updates.
+- `Ak47FireController.update(...)` now supports per-frame `shotBudget` for ammo-safe burst limits.
+- `bootstrap` now instantiates/updates/disposes ammo HUD without changing crosshair behavior.
+- Determinism preserved for map/props systems.
 - Validation: ✅ `pnpm typecheck` | ✅ `pnpm build`
 
 ## Canonical Playtest URL
@@ -24,35 +23,33 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P11_repo_stability_cleanup`
+- Prompt ID: `P13_ammo_hud`
 - Summary:
-  - Fixed preloader timeout race and aligned critical loading assets/background format preference to WebP path
-  - Moved inline loading-screen CSS from `index.html` to `apps/client/src/styles.css` to remove Vite unresolved asset warnings
-  - Switched runtime map loading to `map_spec.json` (anchors embedded), updated generator + loader + CI + package scripts
-  - Added lazy loading for gameplay/runtime bootstrap + AK47 viewmodel path to improve chunking
-  - Added input reset hooks, centralized design->world transforms, improved collision solver stability, and added broadphase query path
-  - Added shared object-disposal utility and repo ergonomics files (`.editorconfig`, `.nvmrc`)
-  - Cleaned tracked tmp screenshot artifacts and removed unused `apps/client/public/models/weapons/.DS_Store`
-  - Captured deterministic artifacts: `artifacts/screenshots/P11_repo_hardening/before.png` and `artifacts/screenshots/P11_repo_hardening/after.png`
+  - Implemented ammo HUD + AK ammo/reload state wrapper and wired it through runtime/game loop.
+  - Added shot-budget enforcement in fire controller so weapon cannot fire beyond available mag ammo.
+  - Captured deterministic compare-shot screenshots at:
+    - `/Users/dimitri/Desktop/ClawdStrike_v2/artifacts/screenshots/P13_ammo_hud/before.png`
+    - `/Users/dimitri/Desktop/ClawdStrike_v2/artifacts/screenshots/P13_ammo_hud/after.png`
 - Files touched:
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/loading-screen/assets.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/styles.css`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/ui/AmmoHud.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/weapons/Ak47Weapon.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/weapons/Ak47FireController.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/game/Game.ts`
   - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/bootstrap.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/map/loadMap.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/scripts/gen-map-runtime.mjs`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/.github/workflows/ci.yml`
   - `/Users/dimitri/Desktop/ClawdStrike_v2/progress.md`
 - How to test (60s):
-  - Run `pnpm dev`
-  - Open canonical URL (above)
-  - Confirm loading screen appears without console spam, then click `Human`
-  - Verify pointer lock + move/look + collision; reload once and verify no loading timeout warning on successful preload
+  - Run `pnpm dev`.
+  - Compare shot: `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
+  - Gameplay check: `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
+  - Lock pointer, hold fire, and verify ammo decrements; press `R` to reload early.
+  - Confirm auto-reload triggers at `mag=0`, and crosshair remains unchanged/fixed.
 
 ## Next 3 Tasks
-1. Validate pointer-lock + movement smoke in a fully interactive local browser session (Playwright pointer-lock had document-lock error).
-2. Decide whether to keep legacy design snapshots (`docs/map-design/anchors.json`, `blockout_spec.json`) or move/delete them.
-3. Evaluate further `three` vendor split/treeshake options if we want to reduce the 545k vendor chunk itself (warning is currently silenced via threshold).
+1. Add optional dry-fire click event/audio when `mag=0 && reserve=0`.
+2. Expose ammo (`mag`, `reserve`, `reloading`) in `render_game_to_text` for automated runtime assertions.
+3. Add lightweight reload SFX timing hook (start/end) without introducing full animation scope.
 
 ## Known Issues / Risks
-- Automated Playwright smoke cannot reliably assert pointer lock in this environment (`WrongDocumentError`); manual browser verification still required.
-- `LMK_HERO_ARCH_01` and `LMK_MID_WELL_01` are reported inside clear zones by generator warnings (currently intentional for visual rhythm).
+- Playwright pointer-lock automation still throws `WrongDocumentError` in this environment; full fire/reload verification needs an interactive browser session.
+- Compare-shot screenshots are deterministic but do not exercise live firing/reload behavior.
+- Existing map generator warnings for `LMK_HERO_ARCH_01` and `LMK_MID_WELL_01` remain intentional.
