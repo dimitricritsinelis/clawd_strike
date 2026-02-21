@@ -1,7 +1,11 @@
 import { BoxGeometry, Group, InstancedMesh, MeshLambertMaterial, Object3D } from "three";
+import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibrary";
 import type { RuntimeBlockoutSpec, RuntimeRect } from "./types";
 import type { RuntimeColliderAabb } from "../sim/collision/WorldColliders";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
+import type { RuntimeFloorMode, RuntimeFloorQuality, RuntimeLightingPreset } from "../utils/UrlParams";
+import { buildPbrFloors } from "./buildPbrFloors";
+import { buildSandAccumulation } from "./buildSandAccumulation";
 
 const WALKABLE_ZONE_TYPES = new Set([
   "spawn_plaza",
@@ -18,7 +22,7 @@ const WALL_THICKNESS_M = 0.4;
 const BASE_FLOOR_THICKNESS_M = 0.06;
 const OVERLAY_FLOOR_THICKNESS_M = 0.02;
 
-type BoundarySegment = {
+export type BoundarySegment = {
   orientation: "vertical" | "horizontal";
   coord: number;
   start: number;
@@ -33,6 +37,11 @@ export type BlockoutBuildResult = {
 
 export type BlockoutBuildOptions = {
   highVis: boolean;
+  seed: number;
+  floorMode: RuntimeFloorMode;
+  floorQuality: RuntimeFloorQuality;
+  lightingPreset: RuntimeLightingPreset;
+  floorMaterials: FloorMaterialLibrary | null;
 };
 
 function rectContainsPoint(rect: RuntimeRect, x: number, y: number): boolean {
@@ -240,36 +249,61 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
   const clearRects = spec.zones
     .filter((zone) => zone.type === CLEAR_TRAVEL_ZONE_TYPE)
     .map((zone) => zone.rect);
-
-  const floorTopY = spec.defaults.floor_height;
-  const walkableFloor = createFloorInstances(
-    walkableRects,
-    new MeshLambertMaterial({ color: palette.floorBase }),
-    BASE_FLOOR_THICKNESS_M,
-    floorTopY,
-  );
-  const stallOverlay = createFloorInstances(
-    stallRects,
-    new MeshLambertMaterial({ color: palette.floorStallOverlay }),
-    OVERLAY_FLOOR_THICKNESS_M,
-    floorTopY + 0.02,
-  );
-  const clearOverlay = createFloorInstances(
-    clearRects,
-    new MeshLambertMaterial({ color: palette.floorClearOverlay }),
-    OVERLAY_FLOOR_THICKNESS_M,
-    floorTopY + 0.03,
-  );
-
-  if (walkableFloor) root.add(walkableFloor);
-  if (stallOverlay) root.add(stallOverlay);
-  if (clearOverlay) root.add(clearOverlay);
-
-  const colliders: RuntimeColliderAabb[] = [];
-
   const axes = collectAxisCoordinates(walkableRects, spec.playable_boundary);
   const inside = buildInsideGrid(walkableRects, axes.xs, axes.ys);
   const wallSegments = mergeBoundarySegments(extractBoundarySegments(inside, axes.xs, axes.ys));
+
+  const floorTopY = spec.defaults.floor_height;
+  if (options.floorMode === "pbr" && options.floorMaterials) {
+    const pbrFloors = buildPbrFloors(spec, {
+      seed: options.seed,
+      quality: options.floorQuality,
+      manifest: options.floorMaterials,
+      patchSizeM: 4,
+      floorTopY,
+    });
+    root.add(pbrFloors);
+
+    if (options.lightingPreset === "golden") {
+      const sandAccumulation = buildSandAccumulation({
+        wallSegments,
+        seed: options.seed,
+        floorTopY,
+        manifest: options.floorMaterials,
+        quality: options.floorQuality,
+      });
+      root.add(sandAccumulation);
+    }
+  } else {
+    const walkableFloor = createFloorInstances(
+      walkableRects,
+      new MeshLambertMaterial({ color: palette.floorBase }),
+      BASE_FLOOR_THICKNESS_M,
+      floorTopY,
+    );
+    const stallOverlay = createFloorInstances(
+      stallRects,
+      new MeshLambertMaterial({ color: palette.floorStallOverlay }),
+      OVERLAY_FLOOR_THICKNESS_M,
+      floorTopY + 0.02,
+    );
+    const clearOverlay = createFloorInstances(
+      clearRects,
+      new MeshLambertMaterial({ color: palette.floorClearOverlay }),
+      OVERLAY_FLOOR_THICKNESS_M,
+      floorTopY + 0.03,
+    );
+    if (walkableFloor) walkableFloor.receiveShadow = true;
+    if (stallOverlay) stallOverlay.receiveShadow = true;
+    if (clearOverlay) clearOverlay.receiveShadow = true;
+
+    if (walkableFloor) root.add(walkableFloor);
+    if (stallOverlay) root.add(stallOverlay);
+    if (clearOverlay) root.add(clearOverlay);
+  }
+
+  const colliders: RuntimeColliderAabb[] = [];
+
   const wallInstances = createWallInstances(
     wallSegments,
     new MeshLambertMaterial({ color: palette.wall }),
@@ -277,7 +311,11 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     floorTopY,
     colliders,
   );
-  if (wallInstances) root.add(wallInstances);
+  if (wallInstances) {
+    wallInstances.castShadow = true;
+    wallInstances.receiveShadow = true;
+    root.add(wallInstances);
+  }
 
   colliders.push({
     id: "floor-slab",

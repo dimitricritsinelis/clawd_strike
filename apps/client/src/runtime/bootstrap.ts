@@ -6,6 +6,7 @@ import { loadMap, RuntimeMapLoadError } from "./map/loadMap";
 import { resolveShot } from "./map/shots";
 import type { RuntimeMapAssets } from "./map/types";
 import { Renderer } from "./render/Renderer";
+import { FloorMaterialLibrary } from "./render/materials/FloorMaterialLibrary";
 import { WeaponAudio } from "./audio/WeaponAudio";
 import { AmmoHud } from "./ui/AmmoHud";
 import { HealthHud } from "./ui/HealthHud";
@@ -25,6 +26,7 @@ type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["
 
 const OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M = 10;
 const PERF_SCENE_SAMPLE_INTERVAL_MS = 300;
+const FLOOR_MANIFEST_URL = "/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json";
 
 type ScenePerfSnapshot = {
   materials: number;
@@ -88,6 +90,19 @@ export type RuntimeTextState = {
   shot: {
     active: boolean;
     id: string | null;
+    cameraPose: {
+      pos: { x: number; y: number; z: number };
+      lookAt: { x: number; y: number; z: number };
+      fovDeg: number;
+    } | null;
+  };
+  view: {
+    camera: {
+      pos: { x: number; y: number; z: number };
+      yawDeg: number;
+      pitchDeg: number;
+      fovDeg: number;
+    };
   };
   gameplay: {
     active: true;
@@ -255,12 +270,12 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, urlParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
-  const healthHud = new HealthHud(runtimeRoot, urlParams.playerName);
+  const healthHud = new HealthHud(runtimeRoot);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
   const killFeed = new KillFeed(runtimeRoot);
   const hitMarker = new HitMarker(crosshair);
-  const scoreHud = new ScoreHud(runtimeRoot);
+  const scoreHud = new ScoreHud(runtimeRoot, urlParams.playerName);
   const roundEndScreen = new RoundEndScreen(runtimeRoot);
   const timerHud = new TimerHud(runtimeRoot);
   const damageNumbers = new DamageNumbers(runtimeRoot);
@@ -283,7 +298,10 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     errorOverlay.style.display = "block";
   }
 
-  const renderer = new Renderer(runtimeRoot, { highVis: urlParams.highVis });
+  const renderer = new Renderer(runtimeRoot, {
+    highVis: urlParams.highVis,
+    lightingPreset: urlParams.lightingPreset,
+  });
   let disposed = false;
   const weaponAudio = new WeaponAudio();
   const viewModelEnabled = urlParams.vm;
@@ -299,6 +317,19 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     }
     warningOverlay.style.display = "block";
   };
+
+  let resolvedFloorMode = urlParams.floorMode;
+  let floorMaterials: FloorMaterialLibrary | null = null;
+  if (resolvedFloorMode === "pbr") {
+    try {
+      floorMaterials = await FloorMaterialLibrary.load(FLOOR_MANIFEST_URL);
+    } catch (error) {
+      resolvedFloorMode = "blockout";
+      appendWarning(
+        `Failed to load floor PBR pack. Falling back to blockout floors.\n${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   const startViewModelLoad = (): void => {
     if (!viewModelEnabled || disposed || viewModelLoadStarted || viewModel) {
@@ -334,6 +365,10 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     mapId: urlParams.mapId,
     seedOverride: urlParams.seed,
     propChaos: urlParams.propChaos,
+    floorMode: resolvedFloorMode,
+    floorQuality: urlParams.floorQuality,
+    lightingPreset: urlParams.lightingPreset,
+    floorMaterials,
     freezeInput: inputFrozen,
     spawn: urlParams.spawn,
     debug: urlParams.debug,
@@ -530,64 +565,82 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     instancedInstances: 0,
   };
 
-  const state = (): RuntimeTextState => ({
-    mode: "runtime",
-    map: {
-      loaded: mapLoaded,
-      mapId: urlParams.mapId,
-      seed: game.getPropsBuildStats().seed,
-      spawn: urlParams.spawn,
-      highVis: urlParams.highVis,
-      colliderCount: game.getColliderCount(),
-      ...(mapErrorMessage ? { error: mapErrorMessage } : {}),
-    },
-    shot: {
-      active: shotActive,
-      id: shotId,
-    },
-    gameplay: {
-      active: true,
-      pointerLocked: pointerLock?.isLocked() ?? false,
-      inputFrozen,
-      grounded: game.getGrounded(),
-      speedMps: game.getSpeedMps(),
-    },
-    anchorsDebug: game.getAnchorsDebugState(),
-    props: {
-      profile: game.getPropsBuildStats().profile,
-      jitter: game.getPropsBuildStats().jitter,
-      cluster: game.getPropsBuildStats().cluster,
-      density: game.getPropsBuildStats().density,
-      candidatesTotal: game.getPropsBuildStats().candidatesTotal,
-      collidersPlaced: game.getPropsBuildStats().collidersPlaced,
-      rejections: {
-        clearZone: game.getPropsBuildStats().rejectedClearZone,
-        bounds: game.getPropsBuildStats().rejectedBounds,
-        gapRule: game.getPropsBuildStats().rejectedGapRule,
+  const state = (): RuntimeTextState => {
+    const yawPitch = game.getYawPitchDeg();
+    return {
+      mode: "runtime",
+      map: {
+        loaded: mapLoaded,
+        mapId: urlParams.mapId,
+        seed: game.getPropsBuildStats().seed,
+        spawn: urlParams.spawn,
+        highVis: urlParams.highVis,
+        colliderCount: game.getColliderCount(),
+        ...(mapErrorMessage ? { error: mapErrorMessage } : {}),
       },
-      visualOnlyLandmarks: game.getPropsBuildStats().visualOnlyLandmarks,
-      stallFillersPlaced: game.getPropsBuildStats().stallFillersPlaced,
-    },
-    weapon: {
-      enabled: viewModelEnabled,
-      visible: viewModelVisible,
-      loaded: game.getWeaponDebugSnapshot().loaded,
-      alignDot: game.getWeaponDebugSnapshot().dot,
-      alignAngleDeg: game.getWeaponDebugSnapshot().angleDeg,
-    },
-    perf: {
-      visible: perfHud.isVisible(),
-      fps: perfFps,
-      msPerFrame: perfMsPerFrame,
-      drawCalls: perfDrawCalls,
-      triangles: perfTriangles,
-      geometries: perfGeometries,
-      textures: perfTextures,
-      materials: scenePerfSnapshot.materials,
-      instancedMeshes: scenePerfSnapshot.instancedMeshes,
-      instancedInstances: scenePerfSnapshot.instancedInstances,
-    },
-  });
+      shot: {
+        active: shotActive,
+        id: shotId,
+        cameraPose: resolvedShot?.cameraPose ?? null,
+      },
+      // Include explicit camera data so screenshot review gates can assert framing consistency.
+      // This prevents top-down/floor-only compare-shot regressions from passing unnoticed.
+      view: {
+        camera: {
+          pos: {
+            x: game.camera.position.x,
+            y: game.camera.position.y,
+            z: game.camera.position.z,
+          },
+          yawDeg: yawPitch.yaw,
+          pitchDeg: yawPitch.pitch,
+          fovDeg: game.camera.fov,
+        },
+      },
+      gameplay: {
+        active: true,
+        pointerLocked: pointerLock?.isLocked() ?? false,
+        inputFrozen,
+        grounded: game.getGrounded(),
+        speedMps: game.getSpeedMps(),
+      },
+      anchorsDebug: game.getAnchorsDebugState(),
+      props: {
+        profile: game.getPropsBuildStats().profile,
+        jitter: game.getPropsBuildStats().jitter,
+        cluster: game.getPropsBuildStats().cluster,
+        density: game.getPropsBuildStats().density,
+        candidatesTotal: game.getPropsBuildStats().candidatesTotal,
+        collidersPlaced: game.getPropsBuildStats().collidersPlaced,
+        rejections: {
+          clearZone: game.getPropsBuildStats().rejectedClearZone,
+          bounds: game.getPropsBuildStats().rejectedBounds,
+          gapRule: game.getPropsBuildStats().rejectedGapRule,
+        },
+        visualOnlyLandmarks: game.getPropsBuildStats().visualOnlyLandmarks,
+        stallFillersPlaced: game.getPropsBuildStats().stallFillersPlaced,
+      },
+      weapon: {
+        enabled: viewModelEnabled,
+        visible: viewModelVisible,
+        loaded: game.getWeaponDebugSnapshot().loaded,
+        alignDot: game.getWeaponDebugSnapshot().dot,
+        alignAngleDeg: game.getWeaponDebugSnapshot().angleDeg,
+      },
+      perf: {
+        visible: perfHud.isVisible(),
+        fps: perfFps,
+        msPerFrame: perfMsPerFrame,
+        drawCalls: perfDrawCalls,
+        triangles: perfTriangles,
+        geometries: perfGeometries,
+        textures: perfTextures,
+        materials: scenePerfSnapshot.materials,
+        instancedMeshes: scenePerfSnapshot.instancedMeshes,
+        instancedInstances: scenePerfSnapshot.instancedInstances,
+      },
+    };
+  };
 
   const onResize = (): void => {
     renderer.resize();

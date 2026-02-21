@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "gen:maps": "node scripts/gen-map-runtime.mjs",
+    "review:shot-pair": "node scripts/review-shot-pair.mjs",
     "predev": "pnpm gen:maps",
     "prebuild": "pnpm gen:maps",
     "prepreview": "pnpm gen:maps",
