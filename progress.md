@@ -1,12 +1,13 @@
 # progress.md — MVP Blockout Branch
 
 ## Current Status (<=10 lines)
-- Added CS-style ammo HUD overlay with tabular `mag / reserve`, low-ammo color states, and reload progress bar.
-- Added single-weapon AK ammo/reload wrapper (`30/90`, `R` reload, auto-reload at empty, firing blocked during reload).
-- `Game` now routes fire/reload through `Ak47Weapon` and exposes ammo snapshot for UI updates.
-- `Ak47FireController.update(...)` now supports per-frame `shotBudget` for ammo-safe burst limits.
-- `bootstrap` now instantiates/updates/disposes ammo HUD without changing crosshair behavior.
-- Determinism preserved for map/props systems.
+- Map v2.3: side halls widened to 6.5m (4.5m clear), connectors to 6.0m, cuts to 12.25m.
+- Shopfront anchors rebuilt with organic irregular spacing + per-stall `width_m` (M1=spice, M2=fabric, M3=rug).
+- 3 open_node anchors added as intentional market gap zones (M1 mid, M2 well courtyard, M3 arch clear).
+- `buildProps.ts`: shopfronts now use `anchor.widthM` as authoritative width (±20% jitter vs. old ~4× range).
+- `buildProps.ts`: side hall fillers are now 1.0–1.8m wall-aligned groups (was 0.24–0.62m scattered pebbles).
+- `buildProps.ts`: stall filler skips open_node exclusion radius; open_node anchors place no geometry.
+- Ammo HUD + AK reload flow from P13 remain intact.
 - Validation: ✅ `pnpm typecheck` | ✅ `pnpm build`
 
 ## Canonical Playtest URL
@@ -23,26 +24,29 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P13_ammo_hud`
+- Prompt ID: `P14_map_organic_layout`
 - Summary:
-  - Implemented ammo HUD + AK ammo/reload state wrapper and wired it through runtime/game loop.
-  - Added shot-budget enforcement in fire controller so weapon cannot fire beyond available mag ammo.
-  - Captured deterministic compare-shot screenshots at:
-    - `/Users/dimitri/Desktop/ClawdStrike_v2/artifacts/screenshots/P13_ammo_hud/before.png`
-    - `/Users/dimitri/Desktop/ClawdStrike_v2/artifacts/screenshots/P13_ammo_hud/after.png`
+  - Widened side halls (6.5m total / 4.5m clear), connectors (6.0m), cuts (12.25m) in `map_spec.json`.
+  - Replaced uniform 3m-interval shopfront grid with organic cluster-based layout (~30 anchors, irregular Y spacing).
+  - Each anchor carries explicit `width_m` and `height_m`; M2 well stall uses yaw=80° (angled toward well).
+  - Added 3 `open_node` anchors encoding intentional market gaps; `buildProps.ts` skips filler within their radius.
+  - Side hall fillers scaled up to 1.0–1.8m wall-aligned groups for goods-stack feel.
+  - Shopfront width now driven by `anchor.widthM` (±20% jitter) instead of neighbor-gap heuristic (was ±75%).
+  - `gen-map-runtime.mjs`: registered `open_node` in `KNOWN_ANCHOR_TYPES`.
+  - `dimension_schedule.csv`: updated side hall, cut, and connector dimensions.
 - Files touched:
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/ui/AmmoHud.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/weapons/Ak47Weapon.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/weapons/Ak47FireController.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/game/Game.ts`
-  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/bootstrap.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/docs/map-design/specs/map_spec.json`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/scripts/gen-map-runtime.mjs`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/apps/client/src/runtime/map/buildProps.ts`
+  - `/Users/dimitri/Desktop/ClawdStrike_v2/docs/map-design/specs/dimension_schedule.csv`
   - `/Users/dimitri/Desktop/ClawdStrike_v2/progress.md`
 - How to test (60s):
   - Run `pnpm dev`.
   - Compare shot: `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
-  - Gameplay check: `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
-  - Lock pointer, hold fire, and verify ammo decrements; press `R` to reload early.
-  - Confirm auto-reload triggers at `mag=0`, and crosshair remains unchanged/fixed.
+  - Walk side halls — should feel like a 4.5m clear service alley, not a tunnel.
+  - Walk main lane — shops should have irregular rhythm: wide stalls next to narrow ones, gaps at nodes.
+  - Check M2 segment: fewer, wider stalls; one stall slightly angled toward well.
+  - Verify stall fillers in side halls look like crate stacks vs. main lane scattered pebbles.
 
 ## Next 3 Tasks
 1. Add optional dry-fire click event/audio when `mag=0 && reserve=0`.
@@ -52,4 +56,5 @@ pnpm build
 ## Known Issues / Risks
 - Playwright pointer-lock automation still throws `WrongDocumentError` in this environment; full fire/reload verification needs an interactive browser session.
 - Compare-shot screenshots are deterministic but do not exercise live firing/reload behavior.
+- open_node anchors inside clear travel zones produce `[gen:maps] warning` lines — intentional, they are gap markers.
 - Existing map generator warnings for `LMK_HERO_ARCH_01` and `LMK_MID_WELL_01` remain intentional.

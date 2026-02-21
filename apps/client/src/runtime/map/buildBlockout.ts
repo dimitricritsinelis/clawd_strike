@@ -294,5 +294,25 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     },
   });
 
+  // ── Perimeter cage walls — hard backstop so enemies/players can't escape the map ──
+  {
+    const CAGE_T = 0.5;   // thickness in metres
+    const CAGE_H = 4.0;   // wall height in metres
+    const pbX = spec.playable_boundary.x;
+    const pbZ = spec.playable_boundary.y;  // spec stores Z-axis extent in .y
+    const pbW = spec.playable_boundary.w;
+    const pbD = spec.playable_boundary.h;  // spec stores depth (Z-size) in .h
+    colliders.push(
+      // South wall
+      { id: "cage-S", kind: "wall", min: { x: pbX - CAGE_T, y: 0, z: pbZ - CAGE_T }, max: { x: pbX + pbW + CAGE_T, y: CAGE_H, z: pbZ } },
+      // North wall
+      { id: "cage-N", kind: "wall", min: { x: pbX - CAGE_T, y: 0, z: pbZ + pbD }, max: { x: pbX + pbW + CAGE_T, y: CAGE_H, z: pbZ + pbD + CAGE_T } },
+      // West wall
+      { id: "cage-W", kind: "wall", min: { x: pbX - CAGE_T, y: 0, z: pbZ }, max: { x: pbX, y: CAGE_H, z: pbZ + pbD } },
+      // East wall
+      { id: "cage-E", kind: "wall", min: { x: pbX + pbW, y: 0, z: pbZ }, max: { x: pbX + pbW + CAGE_T, y: CAGE_H, z: pbZ + pbD } },
+    );
+  }
+
   return { root, colliders };
 }

@@ -18,6 +18,7 @@ const KNOWN_ANCHOR_TYPES = new Set([
   "cover_cluster",
   "hero_landmark",
   "landmark",
+  "open_node",
   "service_door_anchor",
   "shopfront_anchor",
   "signage_anchor",

@@ -44,6 +44,15 @@ export class Ak47Weapon {
   private reloadTimerS = 0;
   private reloadQueued = false;
 
+  // Callbacks for audio events
+  onReloadStart: (() => void) | null = null;
+  onReloadEnd: (() => void) | null = null;
+  onDryFire: (() => void) | null = null;
+
+  // Dry-fire rate-limiting: only click once per trigger pull
+  private dryFireCooldownS = 0;
+  private wasFireHeld = false;
+
   constructor(options: Ak47FireControllerOptions) {
     this.fireController = new Ak47FireController(options);
   }
@@ -69,23 +78,47 @@ export class Ak47Weapon {
     const wantsReload = this.reloadQueued;
     this.reloadQueued = false;
 
+    // Dry-fire cooldown tick
+    if (this.dryFireCooldownS > 0) {
+      this.dryFireCooldownS -= Math.max(0, input.deltaSeconds);
+    }
+
     if (this.reloading) {
       this.reloadTimerS += Math.max(0, input.deltaSeconds);
+
+      // Reload cancel: if trigger is pulled mid-reload and mag has bullets, interrupt
+      if (input.fireHeld && !this.wasFireHeld && this.mag > 0) {
+        this.reloading = false;
+        this.reloadTimerS = 0;
+        this.wasFireHeld = input.fireHeld;
+        return this.forwardToFireController(input, input.fireHeld, this.mag, onShot);
+      }
+
       if (this.reloadTimerS >= RELOAD_TIME_S) {
         this.completeReload();
+        this.onReloadEnd?.();
       }
+      this.wasFireHeld = input.fireHeld;
       return this.updateWithoutFiring(input);
     }
 
     if (wantsReload && this.mag < MAG_CAPACITY && this.startReload()) {
+      this.wasFireHeld = input.fireHeld;
       return this.updateWithoutFiring(input);
     }
 
     if (this.mag === 0 && this.reserve > 0 && this.startReload()) {
+      this.wasFireHeld = input.fireHeld;
       return this.updateWithoutFiring(input);
     }
 
     if (this.mag <= 0) {
+      // Dry-fire: click once per trigger pull when mag is empty
+      if (input.fireHeld && !this.wasFireHeld && this.dryFireCooldownS <= 0) {
+        this.onDryFire?.();
+        this.dryFireCooldownS = 0.5; // prevent rapid clicking
+      }
+      this.wasFireHeld = input.fireHeld;
       return this.updateWithoutFiring(input);
     }
 
@@ -98,6 +131,7 @@ export class Ak47Weapon {
       }
     }
 
+    this.wasFireHeld = input.fireHeld;
     return fireResult;
   }
 
@@ -129,6 +163,7 @@ export class Ak47Weapon {
     this.reloadTimerS = 0;
     this.reloadQueued = false;
     this.fireController.cancelTrigger();
+    this.onReloadStart?.();
     return true;
   }
 

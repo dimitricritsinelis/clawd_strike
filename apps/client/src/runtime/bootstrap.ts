@@ -1,3 +1,4 @@
+import { Vector3 } from "three";
 import { Game } from "./game/Game";
 import { PerfHud } from "./debug/PerfHud";
 import { PointerLockController } from "./input/PointerLock";
@@ -7,6 +8,17 @@ import type { RuntimeMapAssets } from "./map/types";
 import { Renderer } from "./render/Renderer";
 import { WeaponAudio } from "./audio/WeaponAudio";
 import { AmmoHud } from "./ui/AmmoHud";
+import { HealthHud } from "./ui/HealthHud";
+import { DeathScreen } from "./ui/DeathScreen";
+import { HitVignette } from "./ui/HitVignette";
+import { KillFeed } from "./ui/KillFeed";
+import { HitMarker } from "./ui/HitMarker";
+import { ScoreHud } from "./ui/ScoreHud";
+import { RoundEndScreen, type RoundStats } from "./ui/RoundEndScreen";
+import { TimerHud } from "./ui/TimerHud";
+import { DamageNumbers } from "./ui/DamageNumbers";
+import { PauseMenu } from "./ui/PauseMenu";
+import { FadeOverlay } from "./ui/FadeOverlay";
 import { parseRuntimeUrlParams } from "./utils/UrlParams";
 
 type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["Ak47ViewModel"]>;
@@ -243,6 +255,17 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, urlParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
+  const healthHud = new HealthHud(runtimeRoot);
+  const hitVignette = new HitVignette(runtimeRoot);
+  const deathScreen = new DeathScreen(runtimeRoot);
+  const killFeed = new KillFeed(runtimeRoot);
+  const hitMarker = new HitMarker(crosshair);
+  const scoreHud = new ScoreHud(runtimeRoot);
+  const roundEndScreen = new RoundEndScreen(runtimeRoot);
+  const timerHud = new TimerHud(runtimeRoot);
+  const damageNumbers = new DamageNumbers(runtimeRoot);
+  const pauseMenu = new PauseMenu(runtimeRoot);
+  const fadeOverlay = new FadeOverlay(runtimeRoot);
 
   let mapLoaded = false;
   let mapErrorMessage: string | null = null;
@@ -321,12 +344,116 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       showLabels: urlParams.labels,
       anchorTypes: urlParams.anchorTypes,
     },
-    onWeaponShot: () => {
+    onWeaponShot: (shot) => {
       viewModel?.triggerShotFx();
       weaponAudio.playAk47Shot();
+      waveStats.shotsFired++;
+
+      // Enemy hit detection: re-raycast against enemy AABBs to see if the bullet hit one
+      if (shot.hit && shot.hitPoint) {
+        const camPos = game.camera.position;
+        const camFwd = new Vector3();
+        game.camera.getWorldDirection(camFwd);
+        const hp = shot.hitPoint;
+        const worldHitDist = camPos.distanceTo(new Vector3(hp.x, hp.y, hp.z));
+        const enemyHit = game.checkEnemyRaycastHit(camPos, camFwd, worldHitDist + 0.1);
+        if (enemyHit.hit && enemyHit.distance <= worldHitDist + 0.05) {
+          // Hit-zone multiplier: head=4× (instant kill), legs=0.75×, body=1×
+          // Enemy height is ~1.8m; head zone = top 20%, legs = bottom 25%
+          const BASE_DAMAGE = 25;
+          const ENEMY_H = 1.8;
+          // Use hitY directly (enemies stand on floor_height ≈ 0)
+          let damage = BASE_DAMAGE;
+          let isHeadshot = false;
+          if (enemyHit.hitY > ENEMY_H * 0.78) {
+            // Head zone (top 22%) → 4× = instant kill (100 damage)
+            damage = BASE_DAMAGE * 4;
+            isHeadshot = true;
+          } else if (enemyHit.hitY < ENEMY_H * 0.25) {
+            // Legs zone (bottom 25%) → 0.75×
+            damage = Math.round(BASE_DAMAGE * 0.75);
+          }
+          waveStats.shotsHit++;
+          if (isHeadshot) waveStats.headshots++;
+          game.applyDamageToEnemy(enemyHit.enemyId, damage);
+          hitMarker.trigger(isHeadshot);
+          weaponAudio.playHitThud();
+          // Floating damage number at hit point
+          damageNumbers.spawn(
+            { x: enemyHit.hitX, y: enemyHit.hitY, z: enemyHit.hitZ },
+            game.camera,
+            damage,
+            isHeadshot,
+          );
+        }
+      }
     },
     ...(urlParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
   });
+
+  // Wire enemy gunshot audio (quiet distant shots from AI enemies)
+  game.setEnemyAudio(weaponAudio);
+
+  // Landing impact: heavy thud + camera bob when player hits the ground
+  game.setLandingCallback(() => {
+    weaponAudio.playLanding();
+  });
+
+  // Weapon audio callbacks: reload sounds + dry-fire click
+  game.setWeaponCallbacks({
+    onReloadStart: () => weaponAudio.playReloadStart(),
+    onReloadEnd: () => weaponAudio.playReloadEnd(),
+    onDryFire: () => weaponAudio.playDryFire(),
+  });
+
+  // Pause menu: resume by re-requesting pointer lock
+  pauseMenu.onResume = () => {
+    void renderer.canvas.requestPointerLock();
+  };
+
+  // Wire kill feed
+  // Wire kill events → feed + ding + score counter
+  const TOTAL_ENEMIES = 9;
+  scoreHud.setTotal(TOTAL_ENEMIES);
+  game.setEnemyKillCallback((name) => {
+    killFeed.addKill(name);
+    weaponAudio.playKillDing();
+    scoreHud.addKill();
+    waveStats.kills++;
+  });
+
+  // New wave → reset score, stats counters, and hide round-end screen
+  game.setEnemyNewWaveCallback((_wave) => {
+    scoreHud.reset();
+    scoreHud.setTotal(TOTAL_ENEMIES);
+    roundEndScreen.hide();
+    roundEndShowing = false;
+    waveElapsedS = 0;
+    timerHud.reset();
+    timerHud.start();
+    // Reset per-wave stats
+    waveStats.kills = 0;
+    waveStats.totalEnemies = TOTAL_ENEMIES;
+    waveStats.shotsFired = 0;
+    waveStats.shotsHit = 0;
+    waveStats.headshots = 0;
+  });
+
+  // Death screen respawn handler — fires on both click and auto-countdown
+  // Fade to black → teleport → fade back in for a smooth transition
+  deathScreen.onRespawn = () => {
+    fadeOverlay.fadeOut(0.18, () => {
+      // Teleport happens while screen is black
+      game.respawn();
+      game.setFreezeInput(false);
+      pauseMenu.hide();
+      void renderer.canvas.requestPointerLock();
+      // Brief hold at black, then fade back in
+      setTimeout(() => {
+        fadeOverlay.fadeIn(0.3);
+      }, 60);
+    });
+  };
 
   // Preload the weapon model at runtime boot so first shots don't miss viewmodel FX.
   startViewModelLoad();
@@ -353,14 +480,36 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
         if (locked) {
           startViewModelLoad();
           weaponAudio.ensureResumedFromGesture();
+          weaponAudio.startAmbient(); // begin wind loop once audio is unlocked
         }
       },
-      onMouseDelta: (deltaX, deltaY) => game.onMouseDelta(deltaX, deltaY),
+      onMouseDelta: (deltaX, deltaY) => {
+        game.onMouseDelta(deltaX, deltaY);
+        swayMouseDeltaX += deltaX;
+        swayMouseDeltaY += deltaY;
+      },
     });
   }
 
   let rafId = 0;
   let previousFrameTime = performance.now();
+  let previousHealth = 100;
+  let footstepTimerS = 0;
+  // Accumulated mouse delta for weapon sway (reset each frame after feeding to viewmodel)
+  let swayMouseDeltaX = 0;
+  let swayMouseDeltaY = 0;
+  // Round / wave timing
+  let waveElapsedS = 0;         // time elapsed since current wave started
+  let roundEndShowing = false;  // true while round-end overlay is displayed
+
+  // Per-wave stats counters (reset each new wave)
+  const waveStats: RoundStats = {
+    kills: 0,
+    totalEnemies: 9, // matches TOTAL_ENEMIES defined below
+    shotsFired: 0,
+    shotsHit: 0,
+    headshots: 0,
+  };
   let perfMsPerFrame = 16.67;
   let perfFps = 60;
   let perfDrawCalls = 0;
@@ -442,18 +591,91 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
 
   const step = (deltaMs: number): void => {
     const clampedMs = Math.min(Math.max(deltaMs, 0), 100);
-    game.update(clampedMs / 1000);
+    const dt = clampedMs / 1000;
+
+    // Freeze game input when pause menu is open (death-freeze is managed inside Game.ts)
+    if (pauseMenu.isVisible()) {
+      game.setFreezeInput(true);
+    } else if (!game.getIsDead() && !inputFrozen) {
+      game.setFreezeInput(false);
+    }
+    game.update(dt);
+
+    // ── Health tracking & hit vignette ───────────────────────────────────────
+    const currentHealth = game.getPlayerHealth();
+    if (currentHealth < previousHealth) {
+      hitVignette.triggerHit();
+    }
+    previousHealth = currentHealth;
+
+    // ── Footstep audio ───────────────────────────────────────────────────────
+    const grounded = game.getGrounded();
+    const speedMps = game.getSpeedMps();
+    if (grounded && speedMps > 0.5) {
+      footstepTimerS -= dt;
+      if (footstepTimerS <= 0) {
+        footstepTimerS = speedMps > 4.5 ? 0.45 : 0.65;
+        weaponAudio.playFootstep(Math.min(1, speedMps / 6.0));
+      }
+    } else {
+      footstepTimerS = 0; // reset so first step fires immediately on landing
+    }
+
+    // ── Wave timing & round-end screen ───────────────────────────────────────
+    if (!game.getIsDead() && !roundEndShowing) {
+      waveElapsedS += dt;
+    }
+    const allDead = game.getAllEnemiesDead();
+    if (allDead && !roundEndShowing && !game.getIsDead()) {
+      // First frame all enemies are dead — show the round-end screen with stats
+      roundEndShowing = true;
+      roundEndScreen.show(waveElapsedS, game.getWaveNumber(), { ...waveStats });
+    }
+    if (roundEndShowing) {
+      const countdown = game.getWaveCountdownS() ?? 0;
+      roundEndScreen.update(dt, countdown);
+    }
+
+    // ── Death detection ──────────────────────────────────────────────────────
+    if (game.getIsDead() && !deathScreen.isVisible()) {
+      deathScreen.show();
+    }
 
     const overviewCamera = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
     viewModelVisible = Boolean(viewModelEnabled && viewModel && !overviewCamera);
     crosshair.style.display = overviewCamera ? "none" : "block";
     ammoHud.setVisible(!overviewCamera);
+    healthHud.setVisible(!overviewCamera);
+    timerHud.setVisible(!overviewCamera);
     if (!overviewCamera) {
       ammoHud.update(game.getAmmoSnapshot());
+      healthHud.update({ health: currentHealth }, dt);
     }
 
+    // Update pause menu
+    pauseMenu.update(dt);
+
+    // ── Timer: pause while dead or round-end showing ─────────────────────────
+    if (game.getIsDead() || roundEndShowing) {
+      timerHud.pause();
+    } else {
+      timerHud.start();
+    }
+    timerHud.update(dt);
+
+    // ── Always-on effects ────────────────────────────────────────────────────
+    fadeOverlay.update(dt);
+    hitVignette.update(dt);
+    deathScreen.update(dt);
+    killFeed.update(dt);
+    hitMarker.update(dt);
+    damageNumbers.update(dt);
+
     if (viewModel) {
-      viewModel.updateFromMainCamera(game.camera, clampedMs / 1000);
+      viewModel.setFrameInput(speedMps, grounded, swayMouseDeltaX, swayMouseDeltaY);
+      swayMouseDeltaX = 0;
+      swayMouseDeltaY = 0;
+      viewModel.updateFromMainCamera(game.camera, dt);
       const weaponDebug = viewModel.getAlignmentSnapshot();
       game.setWeaponDebugSnapshot(weaponDebug.loaded, weaponDebug.dot, weaponDebug.angleDeg);
     } else {
@@ -507,9 +729,32 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     rafId = window.requestAnimationFrame(animate);
   };
 
+  // Escape key toggles pause menu (when pointer lock is NOT held by the browser)
+  const onKeyDownPause = (e: KeyboardEvent): void => {
+    if (e.code !== "Escape") return;
+    if (game.getIsDead()) return; // ignore Esc on death screen
+    if (inputFrozen) return;
+    // When Escape is pressed, pointer lock exits first (browser default),
+    // then we show the pause menu.
+    // If we're already showing pause, hide it and try to re-lock.
+    if (pauseMenu.isVisible()) {
+      pauseMenu.hide();
+      pauseMenu.onResume?.();
+    }
+    // If pointer is not locked (Esc just released it), show pause
+    // We check via a short delay since pointerlockchange fires after keydown
+    setTimeout(() => {
+      if (!pointerLock?.isLocked() && !game.getIsDead() && !inputFrozen) {
+        pauseMenu.show();
+      }
+    }, 50);
+  };
+  window.addEventListener("keydown", onKeyDownPause);
+
   pointerLock?.init();
   onResize();
   window.addEventListener("resize", onResize);
+  timerHud.start(); // begin counting from game boot
   rafId = window.requestAnimationFrame(animate);
 
   window.render_game_to_text = () => JSON.stringify(state());
@@ -543,6 +788,18 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     weaponAudio.dispose();
     perfHud.dispose();
     ammoHud.dispose();
+    healthHud.dispose();
+    hitVignette.dispose();
+    deathScreen.dispose();
+    killFeed.dispose();
+    hitMarker.dispose();
+    scoreHud.dispose();
+    roundEndScreen.dispose();
+    timerHud.dispose();
+    damageNumbers.dispose();
+    pauseMenu.dispose();
+    fadeOverlay.dispose();
+    window.removeEventListener("keydown", onKeyDownPause);
     viewModel?.dispose();
     renderer.dispose();
     crosshair.remove();

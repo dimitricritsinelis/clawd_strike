@@ -16,6 +16,11 @@ export const WALK_SPEED_MPS = 3.0;
 export const GRAVITY_MPS2 = 20.0;
 export const JUMP_VELOCITY_MPS = 6.35;
 
+/** Coyote time: player can still jump for this many seconds after walking off a ledge. */
+const COYOTE_TIME_S = 0.1;
+/** Jump buffer: a jump input this many seconds early will be queued and executed on landing. */
+const JUMP_BUFFER_S = 0.1;
+
 const PLAYER_HALF_WIDTH_M = PLAYER_WIDTH_M * 0.5;
 const MAX_FRAME_DT_S = 1 / 20;
 const MAX_SUBSTEP_DT_S = 1 / 120;
@@ -30,6 +35,10 @@ export class PlayerController {
   private velocityY = 0;
   private grounded = true;
   private horizontalSpeedMps = 0;
+  /** Coyote timer: counts down from COYOTE_TIME_S when the player leaves the ground. */
+  private coyoteTimerS = 0;
+  /** Jump buffer timer: set to JUMP_BUFFER_S on input; executes jump when grounded. */
+  private jumpBufferTimerS = 0;
 
   setWorld(world: WorldColliders): void {
     this.world = world;
@@ -43,6 +52,8 @@ export class PlayerController {
     this.velocityY = 0;
     this.grounded = true;
     this.horizontalSpeedMps = 0;
+    this.coyoteTimerS = 0;
+    this.jumpBufferTimerS = 0;
     this.clampToPlayableBounds();
   }
 
@@ -56,7 +67,10 @@ export class PlayerController {
     const stepCount = Math.max(1, Math.ceil(clampedDt / MAX_SUBSTEP_DT_S));
     const stepDt = clampedDt / stepCount;
 
-    let jumpRequested = input.jumpPressed;
+    // ── Jump buffer: receiving new jump input refreshes the buffer timer ──────
+    if (input.jumpPressed) {
+      this.jumpBufferTimerS = JUMP_BUFFER_S;
+    }
 
     for (let i = 0; i < stepCount; i += 1) {
       let forward = input.forward;
@@ -81,11 +95,21 @@ export class PlayerController {
       const velocityZ = (forwardZ * forward + rightZ * right) * speedMps;
       this.horizontalSpeedMps = Math.hypot(velocityX, velocityZ);
 
-      if (jumpRequested && this.grounded) {
+      // ── Coyote time: allow jumping briefly after walking off a ledge ────────
+      const canJump = this.grounded || this.coyoteTimerS > 0;
+
+      if (this.jumpBufferTimerS > 0 && canJump) {
         this.velocityY = JUMP_VELOCITY_MPS;
         this.grounded = false;
+        this.coyoteTimerS = 0;   // consume coyote window immediately
+        this.jumpBufferTimerS = 0;
       }
-      jumpRequested = false;
+
+      // Decay timers by substep dt
+      this.jumpBufferTimerS = Math.max(0, this.jumpBufferTimerS - stepDt);
+      if (!this.grounded) {
+        this.coyoteTimerS = Math.max(0, this.coyoteTimerS - stepDt);
+      }
 
       this.velocityY -= GRAVITY_MPS2 * stepDt;
 
@@ -101,9 +125,14 @@ export class PlayerController {
       if (this.motionResult.hitY) {
         if (this.velocityY < 0) {
           this.grounded = true;
+          this.coyoteTimerS = 0; // reset coyote on landing
         }
         this.velocityY = 0;
       } else {
+        if (this.grounded) {
+          // Just left the ground — start the coyote window
+          this.coyoteTimerS = COYOTE_TIME_S;
+        }
         this.grounded = false;
       }
 

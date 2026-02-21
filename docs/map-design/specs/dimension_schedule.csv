@@ -7,6 +7,6 @@ Jog centerline offset,ΔX,+2.0,Relative to BZ-M1/BZ-M3 centerline.
 Clear travel zone (bazaar),W,6.0,Must remain unobstructed end-to-end.
 Stall strips (M1/M3),W each side,1.75,Edge decor only.
 Stall strips (M2),W each side,1.25,Edge decor only.
-Side halls (W/E),W x L,4.5 x 62 (each),Target 3.0m clear through path.
-"Cuts (mid + north, W/E)",W x L,11 x 3 (each),Rotation connectors between lanes.
-Spawn↔Side connectors (4),W x L,4.75 x 4.0 (each),Short lane access connectors.
+Side halls (W/E),W x L,6.5 x 62 (each),Target 4.5m clear through path.
+"Cuts (mid + north, W/E)",W x L,12.25 x 3 (each),Rotation connectors between lanes.
+Spawn↔Side connectors (4),W x L,6.0 x 4.0 (each),Short lane access connectors.

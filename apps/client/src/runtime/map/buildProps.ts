@@ -503,6 +503,27 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
   };
 
   const sortedAnchors = [...options.anchors.anchors].sort((a, b) => a.id.localeCompare(b.id));
+
+  // Build open-node exclusion list — intentional market gap zones.
+  // widthM on an open_node encodes the exclusion radius in design space.
+  type OpenNodeCircle = { x: number; z: number; radiusSq: number };
+  const openNodeCircles: OpenNodeCircle[] = sortedAnchors
+    .filter((a) => a.type.toLowerCase() === "open_node")
+    .map((a) => {
+      const w = toWorldPosition(a);
+      const r = a.widthM ?? 2.5;
+      return { x: w.x, z: w.z, radiusSq: r * r };
+    });
+
+  function isNearOpenNode(x: number, z: number): boolean {
+    for (const circle of openNodeCircles) {
+      const dx = x - circle.x;
+      const dz = z - circle.z;
+      if (dx * dx + dz * dz < circle.radiusSq) return true;
+    }
+    return false;
+  }
+
   const shopfrontLines = buildAnchorLineGroups(
     sortedAnchors.filter((anchor) => anchor.type.toLowerCase() === "shopfront_anchor"),
     "shopfront_anchor",
@@ -542,6 +563,11 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
     const base = toWorldPosition(anchor);
     const baseYaw = yawDegToRad(anchor.yawDeg);
 
+    if (type === "open_node") {
+      // Open nodes define intentional market gaps. No geometry placed.
+      continue;
+    }
+
     if (type === "shopfront_anchor") {
       if (!shopfrontVisibility.has(anchor.id)) {
         continue;
@@ -562,11 +588,19 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
       const alongJitter = (rng.next() - 0.5) * 2 * (0.5 + 0.75 * chaos.jitter + 0.5 * chaos.cluster);
       const inwardJitter = (rng.next() - 0.5) * 2 * (0.01 + 0.05 * chaos.jitter);
       const yawJitter = (rng.next() - 0.5) * 2 * (4 + 8 * chaos.jitter) * DEG_TO_RAD;
-      const widthScale = rng.range(0.42, 1.75) * (0.82 + chaos.cluster * 0.52);
+
+      // Use anchor.widthM as the authoritative stall width (±20% jitter) when provided.
+      // Fall back to neighbor-gap heuristic for anchors without an explicit width.
+      const baseWidth = anchor.widthM ?? lineSpan;
+      const widthJitter = anchor.widthM
+        ? rng.range(0.82, 1.18)
+        : rng.range(0.42, 1.75) * (0.82 + chaos.cluster * 0.52);
+
+      const baseHeight = anchor.heightM ?? (2.2 + rng.range(-0.5, 0.95) * (0.65 + chaos.jitter * 0.75));
 
       const size = {
-        x: clamp(lineSpan * widthScale, 0.55, 3.45),
-        y: clamp(2.2 + rng.range(-0.5, 0.95) * (0.65 + chaos.jitter * 0.75), 1.75, 3.8),
+        x: clamp(baseWidth * widthJitter, 0.55, 3.45),
+        y: clamp(baseHeight, 1.75, 3.8),
         z: clamp(0.28 + rng.range(-0.08, 0.18) * (0.55 + chaos.jitter * 0.8), 0.2, 0.62),
       };
       const center = {
@@ -810,9 +844,17 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
     }
   }
 
+  // Side hall strips (x < 10 or x > 40) use larger, wall-aligned filler groups.
+  // Main lane strips use the original small scattered pieces.
+  const SIDE_HALL_X_MAX = 10.0;
+  const SIDE_HALL_X_MIN = 40.0;
+
   for (const strip of stallStripRects) {
     const rng = streamByType.filler.fork(`${strip.x}:${strip.y}:${strip.w}:${strip.h}`);
     const isLongitudinal = strip.h >= strip.w;
+    const stripCenterX = strip.x + strip.w * 0.5;
+    const isSideHall = stripCenterX < SIDE_HALL_X_MAX || stripCenterX > SIDE_HALL_X_MIN;
+
     const stripDropoutChance = clamp(0.45 - chaos.density * 0.3 + (1 - chaos.cluster) * 0.07, 0.14, 0.5);
     if (rng.next() < stripDropoutChance) {
       continue;
@@ -838,20 +880,31 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
         }
 
         const pieceRng = groupRng.fork(`piece-${p}`);
-        const size = {
-          x: pieceRng.range(0.24, 0.62),
-          y: pieceRng.range(0.28, 0.95),
-          z: pieceRng.range(0.24, 0.62),
-        };
+
+        // Side hall fillers: larger crate/barrel groups, wall-aligned.
+        const size = isSideHall
+          ? {
+              x: pieceRng.range(1.0, 1.8),
+              y: pieceRng.range(0.55, 1.15),
+              z: pieceRng.range(0.8, 1.2),
+            }
+          : {
+              x: pieceRng.range(0.24, 0.62),
+              y: pieceRng.range(0.28, 0.95),
+              z: pieceRng.range(0.24, 0.62),
+            };
 
         let centerX = strip.x + strip.w * 0.5;
         let centerZ = strip.y + strip.h * 0.5;
 
+        // Side hall fillers hug the outer wall (within 0.4m of wall face).
+        const sideOffset = isSideHall
+          ? pieceRng.range(-0.15, 0.15) * chaos.jitter
+          : pieceRng.range(-0.45, 0.45) * (0.2 + chaos.jitter * 0.7);
         const alongOffset = pieceRng.range(-1.05, 1.05) * (0.2 + (1 - chaos.cluster) * 0.58);
-        const sideOffset = pieceRng.range(-0.45, 0.45) * (0.2 + chaos.jitter * 0.7);
 
         if (isLongitudinal) {
-          const outerX = strip.x + strip.w * 0.5 < boundaryCenterX
+          const outerX = stripCenterX < boundaryCenterX
             ? strip.x + STALL_FILLER_EDGE_PADDING_M
             : strip.x + strip.w - STALL_FILLER_EDGE_PADDING_M;
           centerX = outerX + sideOffset;
@@ -870,6 +923,11 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
             strip.x + strip.w - 0.45,
           );
           centerZ = outerZ + sideOffset;
+        }
+
+        // Skip filler placement in open node exclusion zones.
+        if (isNearOpenNode(centerX, centerZ)) {
+          continue;
         }
 
         pushInstance(

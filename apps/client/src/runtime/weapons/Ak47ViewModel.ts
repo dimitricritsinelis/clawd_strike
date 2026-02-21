@@ -67,6 +67,25 @@ const VIEWMODEL_KICK_IMPULSE_ROLL_RAD = 0.012;
 const VIEWMODEL_KICK_SPRING_STIFFNESS = 240;
 const VIEWMODEL_KICK_SPRING_DAMPING = 22;
 
+// Idle breathing bob: slow sine wave on Y and Z
+const BOB_IDLE_FREQ_HZ = 0.85;     // breaths per second
+const BOB_IDLE_AMP_Y_M = 0.0014;   // up/down
+const BOB_IDLE_AMP_Z_M = 0.0008;   // slight fore-aft
+
+// Walk/run bob: synced to footstep cycle
+const BOB_WALK_FREQ_HZ = 1.8;
+const BOB_WALK_AMP_Y_M = 0.006;
+const BOB_WALK_AMP_X_M = 0.003;    // side-to-side
+const BOB_RUN_FREQ_MULT = 1.35;     // run is faster
+const BOB_RUN_AMP_MULT  = 1.6;     // and larger
+
+// Sway: weapon lags behind mouse look
+const SWAY_STIFFNESS = 6.5;        // spring stiffness for sway settle
+const SWAY_DAMPING = 4.2;
+const SWAY_MAX_X_M = 0.022;        // left-right limit
+const SWAY_MAX_Y_M = 0.014;        // up-down limit
+const SWAY_SENSITIVITY = 0.003;    // how much mouse delta maps to sway offset
+
 type Ak47ViewModelOptions = {
   vmDebug: boolean;
 };
@@ -166,6 +185,23 @@ export class Ak47ViewModel {
   private readonly kickYaw: SpringState = { value: 0, velocity: 0 };
   private readonly kickRoll: SpringState = { value: 0, velocity: 0 };
 
+  // Sway — position offset that lags behind mouse movement
+  private readonly swayX: SpringState = { value: 0, velocity: 0 };
+  private readonly swayY: SpringState = { value: 0, velocity: 0 };
+  private swayTargetX = 0;
+  private swayTargetY = 0;
+
+  // Bob — accumulated phase for idle breathing + walk cycle
+  private bobPhase = 0; // radians, advances each frame
+
+  // Movement state, fed each frame from bootstrap
+  private moveSpeedMps = 0;
+  private isGrounded = false;
+
+  // Mouse delta accumulated since last frame (set externally)
+  private mouseDeltaX = 0;
+  private mouseDeltaY = 0;
+
   private model: Object3D | null = null;
   private axesHelper: AxesHelper | null = null;
   private muzzleDebugMarker: Mesh | null = null;
@@ -250,6 +286,17 @@ export class Ak47ViewModel {
   setAspect(aspect: number): void {
     this.viewModelCamera.aspect = aspect;
     this.viewModelCamera.updateProjectionMatrix();
+  }
+
+  /**
+   * Feed movement state + raw mouse delta each frame before calling updateFromMainCamera.
+   * mouseDeltaX/Y are raw pixel deltas (same units as pointerlockchange movementX/Y).
+   */
+  setFrameInput(speedMps: number, grounded: boolean, mouseDeltaX: number, mouseDeltaY: number): void {
+    this.moveSpeedMps = speedMps;
+    this.isGrounded = grounded;
+    this.mouseDeltaX = mouseDeltaX;
+    this.mouseDeltaY = mouseDeltaY;
   }
 
   updateFromMainCamera(mainCamera: PerspectiveCamera, deltaSeconds: number): void {
@@ -517,15 +564,51 @@ export class Ak47ViewModel {
       this.muzzleFlashLight.intensity = 0;
     }
 
+    const dt = Math.max(0, Math.min(0.05, deltaSeconds));
+
     stepSpring(this.kickBack, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
     stepSpring(this.kickPitch, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
     stepSpring(this.kickYaw, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
     stepSpring(this.kickRoll, 0, VIEWMODEL_KICK_SPRING_STIFFNESS, VIEWMODEL_KICK_SPRING_DAMPING, deltaSeconds);
 
+    // ── Sway: weapon lags behind mouse movement ───────────────────────────
+    this.swayTargetX = Math.max(-SWAY_MAX_X_M, Math.min(SWAY_MAX_X_M, -this.mouseDeltaX * SWAY_SENSITIVITY));
+    this.swayTargetY = Math.max(-SWAY_MAX_Y_M, Math.min(SWAY_MAX_Y_M,  this.mouseDeltaY * SWAY_SENSITIVITY));
+    stepSpring(this.swayX, this.swayTargetX, SWAY_STIFFNESS, SWAY_DAMPING, dt);
+    stepSpring(this.swayY, this.swayTargetY, SWAY_STIFFNESS, SWAY_DAMPING, dt);
+    // Decay sway target back to zero each frame (mouse delta is per-frame, not persistent)
+    this.mouseDeltaX = 0;
+    this.mouseDeltaY = 0;
+
+    // ── Bob: idle breathing + walk/run oscillation ────────────────────────
+    const isMoving = this.isGrounded && this.moveSpeedMps > 0.5;
+    const isRunning = isMoving && this.moveSpeedMps > 4.5;
+    let bobFreq: number;
+    let bobAmpY: number;
+    let bobAmpX: number;
+
+    if (isMoving) {
+      bobFreq = BOB_WALK_FREQ_HZ * (isRunning ? BOB_RUN_FREQ_MULT : 1.0);
+      const ampMult = isRunning ? BOB_RUN_AMP_MULT : 1.0;
+      bobAmpY = BOB_WALK_AMP_Y_M * ampMult;
+      bobAmpX = BOB_WALK_AMP_X_M * ampMult;
+    } else {
+      bobFreq = BOB_IDLE_FREQ_HZ;
+      bobAmpY = BOB_IDLE_AMP_Y_M;
+      bobAmpX = 0;
+    }
+
+    this.bobPhase += bobFreq * Math.PI * 2 * dt;
+
+    const bobX = isMoving ? Math.sin(this.bobPhase * 0.5) * bobAmpX : 0;     // side-to-side (half-freq)
+    const bobY = Math.sin(this.bobPhase) * bobAmpY;                           // up-down (full-freq)
+    const bobZ = isMoving ? BOB_IDLE_AMP_Z_M * Math.cos(this.bobPhase) : 0;  // fore-aft (when walking)
+
+    // ── Apply all offsets to weaponRoot ───────────────────────────────────
     this.weaponRoot.position.set(
-      BASE_WEAPON_POSE_POSITION.x,
-      BASE_WEAPON_POSE_POSITION.y,
-      BASE_WEAPON_POSE_POSITION.z + this.kickBack.value,
+      BASE_WEAPON_POSE_POSITION.x + this.swayX.value + bobX,
+      BASE_WEAPON_POSE_POSITION.y + this.swayY.value + bobY,
+      BASE_WEAPON_POSE_POSITION.z + this.kickBack.value + bobZ,
     );
 
     this.weaponRoot.rotation.set(

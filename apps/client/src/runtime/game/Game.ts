@@ -1,6 +1,8 @@
 import { AmbientLight, Color, DirectionalLight, HemisphereLight, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
 import { AnchorsDebug, type AnchorsDebugState } from "../debug/AnchorsDebug";
 import { Hud } from "../debug/Hud";
+import { EnemyManager, type EnemyHitResult } from "../enemies/EnemyManager";
+import type { WeaponAudio } from "../audio/WeaponAudio";
 import { buildBlockout } from "../map/buildBlockout";
 import { buildProps, type PropsBuildStats } from "../map/buildProps";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
@@ -22,6 +24,18 @@ const LOOK_SENSITIVITY = 0.002;
 const MIN_PITCH = -(Math.PI / 2) + 0.001;
 const MAX_PITCH = (Math.PI / 2) - 0.001;
 const RAD_TO_DEG = 180 / Math.PI;
+
+// ── Camera shake constants ────────────────────────────────────────────────────
+/** Shake impulse added per bullet fired while trigger held (metres). */
+const SHAKE_FIRE_IMPULSE = 0.008;
+/** Maximum accumulated fire-shake amplitude (metres). */
+const SHAKE_FIRE_MAX = 0.028;
+/** Damage-hit shake impulse (metres) — scales with damage fraction. */
+const SHAKE_DAMAGE_BASE = 0.045;
+/** Spring stiffness for shake recovery. */
+const SHAKE_STIFFNESS = 180;
+/** Spring damping for shake recovery. */
+const SHAKE_DAMPING = 18;
 
 export type CameraPose = {
   pos: {
@@ -117,6 +131,12 @@ export class Game {
     visualOnlyLandmarks: 0,
     stallFillersPlaced: 0,
   };
+  private enemyManager: EnemyManager | null = null;
+  private playerHealth = 100;
+  private isDead = false;
+  private spawnPoseCache: SpawnPose | null = null;
+  private wasGrounded = true;
+  private onLandingCallback: (() => void) | null = null;
   private hud: Hud | null = null;
   private anchorsDebug: AnchorsDebug | null = null;
   private debugHotkeysEnabled = false;
@@ -131,6 +151,12 @@ export class Game {
   private weaponBloomDeg = 0;
   private weaponLastShotRecoilPitchDeg = 0;
   private weaponLastShotRecoilYawDeg = 0;
+
+  // Camera shake: spring state for X and Y offset
+  private shakeX = 0;
+  private shakeXVel = 0;
+  private shakeY = 0;
+  private shakeYVel = 0;
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (this.debugHotkeysEnabled) {
@@ -206,6 +232,8 @@ export class Game {
 
     this.setupLighting();
     this.setupInitialView();
+
+    this.enemyManager = new EnemyManager(this.scene);
 
     this.mapId = options.mapId;
     this.seedOverride = options.seedOverride;
@@ -317,6 +345,14 @@ export class Game {
     if (this.worldColliders) {
       this.updateInputState();
       this.playerController.step(deltaSeconds, this.frameInput, this.yaw);
+      // Detect landing transition: airborne → grounded
+      const nowGrounded = this.playerController.getGrounded();
+      if (!this.wasGrounded && nowGrounded) {
+        this.onLandingCallback?.();
+        // Add a landing camera bob via damage shake channel
+        this.shakeYVel -= 0.06;
+      }
+      this.wasGrounded = nowGrounded;
       this.updateCameraFromPlayer();
 
       this.camera.getWorldDirection(this.cameraForward);
@@ -343,6 +379,47 @@ export class Game {
       if (fireResult.recoilPitchRad !== 0 || fireResult.recoilYawRad !== 0) {
         this.setLookAngles(this.yaw + fireResult.recoilYawRad, this.pitch + fireResult.recoilPitchRad);
       }
+
+      // ── Fire shake: add impulse per shot, capped at SHAKE_FIRE_MAX ─────────
+      if (fireResult.shotsFired > 0) {
+        const impulse = Math.min(SHAKE_FIRE_IMPULSE * fireResult.shotsFired, SHAKE_FIRE_MAX);
+        this.shakeXVel += (Math.random() * 2 - 1) * impulse;
+        this.shakeYVel += (Math.random() * 2 - 1) * impulse;
+      }
+
+      if (this.enemyManager) {
+        this.enemyManager.update(
+          deltaSeconds,
+          this.playerController.getPosition(),
+          this.playerHealth,
+          this.worldColliders,
+        );
+        const delta = this.enemyManager.getPlayerHealthDelta();
+        this.playerHealth = Math.max(0, this.playerHealth - delta);
+        // ── Damage shake: proportional to damage taken ──────────────────────
+        if (delta > 0) {
+          const damageNorm = Math.min(1, delta / 25); // 25 = one shot
+          const impulse = SHAKE_DAMAGE_BASE * damageNorm;
+          this.shakeXVel += (Math.random() * 2 - 1) * impulse;
+          this.shakeYVel -= Math.abs(impulse) * 0.6; // bias upward jolt on damage
+        }
+        if (this.playerHealth <= 0 && !this.isDead) {
+          this.isDead = true;
+          this.setFreezeInput(true);
+        }
+      }
+
+      // ── Shake spring update ───────────────────────────────────────────────
+      const shakeAccelX = -this.shakeX * SHAKE_STIFFNESS - this.shakeXVel * SHAKE_DAMPING;
+      const shakeAccelY = -this.shakeY * SHAKE_STIFFNESS - this.shakeYVel * SHAKE_DAMPING;
+      this.shakeXVel += shakeAccelX * deltaSeconds;
+      this.shakeYVel += shakeAccelY * deltaSeconds;
+      this.shakeX += this.shakeXVel * deltaSeconds;
+      this.shakeY += this.shakeYVel * deltaSeconds;
+
+      // Apply shake as a small positional offset to the camera (after updateCameraFromPlayer)
+      this.camera.position.x += this.shakeX;
+      this.camera.position.y += this.shakeY;
     }
     this.anchorsDebug?.update(this.camera);
 
@@ -387,6 +464,8 @@ export class Game {
       this.anchorsDebug.dispose(this.scene);
       this.anchorsDebug = null;
     }
+    this.enemyManager?.dispose(this.scene);
+    this.enemyManager = null;
     this.clearBlockout();
     this.clearProps();
   }
@@ -436,6 +515,81 @@ export class Game {
 
   getAmmoSnapshot(): Ak47AmmoSnapshot {
     return this.weapon.getAmmoSnapshot();
+  }
+
+  getPlayerHealth(): number {
+    return this.playerHealth;
+  }
+
+  checkEnemyRaycastHit(origin: Vector3, dir: Vector3, maxDist: number): EnemyHitResult {
+    return this.enemyManager?.checkRaycastHit(origin, dir, maxDist) ?? { hit: false };
+  }
+
+  applyDamageToEnemy(enemyId: string, damage: number): void {
+    this.enemyManager?.applyDamageToEnemy(enemyId, damage);
+  }
+
+  setEnemyAudio(audio: WeaponAudio): void {
+    this.enemyManager?.setAudio(audio);
+  }
+
+  setEnemyKillCallback(cb: (name: string) => void): void {
+    this.enemyManager?.setKillCallback(cb);
+  }
+
+  setEnemyNewWaveCallback(cb: (wave: number) => void): void {
+    this.enemyManager?.setNewWaveCallback(cb);
+  }
+
+  setLandingCallback(cb: () => void): void {
+    this.onLandingCallback = cb;
+  }
+
+  setWeaponCallbacks(cbs: {
+    onReloadStart?: () => void;
+    onReloadEnd?: () => void;
+    onDryFire?: () => void;
+  }): void {
+    if (cbs.onReloadStart !== undefined) this.weapon.onReloadStart = cbs.onReloadStart;
+    if (cbs.onReloadEnd !== undefined) this.weapon.onReloadEnd = cbs.onReloadEnd;
+    if (cbs.onDryFire !== undefined) this.weapon.onDryFire = cbs.onDryFire;
+  }
+
+  getAllEnemiesDead(): boolean {
+    return this.enemyManager?.allDead() ?? false;
+  }
+
+  getWaveNumber(): number {
+    return this.enemyManager?.getWaveNumber() ?? 0;
+  }
+
+  /** Seconds remaining until next wave, or null if no countdown is active. */
+  getWaveCountdownS(): number | null {
+    return this.enemyManager?.getWaveCountdownS() ?? null;
+  }
+
+  getIsDead(): boolean {
+    return this.isDead;
+  }
+
+  respawn(): void {
+    this.playerHealth = 100;
+    this.isDead = false;
+    this.shakeX = 0; this.shakeXVel = 0;
+    this.shakeY = 0; this.shakeYVel = 0;
+    this.weapon.cancelTrigger();
+    this.resetInputState();
+
+    if (this.blockoutSpec && this.spawnPoseCache) {
+      const pose = this.spawnPoseCache;
+      this.playerController.setSpawn(
+        pose.x,
+        this.blockoutSpec.defaults.floor_height,
+        pose.z,
+      );
+      this.setLookAngles(pose.yawRad, 0);
+      this.updateCameraFromPlayer();
+    }
   }
 
   private setupLighting(): void {
@@ -579,8 +733,10 @@ export class Game {
     this.runtimeColliders = [...builtBlockout.colliders, ...this.propColliders].sort((a, b) => a.id.localeCompare(b.id));
     this.worldColliders = new WorldColliders(this.runtimeColliders, blockoutSpec.playable_boundary);
     this.playerController.setWorld(this.worldColliders);
+    this.enemyManager?.spawn(this.worldColliders);
 
     const spawnPose = this.selectSpawnPose(blockoutSpec, this.spawn);
+    this.spawnPoseCache = spawnPose;
     this.playerController.setSpawn(spawnPose.x, blockoutSpec.defaults.floor_height, spawnPose.z);
     this.setLookAngles(spawnPose.yawRad, 0);
     if (!this.freezeInput) {

@@ -26,34 +26,39 @@ const RECOIL_RESET_DELAY_S = 0.3;
 const RECOIL_MAX_ACCUM_PITCH_DEG = 24;
 const RECOIL_MAX_ACCUM_YAW_DEG = 4;
 
+// 30-shot spray pattern — full magazine, no wrap-around seam.
+// Phase 1 (shots 1-8):  build-up, rising vertical + mild left drift
+// Phase 2 (shots 9-16): peak recoil, strong left-then-right sway
+// Phase 3 (shots 17-24): partial recovery, settling right
+// Phase 4 (shots 25-30): late-spray, reduced vertical, random walk
 const RECOIL_VERTICAL_PATTERN_DEG = [
-  0.58,
-  0.64,
-  0.71,
-  0.78,
-  0.84,
-  0.9,
-  0.94,
-  0.96,
-  0.94,
-  0.9,
-  0.86,
-  0.81,
+  // Phase 1 — build-up
+  0.58, 0.64, 0.70, 0.76,
+  0.82, 0.88, 0.93, 0.96,
+  // Phase 2 — peak
+  0.96, 0.94, 0.91, 0.88,
+  0.86, 0.85, 0.84, 0.83,
+  // Phase 3 — settling
+  0.80, 0.77, 0.74, 0.72,
+  0.70, 0.68, 0.67, 0.66,
+  // Phase 4 — late spray
+  0.64, 0.62, 0.61, 0.60,
+  0.59, 0.58,
 ] as const;
 
 const RECOIL_HORIZONTAL_PATTERN_DEG = [
-  0.0,
-  0.03,
-  -0.04,
-  -0.1,
-  -0.15,
-  -0.2,
-  -0.12,
-  0.04,
-  0.12,
-  0.2,
-  0.13,
-  -0.03,
+  // Phase 1 — center then left
+   0.00,  0.04, -0.06, -0.12,
+  -0.16, -0.20, -0.18, -0.10,
+  // Phase 2 — strong left-to-right swing
+   0.02,  0.14,  0.20,  0.18,
+   0.10, -0.02, -0.14, -0.18,
+  // Phase 3 — right settle
+  -0.12, -0.04,  0.06,  0.14,
+   0.16,  0.10,  0.02, -0.06,
+  // Phase 4 — tight random walk
+  -0.08, -0.04,  0.06,  0.10,
+   0.06,  0.00,
 ] as const;
 
 const RECOIL_VERTICAL_JITTER_DEG = 0.022;
@@ -75,6 +80,7 @@ export type Ak47ShotEvent = {
     y: number;
     z: number;
   };
+  colliderId?: string;
 };
 
 export type Ak47FireControllerOptions = {
@@ -239,6 +245,7 @@ export class Ak47FireController {
             y: this.raycastHit.normal.y,
             z: this.raycastHit.normal.z,
           },
+          colliderId: this.raycastHit.colliderId,
         });
       } else {
         onShot({ hit: false });
@@ -300,6 +307,14 @@ export class Ak47FireController {
     } else {
       const moveNorm = Math.min(1, (speed - STATIONARY_SPEED_EPS_MPS) / Math.max(0.001, RUN_SPEED_MPS - STATIONARY_SPEED_EPS_MPS));
       baseSpreadDeg = SPREAD_MOVE_MIN_DEG + (SPREAD_MOVE_MAX_DEG - SPREAD_MOVE_MIN_DEG) * moveNorm;
+    }
+
+    // First-shot accuracy bonus: if the spray has fully reset (shotIndex === 0)
+    // and the player is stationary and grounded, suppress bloom entirely and
+    // halve the base spread for a near-perfect first bullet.
+    const isFirstShot = this.shotIndex === 0 && this.timeSinceLastShotS >= RECOIL_RESET_DELAY_S;
+    if (isFirstShot && grounded && speed <= STATIONARY_SPEED_EPS_MPS) {
+      return baseSpreadDeg * 0.4; // near-perfect accuracy for the first clean tap
     }
 
     return baseSpreadDeg + this.bloomDeg;
