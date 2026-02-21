@@ -2,15 +2,14 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Milestone 1 floor coherence pass implemented behind `?floors=pbr`.
-- `stall_strip` no longer contributes a separate PBR floor surface (overlap/z-fighting source removed).
-- PBR floor material selection is now deterministic per-zone-type (no random per-cell patchwork).
-- Added build-time overlap warning for included PBR floor zones.
+- Player name label remains in the top-right score panel and is now visibly larger for readability.
+- Health HUD still starts with `HP` directly (no name line), keeping bottom-left uncluttered.
+- Score HUD keeps player name above KILLS/HEADSHOTS and scales well at default `Operator` length.
 - Deterministic compare-shot pair captured for this prompt (`before.png`/`after.png`).
 - Validation: ✅ `pnpm typecheck` and ✅ `pnpm build`.
 
 ## Canonical Playtest URL
-- `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&shot=compare`
+- `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&lighting=golden&shot=compare&autostart=human`
 
 ## Map Approval Status
 - `NOT APPROVED`
@@ -23,23 +22,22 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P22_floor_pbr_coherence`
+- Prompt ID: `P26_player_name_bigger`
 - What changed:
-  - Updated PBR floor zone inclusion/material assignment in `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/buildPbrFloors.ts`.
-  - Added overlap detection warning for included floor zones in `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/buildPbrFloors.ts`.
+  - Increased top-right player-name typography in `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/ui/ScoreHud.ts` (`fontSize` `13px` → `18px`, `fontWeight` `700` → `800`, slight spacing tweak).
   - Captured deterministic compare screenshots:
-    - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P22_floor_pbr_coherence/before.png`
-    - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P22_floor_pbr_coherence/after.png`
+    - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P26_player_name_bigger/before.png`
+    - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P26_player_name_bigger/after.png`
 - Quick test steps:
   - `pnpm dev`
-  - Open `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr`
-  - Open `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&shot=compare`
+  - Open `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&lighting=golden&shot=compare&autostart=human&name=Operator`
+  - Verify `OPERATOR` appears larger above KILLS/HEADSHOTS in top-right panel.
+  - Verify movement/collision still function (spawn, look, strafe) and no new console spam.
 
 ## Next 3 Tasks
-1. Tune floor shading response in `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/render/materials/FloorMaterialLibrary.ts` toward warm/dusty CS:GO readability (roughness/normal/AO).
-2. If needed, increase `tileSizeM` for noisy floor materials in `/Users/dimitri/Desktop/clawd-strike/apps/client/public/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json`.
-3. Add deterministic macro variation (albedo/roughness breakup) in floor material shader path while keeping low noise.
+1. Add max-width + ellipsis handling for long player names in top-right Score HUD.
+2. Optionally expose a `nameSize` tuning hook or adaptive scale rule for ultra-wide names.
+3. Run a human pointer-lock pass to verify readability during fast camera motion.
 
 ## Known Issues / Risks
-- Automated pointer-lock smoke via Playwright can still hit `WrongDocumentError`; interactive browser smoke remains required for definitive pointer-lock behavior.
-- Existing workspace has unrelated in-progress changes; this prompt only modified the floor builder logic and screenshot artifacts listed above.
+- Playwright smoke can still raise `WrongDocumentError` on pointer-lock requests; automated runs are not definitive for lock/move validation.

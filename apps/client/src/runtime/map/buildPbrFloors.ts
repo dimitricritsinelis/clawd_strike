@@ -1,5 +1,6 @@
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh } from "three";
 import type { FloorMaterialLibrary, FloorTextureQuality } from "../render/materials/FloorMaterialLibrary";
+import { applyFloorShaderTweaks } from "../render/materials/applyFloorShaderTweaks";
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type { RuntimeBlockoutSpec, RuntimeRect } from "./types";
 
@@ -42,6 +43,22 @@ const MATERIAL_ORDER: FloorMaterialId[] = [
   "red_sandstone_pavement",
   "cobblestone_floor_02",
 ];
+
+const FLOOR_MACRO_SETTINGS: Record<
+  FloorMaterialId,
+  { colorAmplitude: number; roughnessAmplitude: number; frequency: number }
+> = {
+  red_sandstone_pavement: {
+    colorAmplitude: 0.06,
+    roughnessAmplitude: 0.045,
+    frequency: 0.075,
+  },
+  cobblestone_floor_02: {
+    colorAmplitude: 0.05,
+    roughnessAmplitude: 0.04,
+    frequency: 0.085,
+  },
+};
 
 function getBatch(map: Map<FloorMaterialId, MaterialBatch>, materialId: FloorMaterialId): MaterialBatch {
   const existing = map.get(materialId);
@@ -239,9 +256,22 @@ export function buildPbrFloors(spec: RuntimeBlockoutSpec, opts: BuildPbrFloorsOp
     const geometry = finalizeGeometry(batch);
     const material = opts.manifest.createStandardMaterial(materialId, opts.quality);
     material.name = `floor-${materialId}-${opts.quality}`;
+    const albedoBoost =
+      typeof material.userData.floorAlbedoBoost === "number" && Number.isFinite(material.userData.floorAlbedoBoost)
+        ? material.userData.floorAlbedoBoost
+        : 1;
+    const macro = FLOOR_MACRO_SETTINGS[materialId];
+    applyFloorShaderTweaks(material, {
+      albedoBoost,
+      macroColorAmplitude: macro.colorAmplitude,
+      macroRoughnessAmplitude: macro.roughnessAmplitude,
+      macroFrequency: macro.frequency,
+      macroSeed: deriveSubSeed(opts.seed, `floor-macro:${materialId}`),
+    });
 
     const mesh = new Mesh(geometry, material);
     mesh.name = `floor-${materialId}`;
+    mesh.receiveShadow = true;
     root.add(mesh);
   }
 

@@ -21,7 +21,12 @@
     },
     {
       "id": "red_sandstone_pavement",
-      "tileSizeM": 2.15,
+      "tileSizeM": 3.25,
+      "tintHex": "#FFF3E3",
+      "albedoBoost": 1.12,
+      "roughness": 0.96,
+      "normalScale": 0.42,
+      "aoIntensity": 0.46,
       "textures": {
         "1k": {
           "albedo": "textures/red_sandstone_pavement/1k/red_sandstone_pavement_albedo_1k.jpg",
@@ -37,7 +42,12 @@
     },
     {
       "id": "cobblestone_floor_02",
-      "tileSizeM": 2.0,
+      "tileSizeM": 3.0,
+      "tintHex": "#FFF4E6",
+      "albedoBoost": 1.1,
+      "roughness": 0.97,
+      "normalScale": 0.38,
+      "aoIntensity": 0.42,
       "textures": {
         "1k": {
           "albedo": "textures/cobblestone_floor_02/1k/cobblestone_floor_02_albedo_1k.jpg",
@@ -53,7 +63,12 @@
     },
     {
       "id": "sand_01",
-      "tileSizeM": 1.5,
+      "tileSizeM": 2.25,
+      "tintHex": "#FFF3C9",
+      "albedoBoost": 1.04,
+      "roughness": 1.0,
+      "normalScale": 0.22,
+      "aoIntensity": 0.32,
       "textures": {
         "1k": {
           "albedo": "textures/sand_01/1k/sand_01_albedo_1k.jpg",

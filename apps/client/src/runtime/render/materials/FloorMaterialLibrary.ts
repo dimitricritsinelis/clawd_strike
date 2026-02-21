@@ -19,6 +19,11 @@ type FloorTextureSet = {
 type FloorMaterialEntry = {
   id: string;
   tileSizeM: number;
+  tintHex?: string;
+  albedoBoost?: number;
+  roughness?: number;
+  normalScale?: number;
+  aoIntensity?: number;
   textures: Record<FloorTextureQuality, FloorTextureSet>;
 };
 
@@ -45,6 +50,16 @@ function asNumber(value: unknown, context: string): number {
   return value;
 }
 
+function asOptionalNumber(value: unknown, context: string): number | undefined {
+  if (value === undefined) return undefined;
+  return asNumber(value, context);
+}
+
+function asOptionalString(value: unknown, context: string): string | undefined {
+  if (value === undefined) return undefined;
+  return asString(value, context);
+}
+
 function parseTextureSet(value: unknown, context: string): FloorTextureSet {
   const record = asRecord(value, context);
   const albedo = asString(record.albedo, `${context}.albedo`);
@@ -57,7 +72,15 @@ function parseEntry(value: unknown, index: number): FloorMaterialEntry {
   const context = `materials[${index}]`;
   const record = asRecord(value, context);
   const texturesRaw = asRecord(record.textures, `${context}.textures`);
-  return {
+  const tintHexRaw = asOptionalString(record.tintHex, `${context}.tintHex`);
+  const albedoBoostRaw = asOptionalNumber(record.albedoBoost, `${context}.albedoBoost`);
+  const roughnessRaw = asOptionalNumber(record.roughness, `${context}.roughness`);
+  const normalScaleRaw = asOptionalNumber(record.normalScale, `${context}.normalScale`);
+  const aoIntensityRaw = asOptionalNumber(record.aoIntensity, `${context}.aoIntensity`);
+  if (tintHexRaw !== undefined && !/^#[0-9a-fA-F]{6}$/.test(tintHexRaw)) {
+    throw new Error(`${context}.tintHex: expected #RRGGBB hex color`);
+  }
+  const entry: FloorMaterialEntry = {
     id: asString(record.id, `${context}.id`),
     tileSizeM: Math.max(0.05, asNumber(record.tileSizeM, `${context}.tileSizeM`)),
     textures: {
@@ -65,6 +88,12 @@ function parseEntry(value: unknown, index: number): FloorMaterialEntry {
       "2k": parseTextureSet(texturesRaw["2k"], `${context}.textures.2k`),
     },
   };
+  if (tintHexRaw !== undefined) entry.tintHex = tintHexRaw;
+  if (albedoBoostRaw !== undefined) entry.albedoBoost = Math.max(0, Math.min(2, albedoBoostRaw));
+  if (roughnessRaw !== undefined) entry.roughness = Math.max(0, Math.min(1, roughnessRaw));
+  if (normalScaleRaw !== undefined) entry.normalScale = Math.max(0, Math.min(1, normalScaleRaw));
+  if (aoIntensityRaw !== undefined) entry.aoIntensity = Math.max(0, Math.min(1, aoIntensityRaw));
+  return entry;
 }
 
 function parseManifest(value: unknown): FloorMaterialEntry[] {
@@ -116,15 +145,19 @@ export class FloorMaterialLibrary {
   createStandardMaterial(materialId: string, quality: FloorTextureQuality): MeshStandardMaterial {
     const entry = this.requireMaterial(materialId);
     const maps = entry.textures[quality];
+    const roughness = entry.roughness ?? 0.96;
+    const normalScale = entry.normalScale ?? 0.7;
+    const albedoBoost = entry.albedoBoost ?? 1;
 
     const material = new MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.96,
+      color: entry.tintHex ?? 0xffffff,
+      roughness,
       metalness: 0,
-      normalScale: new Vector2(0.7, 0.7),
+      normalScale: new Vector2(normalScale, normalScale),
     });
+    material.userData.floorAlbedoBoost = albedoBoost;
 
-    void this.applyMaps(material, maps);
+    void this.applyMaps(material, entry, maps);
     return material;
   }
 
@@ -140,7 +173,11 @@ export class FloorMaterialLibrary {
     return new URL(relativeOrAbsoluteUrl, this.baseDirUrl).toString();
   }
 
-  private async applyMaps(material: MeshStandardMaterial, maps: FloorTextureSet): Promise<void> {
+  private async applyMaps(
+    material: MeshStandardMaterial,
+    entry: FloorMaterialEntry,
+    maps: FloorTextureSet,
+  ): Promise<void> {
     try {
       const [albedoTex, normalTex, armTex] = await Promise.all([
         this.loadTexture(maps.albedo, SRGBColorSpace),
@@ -151,10 +188,10 @@ export class FloorMaterialLibrary {
       material.map = albedoTex;
       material.normalMap = normalTex;
       material.aoMap = armTex;
-      material.aoMapIntensity = 0.7;
+      material.aoMapIntensity = entry.aoIntensity ?? 0.7;
       material.roughnessMap = armTex;
       material.metalnessMap = armTex;
-      material.roughness = 0.96;
+      material.roughness = entry.roughness ?? 0.96;
       material.metalness = 0;
       material.needsUpdate = true;
     } catch (error) {

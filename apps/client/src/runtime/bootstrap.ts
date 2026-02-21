@@ -270,12 +270,12 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, urlParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
-  const healthHud = new HealthHud(runtimeRoot, urlParams.playerName);
+  const healthHud = new HealthHud(runtimeRoot);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
   const killFeed = new KillFeed(runtimeRoot);
   const hitMarker = new HitMarker(crosshair);
-  const scoreHud = new ScoreHud(runtimeRoot);
+  const scoreHud = new ScoreHud(runtimeRoot, urlParams.playerName);
   const roundEndScreen = new RoundEndScreen(runtimeRoot);
   const timerHud = new TimerHud(runtimeRoot);
   const damageNumbers = new DamageNumbers(runtimeRoot);
@@ -298,7 +298,10 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     errorOverlay.style.display = "block";
   }
 
-  const renderer = new Renderer(runtimeRoot, { highVis: urlParams.highVis });
+  const renderer = new Renderer(runtimeRoot, {
+    highVis: urlParams.highVis,
+    lightingPreset: urlParams.lightingPreset,
+  });
   let disposed = false;
   const weaponAudio = new WeaponAudio();
   const viewModelEnabled = urlParams.vm;
@@ -364,6 +367,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     propChaos: urlParams.propChaos,
     floorMode: resolvedFloorMode,
     floorQuality: urlParams.floorQuality,
+    lightingPreset: urlParams.lightingPreset,
     floorMaterials,
     freezeInput: inputFrozen,
     spawn: urlParams.spawn,

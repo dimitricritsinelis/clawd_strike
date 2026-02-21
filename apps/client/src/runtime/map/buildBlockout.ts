@@ -3,8 +3,9 @@ import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibr
 import type { RuntimeBlockoutSpec, RuntimeRect } from "./types";
 import type { RuntimeColliderAabb } from "../sim/collision/WorldColliders";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
-import type { RuntimeFloorMode, RuntimeFloorQuality } from "../utils/UrlParams";
+import type { RuntimeFloorMode, RuntimeFloorQuality, RuntimeLightingPreset } from "../utils/UrlParams";
 import { buildPbrFloors } from "./buildPbrFloors";
+import { buildSandAccumulation } from "./buildSandAccumulation";
 
 const WALKABLE_ZONE_TYPES = new Set([
   "spawn_plaza",
@@ -21,7 +22,7 @@ const WALL_THICKNESS_M = 0.4;
 const BASE_FLOOR_THICKNESS_M = 0.06;
 const OVERLAY_FLOOR_THICKNESS_M = 0.02;
 
-type BoundarySegment = {
+export type BoundarySegment = {
   orientation: "vertical" | "horizontal";
   coord: number;
   start: number;
@@ -39,6 +40,7 @@ export type BlockoutBuildOptions = {
   seed: number;
   floorMode: RuntimeFloorMode;
   floorQuality: RuntimeFloorQuality;
+  lightingPreset: RuntimeLightingPreset;
   floorMaterials: FloorMaterialLibrary | null;
 };
 
@@ -247,6 +249,9 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
   const clearRects = spec.zones
     .filter((zone) => zone.type === CLEAR_TRAVEL_ZONE_TYPE)
     .map((zone) => zone.rect);
+  const axes = collectAxisCoordinates(walkableRects, spec.playable_boundary);
+  const inside = buildInsideGrid(walkableRects, axes.xs, axes.ys);
+  const wallSegments = mergeBoundarySegments(extractBoundarySegments(inside, axes.xs, axes.ys));
 
   const floorTopY = spec.defaults.floor_height;
   if (options.floorMode === "pbr" && options.floorMaterials) {
@@ -258,6 +263,17 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       floorTopY,
     });
     root.add(pbrFloors);
+
+    if (options.lightingPreset === "golden") {
+      const sandAccumulation = buildSandAccumulation({
+        wallSegments,
+        seed: options.seed,
+        floorTopY,
+        manifest: options.floorMaterials,
+        quality: options.floorQuality,
+      });
+      root.add(sandAccumulation);
+    }
   } else {
     const walkableFloor = createFloorInstances(
       walkableRects,
@@ -277,6 +293,9 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       OVERLAY_FLOOR_THICKNESS_M,
       floorTopY + 0.03,
     );
+    if (walkableFloor) walkableFloor.receiveShadow = true;
+    if (stallOverlay) stallOverlay.receiveShadow = true;
+    if (clearOverlay) clearOverlay.receiveShadow = true;
 
     if (walkableFloor) root.add(walkableFloor);
     if (stallOverlay) root.add(stallOverlay);
@@ -285,9 +304,6 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
 
   const colliders: RuntimeColliderAabb[] = [];
 
-  const axes = collectAxisCoordinates(walkableRects, spec.playable_boundary);
-  const inside = buildInsideGrid(walkableRects, axes.xs, axes.ys);
-  const wallSegments = mergeBoundarySegments(extractBoundarySegments(inside, axes.xs, axes.ys));
   const wallInstances = createWallInstances(
     wallSegments,
     new MeshLambertMaterial({ color: palette.wall }),
@@ -295,7 +311,11 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     floorTopY,
     colliders,
   );
-  if (wallInstances) root.add(wallInstances);
+  if (wallInstances) {
+    wallInstances.castShadow = true;
+    wallInstances.receiveShadow = true;
+    root.add(wallInstances);
+  }
 
   colliders.push({
     id: "floor-slab",

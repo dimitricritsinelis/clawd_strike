@@ -1,4 +1,4 @@
-import { AmbientLight, Color, DirectionalLight, HemisphereLight, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
+import { AmbientLight, Color, DirectionalLight, FogExp2, HemisphereLight, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
 import { AnchorsDebug, type AnchorsDebugState } from "../debug/AnchorsDebug";
 import { Hud } from "../debug/Hud";
 import { EnemyManager, type EnemyHitResult } from "../enemies/EnemyManager";
@@ -19,6 +19,7 @@ import { disposeObjectRoot } from "../utils/disposeObjectRoot";
 import type {
   RuntimeFloorMode,
   RuntimeFloorQuality,
+  RuntimeLightingPreset,
   RuntimePropChaosOptions,
   RuntimeSpawnId,
 } from "../utils/UrlParams";
@@ -69,6 +70,7 @@ type GameOptions = {
   highVis?: boolean;
   floorMode: RuntimeFloorMode;
   floorQuality: RuntimeFloorQuality;
+  lightingPreset: RuntimeLightingPreset;
   floorMaterials: FloorMaterialLibrary | null;
   onTogglePerfHud?: () => void;
   mountEl?: HTMLElement;
@@ -112,6 +114,7 @@ export class Game {
   private mapId = "bazaar-map";
   private seedOverride: number | null = null;
   private highVis = false;
+  private lightingPreset: RuntimeLightingPreset = "golden";
   private floorMode: RuntimeFloorMode = "blockout";
   private floorQuality: RuntimeFloorQuality = "2k";
   private floorMaterials: FloorMaterialLibrary | null = null;
@@ -242,14 +245,10 @@ export class Game {
     this.camera.rotation.order = "YXZ";
     this.camera.position.set(0, PLAYER_EYE_HEIGHT_M, 8);
 
-    this.setupLighting();
-    this.setupInitialView();
-
-    this.enemyManager = new EnemyManager(this.scene);
-
     this.mapId = options.mapId;
     this.seedOverride = options.seedOverride;
     this.highVis = options.highVis ?? false;
+    this.lightingPreset = options.lightingPreset;
     this.floorMode = options.floorMode;
     this.floorQuality = options.floorQuality;
     this.floorMaterials = options.floorMaterials;
@@ -260,11 +259,13 @@ export class Game {
     this.onTogglePerfHud = options.onTogglePerfHud ?? null;
     this.onWeaponShot = options.onWeaponShot ?? null;
 
+    this.setupLighting();
+    this.setupInitialView();
+    this.enemyManager = new EnemyManager(this.scene);
+
     const weaponSeed = resolveRuntimeSeed(this.mapId, this.seedOverride);
     this.weapon = new Ak47Weapon({ seed: weaponSeed });
 
-    const palette = resolveBlockoutPalette(this.highVis);
-    this.scene.background = new Color(palette.background);
     const mountEl = options.mountEl ?? document.querySelector<HTMLElement>("#runtime-root") ?? document.querySelector<HTMLElement>("#app");
     const anchorsDebugOptions = options.anchorsDebug ?? {
       showMarkers: false,
@@ -608,13 +609,47 @@ export class Game {
   }
 
   private setupLighting(): void {
-    const ambient = new AmbientLight(0xffffff, 1.05);
-    const hemi = new HemisphereLight(0xfafcff, 0xf0d7ad, 1.2);
-    hemi.position.set(0, 20, 0);
-    const key = new DirectionalLight(0xfff2d0, 0.7);
-    key.position.set(22, 34, 16);
-    key.castShadow = false;
-    this.scene.add(ambient, hemi, key);
+    if (this.lightingPreset === "flat") {
+      const palette = resolveBlockoutPalette(this.highVis);
+      this.scene.background = new Color(palette.background);
+      this.scene.fog = null;
+
+      const ambient = new AmbientLight(0xffffff, 1.05);
+      const hemi = new HemisphereLight(0xfafcff, 0xf0d7ad, 1.2);
+      hemi.position.set(0, 20, 0);
+      const key = new DirectionalLight(0xfff2d0, 0.7);
+      key.position.set(22, 34, 16);
+      key.castShadow = false;
+      this.scene.add(ambient, hemi, key);
+      return;
+    }
+
+    this.scene.background = new Color(0xF6E7D1);
+    this.scene.fog = new FogExp2(0xF6E7D1, 0.0065);
+
+    const ambient = new AmbientLight(0xFFF3E3, 0.22);
+    const hemi = new HemisphereLight(0xCFE7FF, 0xE0B07A, 0.55);
+    hemi.position.set(0, 50, 0);
+
+    const sun = new DirectionalLight(0xFFD2A1, 1.35);
+    sun.position.set(-60, 80, -25);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 200;
+    sun.shadow.camera.left = -70;
+    sun.shadow.camera.right = 70;
+    sun.shadow.camera.top = 70;
+    sun.shadow.camera.bottom = -70;
+    sun.shadow.bias = -0.00015;
+    sun.shadow.normalBias = 0.02;
+    sun.target.position.set(25, 0, 41);
+
+    const fill = new DirectionalLight(0xBFD9FF, 0.20);
+    fill.position.set(60, 40, 20);
+    fill.castShadow = false;
+
+    this.scene.add(ambient, hemi, sun, sun.target, fill);
   }
 
   private setupInitialView(): void {
@@ -715,6 +750,7 @@ export class Game {
       seed: runtimeSeed,
       floorMode: this.floorMode,
       floorQuality: this.floorQuality,
+      lightingPreset: this.lightingPreset,
       floorMaterials: this.floorMaterials,
     });
     this.blockoutRoot = builtBlockout.root;

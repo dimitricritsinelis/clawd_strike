@@ -958,6 +958,15 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
     batches.landmarkWell,
     batches.filler,
   ];
+  const castShadowBatchIds = new Set<string>([
+    "prop-shopfront",
+    "prop-cover",
+    "prop-spawn-cover",
+    "prop-canopy",
+    "prop-hero-pillar",
+    "prop-hero-lintel",
+    "prop-landmark-well",
+  ]);
 
   for (const batch of orderedBatches) {
     if (batch.instances.length === 0) {
@@ -969,6 +978,8 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
     const mesh = new InstancedMesh(geometry, material, batch.instances.length);
     mesh.frustumCulled = false;
     mesh.name = batch.id;
+    mesh.receiveShadow = true;
+    mesh.castShadow = castShadowBatchIds.has(batch.id);
 
     for (let i = 0; i < batch.instances.length; i += 1) {
       const instance = batch.instances[i]!;

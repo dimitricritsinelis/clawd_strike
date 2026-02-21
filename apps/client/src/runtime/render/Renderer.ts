@@ -1,10 +1,19 @@
-import { PerspectiveCamera, Scene, SRGBColorSpace, WebGLRenderer } from "three";
+import {
+  ACESFilmicToneMapping,
+  PCFSoftShadowMap,
+  PerspectiveCamera,
+  Scene,
+  SRGBColorSpace,
+  WebGLRenderer,
+} from "three";
 import { resolveBlockoutPalette } from "./BlockoutMaterials";
+import type { RuntimeLightingPreset } from "../utils/UrlParams";
 
 const MAX_PIXEL_RATIO = 2;
 
 type RendererOptions = {
   highVis: boolean;
+  lightingPreset: RuntimeLightingPreset;
 };
 
 export type RendererPerfInfo = {
@@ -28,11 +37,17 @@ export class Renderer {
       powerPreference: "high-performance",
     });
     this.renderer.outputColorSpace = SRGBColorSpace;
-    this.renderer.shadowMap.enabled = false;
-    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.toneMapping = ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = PCFSoftShadowMap;
+    this.renderer.shadowMap.autoUpdate = true;
     this.renderer.info.autoReset = false;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
-    this.renderer.setClearColor(palette.background, 1);
+    this.renderer.setClearColor(
+      options.lightingPreset === "golden" ? 0xF6E7D1 : palette.background,
+      1,
+    );
 
     this.canvas = this.renderer.domElement;
     this.canvas.style.width = "100%";

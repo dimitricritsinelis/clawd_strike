@@ -22,7 +22,7 @@ export class HealthHud {
   private displayHealth = 100;
   private lastRenderedHealth = -1;
 
-  constructor(mountEl: HTMLElement, playerName = "Operator") {
+  constructor(mountEl: HTMLElement) {
     this.root = document.createElement("div");
     this.root.style.position = "absolute";
     this.root.style.left = "22px";
@@ -37,19 +37,6 @@ export class HealthHud {
     this.root.style.backdropFilter = "blur(1.5px)";
     this.root.style.display = "block";
     this.root.style.minWidth = "110px";
-
-    const nameEl = document.createElement("div");
-    nameEl.style.fontFamily = '"Segoe UI", Tahoma, Verdana, sans-serif';
-    nameEl.style.fontSize = "18px";
-    nameEl.style.fontWeight = "700";
-    nameEl.style.letterSpacing = "0.1em";
-    nameEl.style.color = "rgba(228, 238, 252, 0.9)";
-    nameEl.style.textTransform = "uppercase";
-    nameEl.style.marginBottom = "6px";
-    nameEl.style.textAlign = "center";
-    nameEl.style.width = "100%";
-    nameEl.style.textShadow = "0 1px 2px rgba(0, 0, 0, 0.92)";
-    nameEl.textContent = playerName;
 
     // Label row
     const labelEl = document.createElement("div");
@@ -98,7 +85,7 @@ export class HealthHud {
     this.barFill.style.boxShadow = "0 0 8px rgba(110, 232, 122, 0.45)";
 
     barTrack.append(this.barFill);
-    this.root.append(nameEl, labelEl, this.numericEl, barTrack);
+    this.root.append(labelEl, this.numericEl, barTrack);
     mountEl.append(this.root);
   }
 

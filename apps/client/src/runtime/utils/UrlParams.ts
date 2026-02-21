@@ -6,6 +6,7 @@ export type RuntimeSpawnId = "A" | "B";
 export type RuntimePropProfile = "subtle" | "medium" | "high";
 export type RuntimeFloorMode = "blockout" | "pbr";
 export type RuntimeFloorQuality = "1k" | "2k";
+export type RuntimeLightingPreset = "golden" | "flat";
 export type RuntimePropChaosOptions = {
   profile: RuntimePropProfile;
   jitter: number | null;
@@ -29,6 +30,7 @@ export type RuntimeUrlParams = {
   seed: number | null;
   floorMode: RuntimeFloorMode;
   floorQuality: RuntimeFloorQuality;
+  lightingPreset: RuntimeLightingPreset;
   propChaos: RuntimePropChaosOptions;
 };
 
@@ -91,6 +93,10 @@ function parseFloorQuality(value: string | null): RuntimeFloorQuality {
   return DEFAULT_FLOOR_QUALITY;
 }
 
+function parseLightingPreset(value: string | null): RuntimeLightingPreset {
+  return value?.trim().toLowerCase() === "flat" ? "flat" : "golden";
+}
+
 function getParam(params: URLSearchParams, ...keys: string[]): string | null {
   for (const key of keys) {
     const value = params.get(key);
@@ -123,6 +129,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawSeed = getParam(params, "seed");
   const rawFloors = getParam(params, "floors");
   const rawFloorRes = getParam(params, "floorRes", "floor-res");
+  const rawLighting = getParam(params, "lighting");
   const rawPropProfile = getParam(params, "prop-profile", "propProfile");
   const rawPropJitter = getParam(params, "prop-jitter", "propJitter");
   const rawPropCluster = getParam(params, "prop-cluster", "propCluster");
@@ -143,6 +150,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const seed = parseSeed(rawSeed);
   const floorMode = parseFloorMode(rawFloors);
   const floorQuality = parseFloorQuality(rawFloorRes);
+  const lightingPreset = parseLightingPreset(rawLighting);
   const propChaos: RuntimePropChaosOptions = {
     profile: parsePropProfile(rawPropProfile),
     jitter: parseUnitFloat(rawPropJitter),
@@ -166,6 +174,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     seed,
     floorMode,
     floorQuality,
+    lightingPreset,
     propChaos,
   };
 }

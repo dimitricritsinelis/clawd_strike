@@ -10,7 +10,7 @@ export class ScoreHud {
   private kills = 0;
   private headshots = 0;
 
-  constructor(mountEl: HTMLElement) {
+  constructor(mountEl: HTMLElement, playerName = "Operator") {
     this.root = document.createElement("div");
     Object.assign(this.root.style, {
       position: "absolute",
@@ -29,6 +29,22 @@ export class ScoreHud {
       userSelect: "none",
       minWidth: "168px",
     });
+
+    const nameEl = document.createElement("div");
+    Object.assign(nameEl.style, {
+      width: "100%",
+      fontFamily: '"Segoe UI", Tahoma, Verdana, sans-serif',
+      fontSize: "18px",
+      fontWeight: "800",
+      lineHeight: "1.05",
+      letterSpacing: "0.1em",
+      textTransform: "uppercase",
+      color: "rgba(228, 238, 252, 0.92)",
+      textAlign: "center",
+      textShadow: "0 1px 2px rgba(0, 0, 0, 0.9)",
+      marginBottom: "3px",
+    });
+    nameEl.textContent = playerName;
 
     const labels = document.createElement("div");
     Object.assign(labels.style, {
@@ -84,7 +100,7 @@ export class ScoreHud {
     this.headshotsEl.textContent = "0";
 
     row.append(this.killsEl, this.headshotsEl);
-    this.root.append(labels, row);
+    this.root.append(nameEl, labels, row);
     mountEl.append(this.root);
   }
 
