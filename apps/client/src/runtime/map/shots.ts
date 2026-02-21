@@ -6,9 +6,9 @@ const COMPARE_ALIAS = "compare";
 const COMPARE_SHOT_ID = "SHOT_BLOCKOUT_COMPARE";
 
 const HARDCODED_COMPARE_CAMERA: CameraPose = {
-  pos: { x: 25, y: 55, z: 41 },
-  lookAt: { x: 25, y: 0, z: 41 },
-  fovDeg: 60,
+  pos: { x: 25, y: 1.7, z: 7 },
+  lookAt: { x: 25, y: 1.7, z: 20 },
+  fovDeg: 75,
 };
 
 export type ResolvedShot = {

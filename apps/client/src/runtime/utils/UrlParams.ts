@@ -1,8 +1,11 @@
 const DEFAULT_MAP_ID = "bazaar-map";
 const DEFAULT_PROP_PROFILE = "subtle";
+const DEFAULT_FLOOR_QUALITY = "2k";
 
 export type RuntimeSpawnId = "A" | "B";
 export type RuntimePropProfile = "subtle" | "medium" | "high";
+export type RuntimeFloorMode = "blockout" | "pbr";
+export type RuntimeFloorQuality = "1k" | "2k";
 export type RuntimePropChaosOptions = {
   profile: RuntimePropProfile;
   jitter: number | null;
@@ -24,6 +27,8 @@ export type RuntimeUrlParams = {
   labels: boolean;
   anchorTypes: string[];
   seed: number | null;
+  floorMode: RuntimeFloorMode;
+  floorQuality: RuntimeFloorQuality;
   propChaos: RuntimePropChaosOptions;
 };
 
@@ -74,6 +79,18 @@ function parseUnitFloat(value: string | null): number | null {
   return Math.max(0, Math.min(1, parsed));
 }
 
+function parseFloorMode(value: string | null): RuntimeFloorMode {
+  return value?.trim().toLowerCase() === "pbr" ? "pbr" : "blockout";
+}
+
+function parseFloorQuality(value: string | null): RuntimeFloorQuality {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "1k" || normalized === "2k") {
+    return normalized;
+  }
+  return DEFAULT_FLOOR_QUALITY;
+}
+
 function getParam(params: URLSearchParams, ...keys: string[]): string | null {
   for (const key of keys) {
     const value = params.get(key);
@@ -104,6 +121,8 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawLabels = getParam(params, "labels");
   const rawAnchorTypes = getParam(params, "anchor-types", "anchorTypes");
   const rawSeed = getParam(params, "seed");
+  const rawFloors = getParam(params, "floors");
+  const rawFloorRes = getParam(params, "floorRes", "floor-res");
   const rawPropProfile = getParam(params, "prop-profile", "propProfile");
   const rawPropJitter = getParam(params, "prop-jitter", "propJitter");
   const rawPropCluster = getParam(params, "prop-cluster", "propCluster");
@@ -122,6 +141,8 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const labels = parseBooleanFlag(rawLabels);
   const anchorTypes = parseAnchorTypes(rawAnchorTypes);
   const seed = parseSeed(rawSeed);
+  const floorMode = parseFloorMode(rawFloors);
+  const floorQuality = parseFloorQuality(rawFloorRes);
   const propChaos: RuntimePropChaosOptions = {
     profile: parsePropProfile(rawPropProfile),
     jitter: parseUnitFloat(rawPropJitter),
@@ -143,6 +164,8 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     labels,
     anchorTypes,
     seed,
+    floorMode,
+    floorQuality,
     propChaos,
   };
 }

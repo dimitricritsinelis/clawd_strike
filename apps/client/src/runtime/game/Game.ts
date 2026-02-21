@@ -6,6 +6,7 @@ import type { WeaponAudio } from "../audio/WeaponAudio";
 import { buildBlockout } from "../map/buildBlockout";
 import { buildProps, type PropsBuildStats } from "../map/buildProps";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
+import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibrary";
 import type { RuntimeAnchorsSpec, RuntimeBlockoutSpec } from "../map/types";
 import {
   PLAYER_EYE_HEIGHT_M,
@@ -15,7 +16,12 @@ import {
 import { type RuntimeColliderAabb, WorldColliders } from "../sim/collision/WorldColliders";
 import { resolveRuntimeSeed } from "../utils/Rng";
 import { disposeObjectRoot } from "../utils/disposeObjectRoot";
-import type { RuntimePropChaosOptions, RuntimeSpawnId } from "../utils/UrlParams";
+import type {
+  RuntimeFloorMode,
+  RuntimeFloorQuality,
+  RuntimePropChaosOptions,
+  RuntimeSpawnId,
+} from "../utils/UrlParams";
 import type { Ak47ShotEvent } from "../weapons/Ak47FireController";
 import { Ak47Weapon, type Ak47AmmoSnapshot } from "../weapons/Ak47Weapon";
 
@@ -61,6 +67,9 @@ type GameOptions = {
   spawn?: RuntimeSpawnId;
   debug?: boolean;
   highVis?: boolean;
+  floorMode: RuntimeFloorMode;
+  floorQuality: RuntimeFloorQuality;
+  floorMaterials: FloorMaterialLibrary | null;
   onTogglePerfHud?: () => void;
   mountEl?: HTMLElement;
   anchorsDebug?: {
@@ -103,6 +112,9 @@ export class Game {
   private mapId = "bazaar-map";
   private seedOverride: number | null = null;
   private highVis = false;
+  private floorMode: RuntimeFloorMode = "blockout";
+  private floorQuality: RuntimeFloorQuality = "2k";
+  private floorMaterials: FloorMaterialLibrary | null = null;
   private propChaos: RuntimePropChaosOptions = {
     profile: "subtle",
     jitter: null,
@@ -238,6 +250,9 @@ export class Game {
     this.mapId = options.mapId;
     this.seedOverride = options.seedOverride;
     this.highVis = options.highVis ?? false;
+    this.floorMode = options.floorMode;
+    this.floorQuality = options.floorQuality;
+    this.floorMaterials = options.floorMaterials;
     this.propChaos = options.propChaos;
     this.freezeInput = options.freezeInput ?? false;
     this.spawn = options.spawn ?? "A";
@@ -690,17 +705,24 @@ export class Game {
     if (!blockoutSpec) {
       return;
     }
+    const runtimeSeed = resolveRuntimeSeed(this.mapId, this.seedOverride);
 
     this.clearBlockout();
     this.clearProps();
 
-    const builtBlockout = buildBlockout(blockoutSpec, { highVis: this.highVis });
+    const builtBlockout = buildBlockout(blockoutSpec, {
+      highVis: this.highVis,
+      seed: runtimeSeed,
+      floorMode: this.floorMode,
+      floorQuality: this.floorQuality,
+      floorMaterials: this.floorMaterials,
+    });
     this.blockoutRoot = builtBlockout.root;
     this.scene.add(builtBlockout.root);
 
     this.propColliders = [];
     this.propStats = {
-      seed: 1,
+      seed: runtimeSeed,
       profile: this.propChaos.profile,
       jitter: this.propChaos.jitter ?? 0.34,
       cluster: this.propChaos.cluster ?? 0.56,

@@ -286,36 +286,45 @@ function deriveShotsRuntime(designShotsDoc) {
   }
 
   const shots = sourceShots.map((shot) => JSON.parse(JSON.stringify(shot)));
-  const hasCompareShot = shots.some((shot) => shot?.id === COMPARE_SHOT_ID);
+  const compareSource =
+    shots.find((shot) => shot?.id === "SHOT_02_SPAWN_A_TO_BAZAAR") ||
+    shots.find((shot) => Array.isArray(shot?.tags) && shot.tags.includes("gameplay")) ||
+    shots.find((shot) => shot?.id === "SHOT_04_MAIN_MID_JOG_NORTH");
 
-  if (!hasCompareShot) {
-    const topdown =
-      shots.find((shot) => shot?.id === "SHOT_01_TOPDOWN_ESTABLISHING") ||
-      shots.find((shot) => typeof shot?.label === "string" && /topdown/i.test(shot.label));
+  const fallbackCamera = {
+    pos: { x: 25.0, y: 7.0, z: 1.7 },
+    lookAt: { x: 25.0, y: 20.0, z: 1.7 },
+    fovDeg: 75.0,
+  };
+  const sourceCamera = compareSource?.camera;
+  const compareCamera =
+    sourceCamera &&
+    typeof sourceCamera === "object" &&
+    sourceCamera.pos &&
+    sourceCamera.lookAt &&
+    typeof sourceCamera.fovDeg === "number"
+      ? sourceCamera
+      : fallbackCamera;
 
-    const fallbackCamera = {
-      pos: { x: 25.0, y: 41.0, z: 55.0 },
-      lookAt: { x: 25.0, y: 41.0, z: 0.0 },
-      fovDeg: 60.0,
-    };
-
-    const topdownCamera = topdown?.camera && typeof topdown.camera === "object" ? topdown.camera : fallbackCamera;
-    const tags = uniqueSortedStrings([
-      ...(Array.isArray(topdown?.tags) ? topdown.tags.filter((tag) => typeof tag === "string") : []),
+  // Force compare shot to be a gameplay-facing first-person framing.
+  // This prevents accidental top-down/floor-only regressions in before/after captures.
+  const canonicalCompareShot = {
+    id: COMPARE_SHOT_ID,
+    label: "Blockout compare",
+    description: "Canonical deterministic compare shot for gameplay-facing captures.",
+    camera: compareCamera,
+    durationSec: typeof compareSource?.durationSec === "number" ? compareSource.durationSec : 3.0,
+    tags: uniqueSortedStrings([
+      ...(Array.isArray(compareSource?.tags) ? compareSource.tags.filter((tag) => typeof tag === "string") : []),
       "compare",
-    ]);
+      "gameplay",
+    ]),
+  };
 
-    shots.push({
-      id: COMPARE_SHOT_ID,
-      label: "Blockout compare",
-      description: "Canonical deterministic compare shot for blockout captures.",
-      camera: topdownCamera,
-      durationSec: typeof topdown?.durationSec === "number" ? topdown.durationSec : 3.0,
-      tags,
-    });
-  }
+  const shotsWithoutCompare = shots.filter((shot) => shot?.id !== COMPARE_SHOT_ID);
+  shotsWithoutCompare.push(canonicalCompareShot);
 
-  const sortedShots = [...shots].sort((a, b) => {
+  const sortedShots = [...shotsWithoutCompare].sort((a, b) => {
     const aId = typeof a?.id === "string" ? a.id : "";
     const bId = typeof b?.id === "string" ? b.id : "";
     return aId.localeCompare(bId);

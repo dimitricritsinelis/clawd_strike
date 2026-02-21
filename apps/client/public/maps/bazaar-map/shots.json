@@ -210,25 +210,25 @@
     {
       "id": "SHOT_BLOCKOUT_COMPARE",
       "label": "Blockout compare",
-      "description": "Canonical deterministic compare shot for blockout captures.",
+      "description": "Canonical deterministic compare shot for gameplay-facing captures.",
       "camera": {
         "pos": {
           "x": 25,
-          "y": 41,
-          "z": 55
+          "y": 7,
+          "z": 1.7
         },
         "lookAt": {
           "x": 25,
-          "y": 41,
-          "z": 0
+          "y": 20,
+          "z": 1.7
         },
-        "fovDeg": 60
+        "fovDeg": 75
       },
-      "durationSec": 3,
+      "durationSec": 4,
       "tags": [
         "compare",
-        "debug",
-        "overview"
+        "gameplay",
+        "spawnA"
       ]
     }
   ]

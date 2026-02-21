@@ -1,7 +1,10 @@
 import { BoxGeometry, Group, InstancedMesh, MeshLambertMaterial, Object3D } from "three";
+import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibrary";
 import type { RuntimeBlockoutSpec, RuntimeRect } from "./types";
 import type { RuntimeColliderAabb } from "../sim/collision/WorldColliders";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
+import type { RuntimeFloorMode, RuntimeFloorQuality } from "../utils/UrlParams";
+import { buildPbrFloors } from "./buildPbrFloors";
 
 const WALKABLE_ZONE_TYPES = new Set([
   "spawn_plaza",
@@ -33,6 +36,10 @@ export type BlockoutBuildResult = {
 
 export type BlockoutBuildOptions = {
   highVis: boolean;
+  seed: number;
+  floorMode: RuntimeFloorMode;
+  floorQuality: RuntimeFloorQuality;
+  floorMaterials: FloorMaterialLibrary | null;
 };
 
 function rectContainsPoint(rect: RuntimeRect, x: number, y: number): boolean {
@@ -242,28 +249,39 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     .map((zone) => zone.rect);
 
   const floorTopY = spec.defaults.floor_height;
-  const walkableFloor = createFloorInstances(
-    walkableRects,
-    new MeshLambertMaterial({ color: palette.floorBase }),
-    BASE_FLOOR_THICKNESS_M,
-    floorTopY,
-  );
-  const stallOverlay = createFloorInstances(
-    stallRects,
-    new MeshLambertMaterial({ color: palette.floorStallOverlay }),
-    OVERLAY_FLOOR_THICKNESS_M,
-    floorTopY + 0.02,
-  );
-  const clearOverlay = createFloorInstances(
-    clearRects,
-    new MeshLambertMaterial({ color: palette.floorClearOverlay }),
-    OVERLAY_FLOOR_THICKNESS_M,
-    floorTopY + 0.03,
-  );
+  if (options.floorMode === "pbr" && options.floorMaterials) {
+    const pbrFloors = buildPbrFloors(spec, {
+      seed: options.seed,
+      quality: options.floorQuality,
+      manifest: options.floorMaterials,
+      patchSizeM: 4,
+      floorTopY,
+    });
+    root.add(pbrFloors);
+  } else {
+    const walkableFloor = createFloorInstances(
+      walkableRects,
+      new MeshLambertMaterial({ color: palette.floorBase }),
+      BASE_FLOOR_THICKNESS_M,
+      floorTopY,
+    );
+    const stallOverlay = createFloorInstances(
+      stallRects,
+      new MeshLambertMaterial({ color: palette.floorStallOverlay }),
+      OVERLAY_FLOOR_THICKNESS_M,
+      floorTopY + 0.02,
+    );
+    const clearOverlay = createFloorInstances(
+      clearRects,
+      new MeshLambertMaterial({ color: palette.floorClearOverlay }),
+      OVERLAY_FLOOR_THICKNESS_M,
+      floorTopY + 0.03,
+    );
 
-  if (walkableFloor) root.add(walkableFloor);
-  if (stallOverlay) root.add(stallOverlay);
-  if (clearOverlay) root.add(clearOverlay);
+    if (walkableFloor) root.add(walkableFloor);
+    if (stallOverlay) root.add(stallOverlay);
+    if (clearOverlay) root.add(clearOverlay);
+  }
 
   const colliders: RuntimeColliderAabb[] = [];
 

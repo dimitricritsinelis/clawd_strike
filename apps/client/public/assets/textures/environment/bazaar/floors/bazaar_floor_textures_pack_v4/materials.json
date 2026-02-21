@@ -1,0 +1,71 @@
+{
+  "packId": "bazaar_floor_textures_pack_v4",
+  "version": 4,
+  "notes": "Runtime floor PBR set sourced from Poly Haven CC0 assets (mapped to bazaar material ids).",
+  "materials": [
+    {
+      "id": "pavement_01",
+      "tileSizeM": 2.0,
+      "textures": {
+        "1k": {
+          "albedo": "textures/pavement_01/1k/pavement_01_albedo_1k.jpg",
+          "normal": "textures/pavement_01/1k/pavement_01_normal_gl_1k.jpg",
+          "arm": "textures/pavement_01/1k/pavement_01_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/pavement_01/2k/pavement_01_albedo_2k.jpg",
+          "normal": "textures/pavement_01/2k/pavement_01_normal_gl_2k.jpg",
+          "arm": "textures/pavement_01/2k/pavement_01_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "red_sandstone_pavement",
+      "tileSizeM": 2.15,
+      "textures": {
+        "1k": {
+          "albedo": "textures/red_sandstone_pavement/1k/red_sandstone_pavement_albedo_1k.jpg",
+          "normal": "textures/red_sandstone_pavement/1k/red_sandstone_pavement_normal_gl_1k.jpg",
+          "arm": "textures/red_sandstone_pavement/1k/red_sandstone_pavement_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/red_sandstone_pavement/2k/red_sandstone_pavement_albedo_2k.jpg",
+          "normal": "textures/red_sandstone_pavement/2k/red_sandstone_pavement_normal_gl_2k.jpg",
+          "arm": "textures/red_sandstone_pavement/2k/red_sandstone_pavement_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "cobblestone_floor_02",
+      "tileSizeM": 2.0,
+      "textures": {
+        "1k": {
+          "albedo": "textures/cobblestone_floor_02/1k/cobblestone_floor_02_albedo_1k.jpg",
+          "normal": "textures/cobblestone_floor_02/1k/cobblestone_floor_02_normal_gl_1k.jpg",
+          "arm": "textures/cobblestone_floor_02/1k/cobblestone_floor_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/cobblestone_floor_02/2k/cobblestone_floor_02_albedo_2k.jpg",
+          "normal": "textures/cobblestone_floor_02/2k/cobblestone_floor_02_normal_gl_2k.jpg",
+          "arm": "textures/cobblestone_floor_02/2k/cobblestone_floor_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "sand_01",
+      "tileSizeM": 1.5,
+      "textures": {
+        "1k": {
+          "albedo": "textures/sand_01/1k/sand_01_albedo_1k.jpg",
+          "normal": "textures/sand_01/1k/sand_01_normal_gl_1k.jpg",
+          "arm": "textures/sand_01/1k/sand_01_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/sand_01/2k/sand_01_albedo_2k.jpg",
+          "normal": "textures/sand_01/2k/sand_01_normal_gl_2k.jpg",
+          "arm": "textures/sand_01/2k/sand_01_arm_2k.jpg"
+        }
+      }
+    }
+  ]
+}
