@@ -255,7 +255,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, urlParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
-  const healthHud = new HealthHud(runtimeRoot);
+  const healthHud = new HealthHud(runtimeRoot, urlParams.playerName);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
   const killFeed = new KillFeed(runtimeRoot);
@@ -374,8 +374,11 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
             damage = Math.round(BASE_DAMAGE * 0.75);
           }
           waveStats.shotsHit++;
-          if (isHeadshot) waveStats.headshots++;
-          game.applyDamageToEnemy(enemyHit.enemyId, damage);
+          if (isHeadshot) {
+            waveStats.headshots++;
+            scoreHud.addHeadshot();
+          }
+          game.applyDamageToEnemy(enemyHit.enemyId, damage, isHeadshot);
           hitMarker.trigger(isHeadshot);
           weaponAudio.playHitThud();
           // Floating damage number at hit point
@@ -410,13 +413,17 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   pauseMenu.onResume = () => {
     void renderer.canvas.requestPointerLock();
   };
+  pauseMenu.onReturnToLobby = () => {
+    const lobbyUrl = `${window.location.origin}${window.location.pathname}`;
+    window.location.href = lobbyUrl;
+  };
 
   // Wire kill feed
   // Wire kill events → feed + ding + score counter
   const TOTAL_ENEMIES = 9;
   scoreHud.setTotal(TOTAL_ENEMIES);
-  game.setEnemyKillCallback((name) => {
-    killFeed.addKill(name);
+  game.setEnemyKillCallback((name, isHeadshot) => {
+    killFeed.addKill(urlParams.playerName, name, isHeadshot);
     weaponAudio.playKillDing();
     scoreHud.addKill();
     waveStats.kills++;

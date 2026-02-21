@@ -15,7 +15,7 @@ export class KillFeed {
   constructor(mountEl: HTMLElement) {
     this.root = document.createElement("div");
     this.root.style.position = "absolute";
-    this.root.style.top = "20px";
+    this.root.style.top = "86px";
     this.root.style.right = "22px";
     this.root.style.zIndex = "24";
     this.root.style.display = "flex";
@@ -27,8 +27,8 @@ export class KillFeed {
     mountEl.append(this.root);
   }
 
-  /** @param isHeadshot Pass true to show ★ and gold tint instead of ✕ */
-  addKill(enemyName: string, isHeadshot = false): void {
+  /** @param isHeadshot Pass true to use headshot phrasing and gold tint. */
+  addKill(killerName: string, enemyName: string, isHeadshot = false): void {
     // Trim to MAX_ENTRIES by removing oldest
     if (this.entries.length >= MAX_ENTRIES) {
       const oldest = this.entries.shift();
@@ -53,14 +53,9 @@ export class KillFeed {
     // Slide-in from right + fade-out transition
     el.style.transform = "translateX(220px)";
     el.style.transition = `transform 0.18s cubic-bezier(0.34,1.56,0.64,1), opacity ${KILL_FADE_S}s ease-out`;
-    el.textContent = `${enemyName} eliminated`;
-
-    // Icon prefix — ★ for headshot, ✕ for body
-    const icon = document.createElement("span");
-    icon.style.marginRight = "6px";
-    icon.style.opacity = isHeadshot ? "1" : "0.72";
-    icon.textContent = isHeadshot ? "★" : "✕";
-    el.prepend(icon);
+    el.textContent = isHeadshot
+      ? `${killerName} headshot ${enemyName}`
+      : `${killerName} killed ${enemyName}`;
 
     this.root.append(el);
 

@@ -1,6 +1,6 @@
 import { Vector3 } from "three";
-import type { MutableAabb } from "../sim/collision/Aabb";
-import type { WorldColliderEntry, WorldColliderKind, WorldColliders } from "../sim/collision/WorldColliders";
+import type { MutableAabb } from "./Aabb";
+import type { WorldColliderEntry, WorldColliderKind, WorldColliders } from "./WorldColliders";
 
 const RAY_EPSILON = 1e-6;
 const RAY_QUERY_PAD_M = 0.001;

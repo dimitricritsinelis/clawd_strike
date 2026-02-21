@@ -89,7 +89,7 @@ export class DamageNumbers {
       letterSpacing: "0.02em",
       willChange: "transform, opacity",
     });
-    el.textContent = isHeadshot ? `★ ${damage}` : String(damage);
+    el.textContent = String(damage);
 
     this.root.append(el);
 

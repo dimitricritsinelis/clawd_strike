@@ -1,38 +1,35 @@
-# Codex Prompt — Bazaar Slice v2.2 (Copy/Paste)
+# Codex Prompt — Bazaar Blockout Runtime (Copy/Paste)
 
-You are building a 10-player (5v5) FPS multiplayer map called **Bazaar Slice v2.2**.
+You are updating the Bazaar map runtime for this repository.
 
 ## Inputs
-- Geometry + anchors: `specs/map_spec.json`
-- References: `refs/bazaar_slice_v2_2_detailed_birdseye.png` and `blockout/topdown_layout.svg`
+- Source spec: `docs/map-design/specs/map_spec.json`
+- Visual refs: `docs/map-design/refs/bazaar_slice_v2_2_detailed_birdseye.png`
+- Layout sanity: `docs/map-design/blockout/topdown_layout.svg`
 
 ## Task
-1. Parse `map_spec.json` and generate a **greybox level**:
-   - Create floor regions for each zone rectangle
-   - Create walls where appropriate (default wall height 6.0m)
-2. Enforce gameplay constraints:
-   - Do not place any props that block zones of type `clear_travel_zone`
-   - Maintain ≥ 6.0m navigable width through main bazaar clear zones
-   - Maintain ≥ 3.0m navigable width through side halls
-3. Place placeholder instances at anchors:
-   - shopfront_anchor → shop shutter module
-   - signage_anchor → hanging sign / awning
-   - cover_cluster + spawn_cover → crates/barrels/planters clusters
-   - cloth_canopy_span → overhead cloth mesh (with sag)
-   - hero_landmark → arch gate module
-   - landmark → well/fountain
-4. Output a validation report:
-   - Any prop/collision intruding into clear travel zones
-   - Any nav width violations (main lane < 6m, side halls < 3m)
+1. Apply map/layout adjustments in the source spec only.
+2. Regenerate runtime map files:
+```bash
+pnpm --filter @clawd-strike/client gen:maps
+```
+3. Keep runtime behavior deterministic (same map id + seed => same world/props/spawn).
+4. Preserve client-only scope (no multiplayer/server authority work).
 
-## Output Artifacts
-- A “generated level” file for the engine (or an intermediate representation)
-- A JSON report of validation results
-- A topdown screenshot of the greybox for review
+## Runtime Outputs
+- `apps/client/public/maps/bazaar-map/map_spec.json`
+- `apps/client/public/maps/bazaar-map/shots.json`
 
-## Important Notes
-- Units in the spec are **meters**
-- Coordinate origin is the **southwest** map corner
-- North is +Y
-- If engine uses centimeters, multiply coordinates by 100.
+## Coordinate Reminder
+- Design: `(x,y)` ground and `z` up.
+- Runtime: `(x,z)` ground and `y` up.
+- Use `apps/client/src/runtime/map/coordinateTransforms.ts`.
 
+## Validation
+```bash
+pnpm typecheck
+pnpm build
+```
+
+## Playtest URL
+- `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`

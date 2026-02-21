@@ -1,53 +1,49 @@
-# Codex Instructions — Build Bazaar Slice v2.2 from Spec
+# Codex Instructions — Bazaar Runtime Pipeline (This Repo)
 
 ## Goal
-Generate an engine-ready **greybox level** (then first-pass dressing) from:
-- `specs/map_spec.json` (zones + anchors)
-- `specs/anchor_points.csv` (same anchors in tabular form)
+Keep the Bazaar blockout maintainable and deterministic in the current web client runtime.
 
-## Required Outputs (Codex)
-1. **Blockout geometry** for all zones
-2. **Collision + navigation** respecting clear travel zones
-3. **Placement of placeholder meshes** at anchors (shops, signs, prop pockets, canopies)
-4. A repeatable “regen” script/pipeline (spec → level) so updates are cheap
+## Source Of Truth
+- Primary: `docs/map-design/specs/map_spec.json`
+- Visual intent: `docs/map-design/refs/bazaar_slice_v2_2_detailed_birdseye.png`
+- Geometry sanity check: `docs/map-design/blockout/topdown_layout.svg`
 
-## Parsing Rules
-- Units are **meters**
-- Coordinate origin: **SW corner** of playable boundary
-- Treat every `rect` as a floor region and (optionally) a bounding volume
-- Do **NOT** place any blocking props inside zones of type `clear_travel_zone`
+Do not invent layout data. If required fields are missing, update spec inputs rather than guessing.
 
-## Zone Build Guidance
-- `spawn_plaza`: open area with a few spawn safety props at `spawn_cover` anchors
-- `main_lane_segment`: bazaar hall segment; add shopfront modules at shopfront anchors
-- `stall_strip`: dressing-only strip; props can overlap within strip but must not intrude into clear zone
-- `side_hall`: narrow corridor; keep 3.0m minimum clear corridor through path
-- `cut` / `connector`: connectors between lanes; keep corners clean for movement
+## Runtime Map Pipeline
+1. Edit design spec in `docs/map-design/specs/map_spec.json`.
+2. Generate runtime copies:
+```bash
+pnpm --filter @clawd-strike/client gen:maps
+```
+3. Runtime consumes:
+  - `apps/client/public/maps/<mapId>/map_spec.json`
+  - `apps/client/public/maps/<mapId>/shots.json`
 
-## Anchor Build Guidance
-Anchor types and recommended placeholders:
-- `shopfront_anchor` → shop shutter + doorway module (3m wide suggested)
-- `signage_anchor` → hanging sign + optional awning
-- `cover_cluster` → crates/barrels/carts cluster
-- `spawn_cover` → planters + crates in spawn plazas
-- `cloth_canopy_span` → a cloth mesh strip from start→end; add sag + variation
-- `hero_landmark` → arch gate module
-- `landmark` → well/fountain module
+`apps/client/scripts/gen-map-runtime.mjs` is the converter from design packet -> runtime map files.
 
-## Validation Steps (Codex must run)
-- Confirm no prop collisions intersect `clear_travel_zone` polygons.
-- Confirm navmesh has a continuous path through:
-  - Main lane (south ↔ north)
-  - West hall (south ↔ north)
-  - East hall (south ↔ north)
-- Confirm there are rotations via mid + north cuts.
+## Coordinate Systems
+- Design packet coordinates:
+  - ground plane: `(x, y)`
+  - up axis: `z`
+- Runtime coordinates:
+  - ground plane: `(x, z)`
+  - up axis: `y`
 
-## Suggested Folder Outputs
-- `/GeneratedLevel/` — greybox geometry assets
-- `/GeneratedLevel/Props/` — placeholder props instances
-- `/GeneratedLevel/Reports/` — validation output (clear-zone violations, nav width checks)
+Use `apps/client/src/runtime/map/coordinateTransforms.ts` for mapping:
+- `designToWorldVec3`
+- `designYawDegToWorldYawRad`
 
-## Notes
-If your engine uses centimeters (e.g., Unreal), multiply meters by **100**.
-If your engine uses a different up axis, remap accordingly (Z-up is assumed).
+## Scope Boundaries
+- In scope: blockout geometry, AABB collisions, placeholder props, deterministic runtime map loading.
+- Out of scope in this repo: navmesh systems, engine-export targets, multiplayer/server authority.
 
+## Validation
+Run:
+```bash
+pnpm typecheck
+pnpm build
+```
+
+Canonical playtest URL:
+- `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`

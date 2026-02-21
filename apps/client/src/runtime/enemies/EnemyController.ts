@@ -1,8 +1,9 @@
 import { Vector3 } from "three";
 import { AabbCollisionSolver, type MotionResult, type MutablePosition } from "../sim/collision/Solver";
+import { rayVsAabb } from "../sim/collision/rayVsAabb";
+import { raycastFirstHit, type RaycastAabbHit } from "../sim/collision/raycastAabb";
 import type { WorldColliders } from "../sim/collision/WorldColliders";
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
-import { raycastFirstHit, type RaycastAabbHit } from "../weapons/raycastAabb";
 
 const DEG_TO_RAD = Math.PI / 180;
 const TAU = Math.PI * 2;
@@ -58,55 +59,6 @@ export type EnemyAabb = {
   maxZ: number;
 };
 
-// Inline slab-test against an EnemyAabb. Returns hit distance or Infinity.
-function rayVsEnemyAabb(
-  ox: number, oy: number, oz: number,
-  dx: number, dy: number, dz: number,
-  maxDist: number,
-  aabb: EnemyAabb,
-): number {
-  const RAY_EPS = 1e-6;
-  let tMin = 0;
-  let tMax = maxDist;
-
-  if (Math.abs(dx) <= RAY_EPS) {
-    if (ox < aabb.minX || ox > aabb.maxX) return Infinity;
-  } else {
-    let t0 = (aabb.minX - ox) / dx;
-    let t1 = (aabb.maxX - ox) / dx;
-    if (t0 > t1) { const tmp = t0; t0 = t1; t1 = tmp; }
-    tMin = Math.max(tMin, t0);
-    tMax = Math.min(tMax, t1);
-    if (tMin > tMax) return Infinity;
-  }
-
-  if (Math.abs(dy) <= RAY_EPS) {
-    if (oy < aabb.minY || oy > aabb.maxY) return Infinity;
-  } else {
-    let t0 = (aabb.minY - oy) / dy;
-    let t1 = (aabb.maxY - oy) / dy;
-    if (t0 > t1) { const tmp = t0; t0 = t1; t1 = tmp; }
-    tMin = Math.max(tMin, t0);
-    tMax = Math.min(tMax, t1);
-    if (tMin > tMax) return Infinity;
-  }
-
-  if (Math.abs(dz) <= RAY_EPS) {
-    if (oz < aabb.minZ || oz > aabb.maxZ) return Infinity;
-  } else {
-    let t0 = (aabb.minZ - oz) / dz;
-    let t1 = (aabb.maxZ - oz) / dz;
-    if (t0 > t1) { const tmp = t0; t0 = t1; t1 = tmp; }
-    tMin = Math.max(tMin, t0);
-    tMax = Math.min(tMax, t1);
-    if (tMin > tMax) return Infinity;
-  }
-
-  if (tMin >= 0 && tMin <= maxDist) return tMin;
-  if (tMax >= 0 && tMax <= maxDist) return tMax;
-  return Infinity;
-}
-
 export class EnemyController {
   readonly id: EnemyId;
   readonly name: string;
@@ -118,6 +70,7 @@ export class EnemyController {
   private health = ENEMY_MAX_HEALTH;
   private state: EnemyState = "PATROL";
   private dead = false;
+  private lastHitWasHeadshot = false;
 
   // Patrol
   private patrolTargetX: number;
@@ -428,8 +381,9 @@ export class EnemyController {
     };
   }
 
-  applyDamage(amount: number): void {
+  applyDamage(amount: number, isHeadshot = false): void {
     if (this.dead) return;
+    this.lastHitWasHeadshot = isHeadshot;
     this.health = Math.max(0, this.health - amount);
     if (this.health <= 0) {
       this.dead = true;
@@ -437,6 +391,7 @@ export class EnemyController {
   }
 
   isDead(): boolean { return this.dead; }
+  wasLastHitHeadshot(): boolean { return this.lastHitWasHeadshot; }
   getHealth(): number { return this.health; }
   getMag(): number { return this.mag; }
   getReserve(): number { return this.reserve; }
@@ -476,7 +431,7 @@ export class EnemyController {
     for (const aabb of enemyAabbs) {
       if (aabb.id === this.id) continue;
       if (aabb.id === "player") continue; // player AABB doesn't block LOS checks
-      const t = rayVsEnemyAabb(eyeX, eyeY, eyeZ, ndx, ndy, ndz, dist - 0.1, aabb);
+      const t = rayVsAabb(eyeX, eyeY, eyeZ, ndx, ndy, ndz, dist - 0.1, aabb);
       if (t < dist - 0.1) return false;
     }
 
@@ -551,7 +506,7 @@ export class EnemyController {
 
     for (const aabb of enemyAabbs) {
       if (aabb.id === this.id) continue;
-      const t = rayVsEnemyAabb(eyeX, eyeY, eyeZ, ndx, ndy, ndz, MAX_RANGE, aabb);
+      const t = rayVsAabb(eyeX, eyeY, eyeZ, ndx, ndy, ndz, MAX_RANGE, aabb);
       if (t < bestDist) {
         bestDist = t;
         bestHitId = aabb.id;

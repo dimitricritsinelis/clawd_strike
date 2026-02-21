@@ -525,15 +525,15 @@ export class Game {
     return this.enemyManager?.checkRaycastHit(origin, dir, maxDist) ?? { hit: false };
   }
 
-  applyDamageToEnemy(enemyId: string, damage: number): void {
-    this.enemyManager?.applyDamageToEnemy(enemyId, damage);
+  applyDamageToEnemy(enemyId: string, damage: number, isHeadshot = false): void {
+    this.enemyManager?.applyDamageToEnemy(enemyId, damage, isHeadshot);
   }
 
   setEnemyAudio(audio: WeaponAudio): void {
     this.enemyManager?.setAudio(audio);
   }
 
-  setEnemyKillCallback(cb: (name: string) => void): void {
+  setEnemyKillCallback(cb: (name: string, isHeadshot: boolean) => void): void {
     this.enemyManager?.setKillCallback(cb);
   }
 

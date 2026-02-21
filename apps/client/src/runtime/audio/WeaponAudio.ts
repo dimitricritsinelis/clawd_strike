@@ -516,7 +516,10 @@ export class WeaponAudio {
       try { this.ambientSource.stop(); } catch { /* already stopped */ }
       this.ambientSource = null;
     }
-    this.ambientGain = null;
+    if (this.ambientGain) {
+      this.ambientGain.disconnect();
+      this.ambientGain = null;
+    }
     this.ambientRunning = false;
     this.loadPromise = null;
     this.closeBuffer = null;

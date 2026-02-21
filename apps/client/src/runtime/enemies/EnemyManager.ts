@@ -1,6 +1,8 @@
 import { Scene, Vector3 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { WeaponAudio } from "../audio/WeaponAudio";
+import { PLAYER_HEIGHT_M, PLAYER_WIDTH_M } from "../sim/PlayerController";
+import { rayVsAabb } from "../sim/collision/rayVsAabb";
 import type { WorldColliders } from "../sim/collision/WorldColliders";
 import { DeterministicRng, deriveSubSeed, resolveRuntimeSeed } from "../utils/Rng";
 import {
@@ -12,8 +14,7 @@ import {
 } from "./EnemyController";
 import { EnemyVisual } from "./EnemyVisual";
 
-const PLAYER_HALF_WIDTH_M = 0.3;
-const PLAYER_HEIGHT_M = 1.8;
+const PLAYER_HALF_WIDTH_M = PLAYER_WIDTH_M * 0.5;
 
 /** How much position jitter (metres) to add to each spawn point per axis. */
 const SPAWN_JITTER_M = 1.5;
@@ -36,62 +37,13 @@ export type EnemyHitResult =
   | { hit: true; enemyId: string; distance: number; hitX: number; hitY: number; hitZ: number }
   | { hit: false };
 
-// Inline slab-test (same algorithm as EnemyController, used here for player-facing raycast)
-function rayVsEnemyAabb(
-  ox: number, oy: number, oz: number,
-  dx: number, dy: number, dz: number,
-  maxDist: number,
-  aabb: EnemyAabb,
-): number {
-  const RAY_EPS = 1e-6;
-  let tMin = 0;
-  let tMax = maxDist;
-
-  if (Math.abs(dx) <= RAY_EPS) {
-    if (ox < aabb.minX || ox > aabb.maxX) return Infinity;
-  } else {
-    let t0 = (aabb.minX - ox) / dx;
-    let t1 = (aabb.maxX - ox) / dx;
-    if (t0 > t1) { const tmp = t0; t0 = t1; t1 = tmp; }
-    tMin = Math.max(tMin, t0);
-    tMax = Math.min(tMax, t1);
-    if (tMin > tMax) return Infinity;
-  }
-
-  if (Math.abs(dy) <= RAY_EPS) {
-    if (oy < aabb.minY || oy > aabb.maxY) return Infinity;
-  } else {
-    let t0 = (aabb.minY - oy) / dy;
-    let t1 = (aabb.maxY - oy) / dy;
-    if (t0 > t1) { const tmp = t0; t0 = t1; t1 = tmp; }
-    tMin = Math.max(tMin, t0);
-    tMax = Math.min(tMax, t1);
-    if (tMin > tMax) return Infinity;
-  }
-
-  if (Math.abs(dz) <= RAY_EPS) {
-    if (oz < aabb.minZ || oz > aabb.maxZ) return Infinity;
-  } else {
-    let t0 = (aabb.minZ - oz) / dz;
-    let t1 = (aabb.maxZ - oz) / dz;
-    if (t0 > t1) { const tmp = t0; t0 = t1; t1 = tmp; }
-    tMin = Math.max(tMin, t0);
-    tMax = Math.min(tMax, t1);
-    if (tMin > tMax) return Infinity;
-  }
-
-  if (tMin >= 0 && tMin <= maxDist) return tMin;
-  if (tMax >= 0 && tMax <= maxDist) return tMax;
-  return Infinity;
-}
-
 export class EnemyManager {
   private readonly scene: Scene;
   private readonly sharedLoader: GLTFLoader;
   private controllers: EnemyController[] = [];
   private visuals: EnemyVisual[] = [];
   private weaponAudio: WeaponAudio | null = null;
-  private onEnemyKilled: ((name: string) => void) | null = null;
+  private onEnemyKilled: ((name: string, isHeadshot: boolean) => void) | null = null;
 
   // Tracks which indices have started their death fade (stable by array index)
   private readonly deathFadeStarted = new Set<number>();
@@ -125,7 +77,7 @@ export class EnemyManager {
     this.weaponAudio = audio;
   }
 
-  setKillCallback(cb: (name: string) => void): void {
+  setKillCallback(cb: (name: string, isHeadshot: boolean) => void): void {
     this.onEnemyKilled = cb;
   }
 
@@ -269,7 +221,7 @@ export class EnemyManager {
         if (!this.deathFadeStarted.has(i)) {
           this.deathFadeStarted.add(i);
           visual.startDeathFade();
-          this.onEnemyKilled?.(ctrl.name);
+          this.onEnemyKilled?.(ctrl.name, ctrl.wasLastHitHeadshot());
         }
         visual.updateDeathFade(deltaSeconds);
         continue; // no muzzle FX for dead enemies
@@ -285,10 +237,10 @@ export class EnemyManager {
     }
   }
 
-  applyDamageToEnemy(enemyId: string, damage: number): void {
+  applyDamageToEnemy(enemyId: string, damage: number, isHeadshot = false): void {
     for (const ctrl of this.controllers) {
       if (ctrl.id === enemyId) {
-        ctrl.applyDamage(damage);
+        ctrl.applyDamage(damage, isHeadshot);
         return;
       }
     }
@@ -312,7 +264,7 @@ export class EnemyManager {
     for (const aabb of this.aabbScratch) {
       // Only check actual enemy AABBs (not the player AABB — player can't shoot themselves)
       if (aabb.id === "player") continue;
-      const t = rayVsEnemyAabb(ox, oy, oz, dx, dy, dz, maxDist, aabb);
+      const t = rayVsAabb(ox, oy, oz, dx, dy, dz, maxDist, aabb);
       if (t < bestDist) {
         bestDist = t;
         bestId = aabb.id;

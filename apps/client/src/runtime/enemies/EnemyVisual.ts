@@ -44,9 +44,11 @@ function createNameTagTexture(name: string): CanvasTexture {
     // Dark pill background
     ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
     ctx.beginPath();
-    if ("roundRect" in ctx) {
-      (ctx as CanvasRenderingContext2D & { roundRect: (x: number, y: number, w: number, h: number, r: number) => void })
-        .roundRect(4, 4, 248, 56, 10);
+    const maybeRoundRect = (ctx as CanvasRenderingContext2D & {
+      roundRect?: (x: number, y: number, w: number, h: number, r: number) => void;
+    }).roundRect;
+    if (typeof maybeRoundRect === "function") {
+      maybeRoundRect.call(ctx, 4, 4, 248, 56, 10);
     } else {
       ctx.rect(4, 4, 248, 56);
     }

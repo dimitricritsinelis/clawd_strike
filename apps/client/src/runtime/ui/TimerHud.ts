@@ -17,7 +17,7 @@ export class TimerHud {
     this.root = document.createElement("div");
     Object.assign(this.root.style, {
       position: "absolute",
-      top: "88px",                          // below ScoreHud (approx 20px + 58px + gap)
+      top: "20px",
       left: "50%",
       transform: "translateX(-50%)",
       zIndex: "22",

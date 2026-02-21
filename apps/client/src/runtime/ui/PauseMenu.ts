@@ -1,7 +1,7 @@
 /**
  * PauseMenu — shown when the player presses Escape while pointer locked.
- * Displays a semi-transparent overlay with "PAUSED" and instructions.
- * Click anywhere or press Escape again to resume.
+ * Displays a semi-transparent overlay with "PAUSED" and actions.
+ * Escape always resumes gameplay.
  * z-index 34 (above DeathScreen at 32).
  */
 export class PauseMenu {
@@ -11,8 +11,10 @@ export class PauseMenu {
   private fadeTimerS = 0;
   private readonly FADE_IN_S = 0.2;
 
-  /** Called when the player resumes (click or Esc). */
+  /** Called when the player resumes (button or Esc). */
   onResume: (() => void) | null = null;
+  /** Called when the player wants to return to lobby. */
+  onReturnToLobby: (() => void) | null = null;
 
   constructor(mountEl: HTMLElement) {
     this.root = document.createElement("div");
@@ -71,18 +73,65 @@ export class PauseMenu {
       fontWeight: "400",
       color: "rgba(180, 200, 230, 0.55)",
       letterSpacing: "0.04em",
+      marginBottom: "18px",
     });
-    hintEl.textContent = "Press Escape or click to resume";
+    hintEl.textContent = "Press Escape to return to game";
 
-    panel.append(titleEl, divider, hintEl);
+    const actionsEl = document.createElement("div");
+    Object.assign(actionsEl.style, {
+      display: "flex",
+      gap: "12px",
+      alignItems: "center",
+      justifyContent: "center",
+    });
+
+    const gameBtn = document.createElement("button");
+    gameBtn.type = "button";
+    gameBtn.textContent = "Return to Game";
+    Object.assign(gameBtn.style, {
+      border: "1px solid rgba(182, 206, 232, 0.26)",
+      background: "rgba(18, 36, 58, 0.86)",
+      color: "#e8f0ff",
+      borderRadius: "8px",
+      padding: "10px 14px",
+      fontFamily: '"Segoe UI", Tahoma, Verdana, sans-serif',
+      fontSize: "13px",
+      fontWeight: "600",
+      letterSpacing: "0.03em",
+      cursor: "pointer",
+    });
+
+    const lobbyBtn = document.createElement("button");
+    lobbyBtn.type = "button";
+    lobbyBtn.textContent = "Return to Lobby";
+    Object.assign(lobbyBtn.style, {
+      border: "1px solid rgba(182, 206, 232, 0.20)",
+      background: "rgba(8, 14, 24, 0.86)",
+      color: "rgba(224, 236, 252, 0.92)",
+      borderRadius: "8px",
+      padding: "10px 14px",
+      fontFamily: '"Segoe UI", Tahoma, Verdana, sans-serif',
+      fontSize: "13px",
+      fontWeight: "600",
+      letterSpacing: "0.03em",
+      cursor: "pointer",
+    });
+
+    actionsEl.append(gameBtn, lobbyBtn);
+    panel.append(titleEl, divider, hintEl, actionsEl);
     this.root.append(panel);
     mountEl.append(this.root);
 
-    // Click to resume
-    this.root.addEventListener("click", () => {
+    gameBtn.addEventListener("click", () => {
       if (!this.visible) return;
       this.hide();
       this.onResume?.();
+    });
+
+    lobbyBtn.addEventListener("click", () => {
+      if (!this.visible) return;
+      this.hide();
+      this.onReturnToLobby?.();
     });
   }
 

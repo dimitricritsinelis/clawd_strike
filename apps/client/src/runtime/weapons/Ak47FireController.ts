@@ -1,8 +1,8 @@
 import { Vector3 } from "three";
 import { RUN_SPEED_MPS } from "../sim/PlayerController";
+import { type RaycastAabbHit, raycastFirstHit } from "../sim/collision/raycastAabb";
 import type { WorldColliders } from "../sim/collision/WorldColliders";
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
-import { type RaycastAabbHit, raycastFirstHit } from "./raycastAabb";
 
 const DEG_TO_RAD = Math.PI / 180;
 const TAU = Math.PI * 2;

@@ -40,8 +40,8 @@ export class PointerLockController {
     this.hintEl.textContent = "Click to lock pointer";
     this.hintEl.style.position = "absolute";
     this.hintEl.style.left = "50%";
-    this.hintEl.style.top = "16px";
-    this.hintEl.style.transform = "translateX(-50%)";
+    this.hintEl.style.top = "50%";
+    this.hintEl.style.transform = "translate(-50%, -50%)";
     this.hintEl.style.padding = "6px 10px";
     this.hintEl.style.borderRadius = "8px";
     this.hintEl.style.border = "1px solid rgba(0,0,0,0.28)";

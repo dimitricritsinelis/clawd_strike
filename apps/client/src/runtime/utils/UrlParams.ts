@@ -12,6 +12,7 @@ export type RuntimePropChaosOptions = {
 
 export type RuntimeUrlParams = {
   mapId: string;
+  playerName: string;
   shot: string | null;
   spawn: RuntimeSpawnId;
   debug: boolean;
@@ -81,9 +82,17 @@ function getParam(params: URLSearchParams, ...keys: string[]): string | null {
   return null;
 }
 
+function parsePlayerName(value: string | null): string {
+  if (!value) return "Operator";
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return "Operator";
+  return trimmed.slice(0, 24);
+}
+
 export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const params = new URLSearchParams(search);
   const rawMapId = getParam(params, "map");
+  const rawPlayerName = getParam(params, "name", "player", "playerName");
   const rawShot = getParam(params, "shot");
   const rawSpawn = getParam(params, "spawn");
   const rawDebug = getParam(params, "debug");
@@ -101,6 +110,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawPropDensity = getParam(params, "prop-density", "propDensity");
 
   const mapId = rawMapId && rawMapId.trim().length > 0 ? rawMapId.trim() : DEFAULT_MAP_ID;
+  const playerName = parsePlayerName(rawPlayerName);
   const shot = rawShot && rawShot.trim().length > 0 ? rawShot.trim() : null;
   const spawn = rawSpawn?.trim().toUpperCase() === "B" ? "B" : "A";
   const debug = parseBooleanFlag(rawDebug);
@@ -121,6 +131,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
 
   return {
     mapId,
+    playerName,
     shot,
     spawn,
     debug,
