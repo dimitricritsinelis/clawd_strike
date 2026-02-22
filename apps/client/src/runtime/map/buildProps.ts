@@ -1,16 +1,20 @@
 import {
+  Box3,
   BoxGeometry,
   CylinderGeometry,
+  DoubleSide,
   Group,
   InstancedMesh,
   MeshLambertMaterial,
   Object3D,
+  Vector3,
   type BufferGeometry,
 } from "three";
 import type { RuntimeColliderAabb } from "../sim/collision/WorldColliders";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
+import type { PropModelLibrary } from "../render/models/PropModelLibrary";
 import { DeterministicRng, resolveRuntimeSeed } from "../utils/Rng";
-import type { RuntimePropChaosOptions, RuntimePropProfile } from "../utils/UrlParams";
+import type { RuntimePropChaosOptions, RuntimePropProfile, RuntimePropVisualMode } from "../utils/UrlParams";
 import { designToWorldVec3, designYawDegToWorldYawRad, type WorldVec3 } from "./coordinateTransforms";
 import type { RuntimeAnchor, RuntimeAnchorsSpec, RuntimeBlockoutSpec, RuntimeRect } from "./types";
 
@@ -47,8 +51,30 @@ type InstanceSpec = {
 type InstanceBatch = {
   id: string;
   color: number;
+  kind: PropPlacementKind;
   createGeometry: () => BufferGeometry;
   instances: InstanceSpec[];
+};
+
+type PropPlacementKind =
+  | "shopfront"
+  | "signage"
+  | "cover"
+  | "spawnCover"
+  | "serviceDoor"
+  | "thresholdRug"
+  | "canopy"
+  | "heroPillar"
+  | "heroLintel"
+  | "landmarkWell"
+  | "filler";
+
+type PropPlacement = {
+  id: string;
+  anchorId: string;
+  kind: PropPlacementKind;
+  transform: InstanceSpec;
+  colliderDims: { x: number; y: number; z: number } | null;
 };
 
 type LineRhythmPoint = {
@@ -90,6 +116,8 @@ export type BuildPropsOptions = {
   anchors: RuntimeAnchorsSpec;
   seedOverride: number | null;
   propChaos: RuntimePropChaosOptions;
+  propVisuals: RuntimePropVisualMode;
+  propModels: PropModelLibrary | null;
   highVis: boolean;
 };
 
@@ -152,8 +180,13 @@ function createColliderFromOrientedBox(
   };
 }
 
-function createBatch(id: string, color: number, createGeometry: () => BufferGeometry): InstanceBatch {
-  return { id, color, createGeometry, instances: [] };
+function createBatch(
+  id: string,
+  color: number,
+  kind: PropPlacementKind,
+  createGeometry: () => BufferGeometry,
+): InstanceBatch {
+  return { id, color, kind, createGeometry, instances: [] };
 }
 
 function pushInstance(
@@ -367,6 +400,336 @@ function sampleClusteredGroupTs(rng: DeterministicRng, count: number, cluster: n
   return values;
 }
 
+const HANGING_KINDS = new Set<PropPlacementKind>([
+  "canopy",
+  "serviceDoor",
+  "signage",
+  "heroLintel",
+]);
+
+const WALL_OFFSET_KINDS = new Set<PropPlacementKind>([
+  "serviceDoor",
+  "signage",
+  "heroLintel",
+]);
+
+const TOP_ALIGN_KINDS = new Set<PropPlacementKind>([
+  "canopy",
+  "serviceDoor",
+  "signage",
+]);
+
+const MODEL_POOLS_BY_KIND: Record<PropPlacementKind, readonly string[]> = {
+  shopfront: ["pp_market_stand"],
+  canopy: ["pp_curtains_double"],
+  serviceDoor: ["pp_curtains_double"],
+  thresholdRug: ["pp_rug", "pp_round_rug", "pp_rug_rectangle"],
+  signage: ["pp_rug_rectangle"],
+  cover: ["ph_wooden_crate_02", "ph_Barrel_02", "ph_wicker_basket_02"],
+  spawnCover: ["ph_wooden_crate_02", "ph_Barrel_02", "ph_wicker_basket_02"],
+  filler: [
+    "pp_bags",
+    "pp_bag_open",
+    "pp_fruit_crate",
+    "ph_brass_pot_01",
+    "ph_jug_01",
+    "ph_wicker_basket_02",
+  ],
+  heroPillar: ["pp_market_stand"],
+  heroLintel: ["pp_curtains_double"],
+  landmarkWell: ["ph_brass_pot_01"],
+};
+
+const RUG_MODEL_IDS = new Set<string>([
+  "pp_rug",
+  "pp_round_rug",
+  "pp_rug_rectangle",
+]);
+
+function chooseDeterministicModelId(
+  placement: PropPlacement,
+  propModels: PropModelLibrary,
+  rngRoot: DeterministicRng,
+): string | null {
+  const rng = rngRoot.fork(`${placement.id}:${placement.anchorId}:${placement.kind}`);
+  let pool = MODEL_POOLS_BY_KIND[placement.kind];
+
+  if (placement.kind === "canopy") {
+    // Skip tiny canopy spans; they read as thin artifacts from distance.
+    if (placement.transform.sx < 2.4) {
+      return null;
+    }
+  } else if (placement.kind === "filler") {
+    const footprint = Math.max(placement.transform.sx, placement.transform.sz);
+    if (footprint >= 1.0) {
+      pool = ["ph_wooden_crate_02", "pp_fruit_crate", "pp_bags"];
+    } else {
+      pool = ["ph_wicker_basket_02", "ph_brass_pot_01", "ph_jug_01", "pp_bag_open"];
+    }
+  }
+
+  const available = pool.filter((modelId) => propModels.hasModel(modelId));
+  if (available.length === 0) {
+    return null;
+  }
+  if (available.length === 1) {
+    return available[0]!;
+  }
+  const index = rng.int(0, available.length);
+  return available[index]!;
+}
+
+function computeUniformScaleFromAxes(
+  target: { x: number; y: number; z: number },
+  bboxSize: Vector3,
+  axes: readonly ("x" | "y" | "z")[],
+): number {
+  const sx = target.x / Math.max(0.0001, bboxSize.x);
+  const sy = target.y / Math.max(0.0001, bboxSize.y);
+  const sz = target.z / Math.max(0.0001, bboxSize.z);
+  const values = {
+    x: sx,
+    y: sy,
+    z: sz,
+  };
+  let out = Number.POSITIVE_INFINITY;
+  for (const axis of axes) {
+    out = Math.min(out, values[axis]);
+  }
+  if (!Number.isFinite(out)) {
+    return 1;
+  }
+  return clamp(out, 0.25, 8);
+}
+
+function computeKindAwareScale(
+  kind: PropPlacementKind,
+  target: { x: number; y: number; z: number },
+  bboxSize: Vector3,
+): number {
+  if (kind === "shopfront") {
+    const base = computeUniformScaleFromAxes(target, bboxSize, ["x", "y"]) * 1.16;
+    const depthCap = computeUniformScaleFromAxes(target, bboxSize, ["z"]) * 18;
+    return clamp(Math.min(base, depthCap), 0.55, 8);
+  }
+  if (kind === "serviceDoor") {
+    const base = computeUniformScaleFromAxes(target, bboxSize, ["x", "y"]) * 1.08;
+    const depthCap = computeUniformScaleFromAxes(target, bboxSize, ["z"]) * 8;
+    return clamp(Math.min(base, depthCap), 0.4, 8);
+  }
+  if (kind === "canopy") {
+    const stretched = computeUniformScaleFromAxes(target, bboxSize, ["x", "z"]) * 0.36;
+    return clamp(stretched, 0.35, 2.2);
+  }
+  if (kind === "signage") {
+    return clamp(computeUniformScaleFromAxes(target, bboxSize, ["x", "y"]) * 1.16, 0.25, 8);
+  }
+  if (kind === "thresholdRug") {
+    return clamp(computeUniformScaleFromAxes(target, bboxSize, ["x", "z"]) * 1.16, 0.25, 8);
+  }
+  if (kind === "cover" || kind === "spawnCover") {
+    return clamp(computeUniformScaleFromAxes(target, bboxSize, ["x", "y", "z"]) * 1.16, 0.25, 8);
+  }
+  if (kind === "filler") {
+    return clamp(computeUniformScaleFromAxes(target, bboxSize, ["x", "z"]) * 1.34, 0.25, 8);
+  }
+  if (kind === "heroPillar") {
+    return clamp(computeUniformScaleFromAxes(target, bboxSize, ["x", "y"]) * 1.18, 0.25, 8);
+  }
+  if (kind === "heroLintel") {
+    return clamp(computeUniformScaleFromAxes(target, bboxSize, ["x", "z"]) * 1.22, 0.25, 8);
+  }
+  if (kind === "landmarkWell") {
+    return clamp(computeUniformScaleFromAxes(target, bboxSize, ["x", "y", "z"]) * 1.12, 0.25, 8);
+  }
+  return computeUniformScaleFromAxes(target, bboxSize, ["x", "y", "z"]);
+}
+
+function applyKindOrientation(model: Group, kind: PropPlacementKind): void {
+  if (kind === "signage") {
+    model.rotation.x = -(Math.PI * 0.5);
+    return;
+  }
+  if (kind === "canopy") {
+    model.rotation.x = -(Math.PI * 0.5);
+    return;
+  }
+  if (kind === "heroLintel") {
+    model.rotation.x = -(Math.PI * 0.5);
+  }
+}
+
+function applyRenderStabilityTweaks(
+  model: Group,
+  kind: PropPlacementKind,
+  modelId: string,
+): void {
+  const isRugLike = RUG_MODEL_IDS.has(modelId) || kind === "thresholdRug";
+  const isHanging = HANGING_KINDS.has(kind);
+
+  model.traverse((node) => {
+    const mesh = node as {
+      isMesh?: boolean;
+      castShadow?: boolean;
+      material?: unknown;
+    };
+    if (!mesh.isMesh) return;
+
+    if (isRugLike || isHanging) {
+      mesh.castShadow = false;
+    }
+
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if (!material || typeof material !== "object") continue;
+      const stableMaterial = material as {
+        transparent?: boolean;
+        depthWrite?: boolean;
+        side?: number;
+        polygonOffset?: boolean;
+        polygonOffsetFactor?: number;
+        polygonOffsetUnits?: number;
+        needsUpdate?: boolean;
+      };
+
+      if (isRugLike) {
+        stableMaterial.polygonOffset = true;
+        stableMaterial.polygonOffsetFactor = -1;
+        stableMaterial.polygonOffsetUnits = -1;
+      }
+
+      if (isHanging && stableMaterial.transparent === true) {
+        stableMaterial.depthWrite = false;
+      }
+
+      if (kind === "canopy") {
+        stableMaterial.side = DoubleSide;
+      }
+
+      stableMaterial.needsUpdate = true;
+    }
+  });
+}
+
+function resolveWallOffsetRange(kind: PropPlacementKind): { min: number; max: number } {
+  if (kind === "signage" || kind === "serviceDoor") {
+    return { min: 0.12, max: 0.2 };
+  }
+  if (kind === "canopy") {
+    return { min: 0.08, max: 0.16 };
+  }
+  if (kind === "heroLintel") {
+    return { min: 0.05, max: 0.1 };
+  }
+  return { min: 0.06, max: 0.12 };
+}
+
+function resolveForwardPlacementOffset(placement: PropPlacement): number {
+  const depth = placement.colliderDims?.z ?? placement.transform.sz;
+  if (placement.kind === "shopfront") {
+    return Math.max(0.24, depth * 0.62);
+  }
+  if (placement.kind === "serviceDoor") {
+    return 0.12;
+  }
+  if (placement.kind === "signage") {
+    return 0.08;
+  }
+  return 0;
+}
+
+function buildDressedGroup(
+  placements: PropPlacement[],
+  propModels: PropModelLibrary,
+  seed: number,
+): Group | null {
+  if (placements.length === 0) return null;
+
+  const dressedGroup = new Group();
+  dressedGroup.name = "map-props-dressed";
+  const rngRoot = new DeterministicRng(seed).fork("dressed-props");
+  const bbox = new Box3();
+
+  for (const placement of placements) {
+    const modelId = chooseDeterministicModelId(placement, propModels, rngRoot);
+    if (!modelId) continue;
+
+    const model = propModels.instantiate(modelId);
+    applyKindOrientation(model, placement.kind);
+    applyRenderStabilityTweaks(model, placement.kind, modelId);
+    model.updateMatrixWorld(true);
+    bbox.setFromObject(model);
+    const orientedSize = bbox.getSize(new Vector3());
+
+    const target = {
+      x: placement.transform.sx,
+      y: placement.transform.sy,
+      z: placement.transform.sz,
+    };
+
+    if (placement.kind === "canopy") {
+      const scaleX = clamp(target.x / Math.max(0.0001, orientedSize.x), 0.05, 20);
+      const scaleY = clamp(target.y / Math.max(0.0001, orientedSize.y), 0.05, 20);
+      const scaleZ = clamp(target.z / Math.max(0.0001, orientedSize.z), 0.05, 20);
+      model.scale.set(
+        model.scale.x * scaleX,
+        model.scale.y * scaleY,
+        model.scale.z * scaleZ,
+      );
+    } else {
+      const fitScale = computeKindAwareScale(placement.kind, target, orientedSize);
+      model.scale.multiplyScalar(fitScale);
+    }
+
+    model.updateMatrixWorld(true);
+    bbox.setFromObject(model);
+
+    const centerX = (bbox.min.x + bbox.max.x) * 0.5;
+    const centerZ = (bbox.min.z + bbox.max.z) * 0.5;
+    model.position.x -= centerX;
+    model.position.z -= centerZ;
+
+    if (TOP_ALIGN_KINDS.has(placement.kind)) {
+      const topY = placement.transform.y + placement.transform.sy * 0.5;
+      model.position.y += topY - bbox.max.y;
+    } else {
+      const baseY = placement.transform.y - placement.transform.sy * 0.5;
+      model.position.y += baseY - bbox.min.y;
+    }
+    if (RUG_MODEL_IDS.has(modelId) && !HANGING_KINDS.has(placement.kind)) {
+      model.position.y += 0.02;
+    }
+
+    const placementRoot = new Group();
+    placementRoot.name = `prop-dressed-${placement.id}`;
+    placementRoot.position.set(
+      placement.transform.x,
+      0,
+      placement.transform.z,
+    );
+    placementRoot.rotation.set(0, placement.transform.yawRad, 0);
+
+    const forwardOffset = resolveForwardPlacementOffset(placement);
+    if (forwardOffset > 0) {
+      placementRoot.position.x += -Math.sin(placement.transform.yawRad) * forwardOffset;
+      placementRoot.position.z += -Math.cos(placement.transform.yawRad) * forwardOffset;
+    }
+
+    if (WALL_OFFSET_KINDS.has(placement.kind)) {
+      const offsetRng = rngRoot.fork(`wall-offset:${placement.id}`);
+      const offsetRange = resolveWallOffsetRange(placement.kind);
+      const wallOffset = offsetRng.range(offsetRange.min, offsetRange.max);
+      placementRoot.position.x += -Math.sin(placement.transform.yawRad) * wallOffset;
+      placementRoot.position.z += -Math.cos(placement.transform.yawRad) * wallOffset;
+    }
+
+    placementRoot.add(model);
+    dressedGroup.add(placementRoot);
+  }
+
+  return dressedGroup.children.length > 0 ? dressedGroup : null;
+}
+
 export function buildProps(options: BuildPropsOptions): PropsBuildResult {
   const root = new Group();
   root.name = "map-props";
@@ -391,16 +754,16 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
   const boundaryCenterZ = boundary.y + boundary.h * 0.5;
 
   const batches = {
-    shopfront: createBatch("prop-shopfront", palette.shopfront, () => new BoxGeometry(1, 1, 1)),
-    signage: createBatch("prop-signage", palette.signage, () => new BoxGeometry(1, 1, 1)),
-    cover: createBatch("prop-cover", palette.cover, () => new BoxGeometry(1, 1, 1)),
-    spawnCover: createBatch("prop-spawn-cover", palette.spawnCover, () => new BoxGeometry(1, 1, 1)),
-    serviceDoor: createBatch("prop-service-door", palette.serviceDoor, () => new BoxGeometry(1, 1, 1)),
-    canopy: createBatch("prop-canopy", palette.canopy, () => new BoxGeometry(1, 1, 1)),
-    heroPillar: createBatch("prop-hero-pillar", palette.heroPillar, () => new BoxGeometry(1, 1, 1)),
-    heroLintel: createBatch("prop-hero-lintel", palette.heroLintel, () => new BoxGeometry(1, 1, 1)),
-    landmarkWell: createBatch("prop-landmark-well", palette.landmarkWell, () => new CylinderGeometry(0.5, 0.62, 1, 14)),
-    filler: createBatch("prop-stall-filler", palette.filler, () => new BoxGeometry(1, 1, 1)),
+    shopfront: createBatch("prop-shopfront", palette.shopfront, "shopfront", () => new BoxGeometry(1, 1, 1)),
+    signage: createBatch("prop-signage", palette.signage, "signage", () => new BoxGeometry(1, 1, 1)),
+    cover: createBatch("prop-cover", palette.cover, "cover", () => new BoxGeometry(1, 1, 1)),
+    spawnCover: createBatch("prop-spawn-cover", palette.spawnCover, "spawnCover", () => new BoxGeometry(1, 1, 1)),
+    serviceDoor: createBatch("prop-service-door", palette.serviceDoor, "serviceDoor", () => new BoxGeometry(1, 1, 1)),
+    canopy: createBatch("prop-canopy", palette.canopy, "canopy", () => new BoxGeometry(1, 1, 1)),
+    heroPillar: createBatch("prop-hero-pillar", palette.heroPillar, "heroPillar", () => new BoxGeometry(1, 1, 1)),
+    heroLintel: createBatch("prop-hero-lintel", palette.heroLintel, "heroLintel", () => new BoxGeometry(1, 1, 1)),
+    landmarkWell: createBatch("prop-landmark-well", palette.landmarkWell, "landmarkWell", () => new CylinderGeometry(0.5, 0.62, 1, 14)),
+    filler: createBatch("prop-stall-filler", palette.filler, "filler", () => new BoxGeometry(1, 1, 1)),
   };
 
   const stats: PropsBuildStats = {
@@ -420,6 +783,30 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
   };
 
   const colliders: RuntimeColliderAabb[] = [];
+  const placements: PropPlacement[] = [];
+  let placementSequence = 0;
+
+  function nextPlacementId(anchorId: string, kind: PropPlacementKind): string {
+    const id = `${anchorId}-${kind}-${placementSequence}`;
+    placementSequence += 1;
+    return id;
+  }
+
+  function recordPlacement(
+    anchorId: string,
+    kind: PropPlacementKind,
+    transform: InstanceSpec,
+    colliderDims: { x: number; y: number; z: number } | null,
+    explicitId?: string,
+  ): void {
+    placements.push({
+      id: explicitId ?? nextPlacementId(anchorId, kind),
+      anchorId,
+      kind,
+      transform,
+      colliderDims,
+    });
+  }
 
   function rejectReason(collider: RuntimeColliderAabb): "clear" | "bounds" | "gap" | null {
     for (const rect of clearTravelRects) {
@@ -476,7 +863,8 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
     size: { x: number; y: number; z: number },
     yawRad: number,
   ): void {
-    const collider = createColliderFromOrientedBox(`${anchorId}-${suffix}`, center, size, yawRad);
+    const colliderId = `${anchorId}-${suffix}`;
+    const collider = createColliderFromOrientedBox(colliderId, center, size, yawRad);
     stats.candidatesTotal += 1;
 
     const reason = rejectReason(collider);
@@ -486,6 +874,13 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
     }
 
     pushInstance(batch, center.x, center.y, center.z, size.x, size.y, size.z, yawRad);
+    recordPlacement(
+      anchorId,
+      batch.kind,
+      { x: center.x, y: center.y, z: center.z, sx: size.x, sy: size.y, sz: size.z, yawRad },
+      { x: size.x, y: size.y, z: size.z },
+      colliderId,
+    );
     colliders.push(collider);
     stats.collidersPlaced += 1;
   }
@@ -644,6 +1039,12 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
       const yaw = baseYaw + rng.range(-1, 1) * (12 + 28 * chaos.jitter) * DEG_TO_RAD;
 
       pushInstance(batches.signage, center.x, center.y, center.z, size.x, size.y, size.z, yaw);
+      recordPlacement(
+        anchor.id,
+        batches.signage.kind,
+        { x: center.x, y: center.y, z: center.z, sx: size.x, sy: size.y, sz: size.z, yawRad: yaw },
+        null,
+      );
       continue;
     }
 
@@ -721,6 +1122,35 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
       };
       const yaw = baseYaw + rng.range(-1, 1) * (2 + 4 * chaos.jitter) * DEG_TO_RAD;
       pushInstance(batches.serviceDoor, center.x, center.y, center.z, size.x, size.y, size.z, yaw);
+      recordPlacement(
+        anchor.id,
+        batches.serviceDoor.kind,
+        { x: center.x, y: center.y, z: center.z, sx: size.x, sy: size.y, sz: size.z, yawRad: yaw },
+        null,
+      );
+
+      const forwardX = -Math.sin(yaw);
+      const forwardZ = -Math.cos(yaw);
+      const rugSize = {
+        x: clamp(size.x * 1.35, 0.95, 1.5),
+        y: 0.06,
+        z: clamp(0.92 + rng.range(-0.1, 0.18), 0.72, 1.35),
+      };
+      recordPlacement(
+        anchor.id,
+        "thresholdRug",
+        {
+          x: center.x + forwardX * 0.44,
+          y: rugSize.y * 0.5,
+          z: center.z + forwardZ * 0.44,
+          sx: rugSize.x,
+          sy: rugSize.y,
+          sz: rugSize.z,
+          yawRad: yaw,
+        },
+        null,
+        `${anchor.id}-threshold-rug`,
+      );
       continue;
     }
 
@@ -751,6 +1181,12 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
           z: clamp((anchor.heightM ?? 0.8) * (0.82 + rng.range(0, 0.4) * chaos.density), 0.4, 1.5),
         };
         pushInstance(batches.canopy, center.x, center.y, center.z, size.x, size.y, size.z, yaw);
+        recordPlacement(
+          anchor.id,
+          batches.canopy.kind,
+          { x: center.x, y: center.y, z: center.z, sx: size.x, sy: size.y, sz: size.z, yawRad: yaw },
+          null,
+        );
       } else {
         const size = {
           x: clamp(anchor.widthM ?? 2.6, 1.8, 8),
@@ -763,6 +1199,12 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
           z: base.z + rng.range(-0.2, 0.2) * chaos.jitter,
         };
         pushInstance(batches.canopy, center.x, center.y, center.z, size.x, size.y, size.z, baseYaw);
+        recordPlacement(
+          anchor.id,
+          batches.canopy.kind,
+          { x: center.x, y: center.y, z: center.z, sx: size.x, sy: size.y, sz: size.z, yawRad: baseYaw },
+          null,
+        );
       }
       continue;
     }
@@ -816,6 +1258,20 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
         lintelSize.z,
         yaw,
       );
+      recordPlacement(
+        anchor.id,
+        batches.heroLintel.kind,
+        {
+          x: lintelCenter.x,
+          y: lintelCenter.y,
+          z: lintelCenter.z,
+          sx: lintelSize.x,
+          sy: lintelSize.y,
+          sz: lintelSize.z,
+          yawRad: yaw,
+        },
+        null,
+      );
       continue;
     }
 
@@ -833,7 +1289,22 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
       };
       const inClearZone = clearTravelRects.some((rect) => pointInRect2d(center.x, center.z, rect));
 
-      pushInstance(batches.landmarkWell, center.x, center.y, center.z, 1.4, size.y, 1.4, rng.range(0, Math.PI));
+      const landmarkYaw = rng.range(0, Math.PI);
+      pushInstance(batches.landmarkWell, center.x, center.y, center.z, 1.4, size.y, 1.4, landmarkYaw);
+      recordPlacement(
+        anchor.id,
+        batches.landmarkWell.kind,
+        {
+          x: center.x,
+          y: center.y,
+          z: center.z,
+          sx: 1.4,
+          sy: size.y,
+          sz: 1.4,
+          yawRad: landmarkYaw,
+        },
+        null,
+      );
 
       if (inClearZone) {
         stats.visualOnlyLandmarks += 1;
@@ -884,14 +1355,14 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
         // Side hall fillers: larger crate/barrel groups, wall-aligned.
         const size = isSideHall
           ? {
-              x: pieceRng.range(1.0, 1.8),
-              y: pieceRng.range(0.55, 1.15),
-              z: pieceRng.range(0.8, 1.2),
+              x: pieceRng.range(1.2, 2.1),
+              y: pieceRng.range(0.7, 1.4),
+              z: pieceRng.range(1.0, 1.45),
             }
           : {
-              x: pieceRng.range(0.24, 0.62),
-              y: pieceRng.range(0.28, 0.95),
-              z: pieceRng.range(0.24, 0.62),
+              x: pieceRng.range(0.55, 1.15),
+              y: pieceRng.range(0.45, 1.25),
+              z: pieceRng.range(0.55, 1.15),
             };
 
         let centerX = strip.x + strip.w * 0.5;
@@ -929,7 +1400,11 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
         if (isNearOpenNode(centerX, centerZ)) {
           continue;
         }
+        if (clearTravelRects.some((rect) => pointInRect2d(centerX, centerZ, rect))) {
+          continue;
+        }
 
+        const fillerYaw = pieceRng.range(-1, 1) * (7 + chaos.jitter * 20) * DEG_TO_RAD;
         pushInstance(
           batches.filler,
           centerX,
@@ -938,7 +1413,21 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
           size.x,
           size.y,
           size.z,
-          pieceRng.range(-1, 1) * (7 + chaos.jitter * 20) * DEG_TO_RAD,
+          fillerYaw,
+        );
+        recordPlacement(
+          `stall-strip-${strip.x.toFixed(2)}-${strip.y.toFixed(2)}-${g}-${p}`,
+          batches.filler.kind,
+          {
+            x: centerX,
+            y: size.y * 0.5,
+            z: centerZ,
+            sx: size.x,
+            sy: size.y,
+            sz: size.z,
+            yawRad: fillerYaw,
+          },
+          null,
         );
         stats.stallFillersPlaced += 1;
       }
@@ -946,6 +1435,9 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
   }
 
   const instanceDummy = new Object3D();
+  const blockoutGroup = new Group();
+  blockoutGroup.name = "map-props-blockout";
+  root.add(blockoutGroup);
   const orderedBatches = [
     batches.shopfront,
     batches.signage,
@@ -990,7 +1482,16 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
       mesh.setMatrixAt(i, instanceDummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
-    root.add(mesh);
+    blockoutGroup.add(mesh);
+  }
+
+  if (options.propVisuals === "bazaar" && options.propModels) {
+    const dressedGroup = buildDressedGroup(placements, options.propModels, seed);
+    if (dressedGroup) {
+      root.add(dressedGroup);
+      blockoutGroup.visible = false;
+      dressedGroup.visible = true;
+    }
   }
 
   return {

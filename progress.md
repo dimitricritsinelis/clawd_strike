@@ -2,14 +2,17 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Player name label remains in the top-right score panel and is now visibly larger for readability.
-- Health HUD still starts with `HP` directly (no name line), keeping bottom-left uncluttered.
-- Score HUD keeps player name above KILLS/HEADSHOTS and scales well at default `Operator` length.
-- Deterministic compare-shot pair captured for this prompt (`before.png`/`after.png`).
+- Bazaar prop runtime pack remains `bazaar_prop_models_pack_v1` with `props=bazaar` opt-in.
+- P34 fixes floating canopy placement with top-aligned dressing (`canopy`, `serviceDoor`, `signage`) instead of always bottom-aligning dressed meshes.
+- Canopy models now rotate to horizontal slab orientation, use non-uniform fit-to-target scaling, and render double-sided from below.
+- Shopfront dressed model selection is now structure-only (`pp_market_stand`) to remove oversized crate/bag storefronts.
+- Stall-strip filler now skips `clear_travel_zone` rectangles to reduce visual clutter in main traversal lanes.
+- Deterministic compare screenshots captured for P34 and review gate passed (`pos/yaw/pitch/fov drift = 0`).
 - Validation: ✅ `pnpm typecheck` and ✅ `pnpm build`.
+- Dev server restarted on `5174`; canonical compare URL opened for manual smoke.
 
 ## Canonical Playtest URL
-- `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&lighting=golden&shot=compare&autostart=human`
+- `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&walls=pbr&lighting=golden&shot=compare&autostart=human&props=bazaar`
 
 ## Map Approval Status
 - `NOT APPROVED`
@@ -19,25 +22,30 @@
 pnpm dev
 pnpm typecheck
 pnpm build
+pnpm --filter @clawd-strike/client fetch:bazaar-walls-sky --force
+pnpm --filter @clawd-strike/client fetch:bazaar-props --force
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P26_player_name_bigger`
+- Prompt ID: `P34_map_visual_polish`
 - What changed:
-  - Increased top-right player-name typography in `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/ui/ScoreHud.ts` (`fontSize` `13px` → `18px`, `fontWeight` `700` → `800`, slight spacing tweak).
-  - Captured deterministic compare screenshots:
-    - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P26_player_name_bigger/before.png`
-    - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P26_player_name_bigger/after.png`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/buildProps.ts`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/before.png`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/before_state.json`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/after.png`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/after_state.json`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/review.json`
 - Quick test steps:
-  - `pnpm dev`
-  - Open `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&lighting=golden&shot=compare&autostart=human&name=Operator`
-  - Verify `OPERATOR` appears larger above KILLS/HEADSHOTS in top-right panel.
-  - Verify movement/collision still function (spawn, look, strafe) and no new console spam.
+- `pnpm dev`
+- Open canonical URL above for deterministic compare framing.
+- Optional traversal URL: `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&walls=pbr&lighting=golden&autostart=human&props=bazaar`
 
 ## Next 3 Tasks
-1. Add max-width + ellipsis handling for long player names in top-right Score HUD.
-2. Optionally expose a `nameSize` tuning hook or adaptive scale rule for ultra-wide names.
-3. Run a human pointer-lock pass to verify readability during fast camera motion.
+1. Add 2-3 additional CC0 market stall/counter meshes to improve shopfront variety without reintroducing tiny repeated visuals.
+2. Move per-model fit/offset values from code into manifest-driven metadata (`models.json` overrides).
+3. Add `propsDebug=1` overlay (pivot, wall-normal, chosen model id) to speed visual tuning loops.
 
 ## Known Issues / Risks
-- Playwright smoke can still raise `WrongDocumentError` on pointer-lock requests; automated runs are not definitive for lock/move validation.
+- Automated movement smoke in Playwright still reports `WrongDocumentError` during pointer-lock request after loading→runtime transition.
+- Canopy visuals are conservative (small spans skipped) until better dedicated drape models are integrated.
+- Compare-shot mode freezes input by design; traversal checks require non-shot URLs.
