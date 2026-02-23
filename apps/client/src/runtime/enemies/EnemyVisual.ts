@@ -4,6 +4,8 @@ import {
   CanvasTexture,
   CylinderGeometry,
   Group,
+  Material,
+  Matrix4,
   Mesh,
   MeshStandardMaterial,
   Object3D,
@@ -16,24 +18,112 @@ import {
   Vector3,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { disposeObjectRoot } from "../utils/disposeObjectRoot";
 
-const MODEL_URL = "/assets/models/weapons/ak47/ak47.glb";
-const MODEL_FIXUP_YAW_RAD = Math.PI / 2;
-const GUN_TARGET_LENGTH_M = 0.65;
+const MODEL_URL = "/assets/models/characters/enemy_raider/model.glb";
+const MODEL_TARGET_HEIGHT_M = 1.8;
+const MODEL_FACING_FIXUP_YAW_RAD = Math.PI * 0.5;
+const MODEL_BARREL_AXIS_LOCAL = new Vector3(1, 0, 0);
+const MUZZLE_FORWARD_OFFSET_M = 0.03;
+const MUZZLE_MIN_HEIGHT_RATIO = 0.45;
+const MUZZLE_CENTERLINE_Z_RATIO = 0.7;
+const MUZZLE_FALLBACK_HEIGHT_RATIO = 0.63;
 
 const BODY_RADIUS_M = 0.28;
 const BODY_HEIGHT_M = 1.2;
 const HEAD_RADIUS_M = 0.18;
 const HEAD_Y_OFFSET = 1.4;
-const GUN_Y_OFFSET = 1.0;
-const GUN_X_OFFSET = 0.22;
+const FALLBACK_MUZZLE_X_OFFSET = 0.24;
+const FALLBACK_MUZZLE_Y_OFFSET = 1.1;
+const FALLBACK_MUZZLE_Z_OFFSET = 0.38;
 const NAME_Y_OFFSET = 2.2;
 
 const BODY_COLOR = 0x2a2e2a;
 const HEAD_COLOR = 0x3a2e28;
 
 const MUZZLE_FLASH_DURATION_S = 0.085;
+
+type EnemyModelTemplate = {
+  template: Object3D;
+  center: Vector3;
+  minY: number;
+  sizeY: number;
+  muzzleLocal: Vector3;
+};
+
+let enemyModelTemplatePromise: Promise<EnemyModelTemplate> | null = null;
+
+function loadEnemyModelTemplate(sharedGltfLoader: GLTFLoader): Promise<EnemyModelTemplate> {
+  if (enemyModelTemplatePromise) return enemyModelTemplatePromise;
+
+  enemyModelTemplatePromise = sharedGltfLoader.loadAsync(MODEL_URL)
+    .then((gltf) => {
+      gltf.scene.updateMatrixWorld(true);
+
+      const bounds = new Box3().setFromObject(gltf.scene);
+      const size = new Vector3();
+      const center = new Vector3();
+      bounds.getSize(size);
+      bounds.getCenter(center);
+
+      const minMuzzleY = bounds.min.y + size.y * MUZZLE_MIN_HEIGHT_RATIO;
+      const maxMuzzleAbsZ = size.z * MUZZLE_CENTERLINE_Z_RATIO;
+      const rootWorldInverse = new Matrix4().copy(gltf.scene.matrixWorld).invert();
+      const vertexWorld = new Vector3();
+      const vertexRootLocal = new Vector3();
+      const bestMuzzle = new Vector3();
+      let bestProjection = -Infinity;
+
+      gltf.scene.traverse((child) => {
+        const maybeMesh = child as Mesh;
+        if (!maybeMesh.isMesh) return;
+        const positionAttr = maybeMesh.geometry?.getAttribute("position");
+        if (!positionAttr || positionAttr.itemSize < 3) return;
+
+        const step = positionAttr.count > 20000 ? 2 : 1;
+        for (let i = 0; i < positionAttr.count; i += step) {
+          vertexRootLocal
+            .set(positionAttr.getX(i), positionAttr.getY(i), positionAttr.getZ(i))
+            .applyMatrix4(maybeMesh.matrixWorld);
+          vertexWorld.copy(vertexRootLocal).applyMatrix4(rootWorldInverse);
+
+          if (vertexWorld.y < minMuzzleY) continue;
+          if (Math.abs(vertexWorld.z - center.z) > maxMuzzleAbsZ) continue;
+
+          const projection = vertexWorld.dot(MODEL_BARREL_AXIS_LOCAL);
+          if (projection > bestProjection) {
+            bestProjection = projection;
+            bestMuzzle.copy(vertexWorld);
+          }
+        }
+      });
+
+      const muzzleLocal = Number.isFinite(bestProjection)
+        ? bestMuzzle
+        : new Vector3(
+          bounds.max.x,
+          bounds.min.y + size.y * MUZZLE_FALLBACK_HEIGHT_RATIO,
+          center.z,
+        );
+      muzzleLocal.addScaledVector(MODEL_BARREL_AXIS_LOCAL, MUZZLE_FORWARD_OFFSET_M);
+
+      return {
+        template: gltf.scene,
+        center,
+        minY: bounds.min.y,
+        sizeY: Math.max(0.001, size.y),
+        muzzleLocal,
+      };
+    })
+    .catch((error) => {
+      // Allow retry if the first load fails.
+      enemyModelTemplatePromise = null;
+      throw error;
+    });
+
+  return enemyModelTemplatePromise;
+}
 
 function createNameTagTexture(name: string): CanvasTexture {
   const canvas = document.createElement("canvas");
@@ -91,11 +181,12 @@ export class EnemyVisual {
   private readonly headMesh: Mesh;
   private readonly bodyMat: MeshStandardMaterial;
   private readonly headMat: MeshStandardMaterial;
-  private gunRoot: Group | null = null;
-  private gunModel: Object3D | null = null;
+  private modelRoot: Group | null = null;
+  private modelFadeMaterials: Material[] = [];
   private readonly nameSprite: Sprite;
   private readonly nameTexture: CanvasTexture;
   private readonly nameMaterial: SpriteMaterial;
+  private readonly muzzleAnchor: Group;
 
   // Death fade
   private fadingOut = false;
@@ -151,76 +242,74 @@ export class EnemyVisual {
     this.nameSprite.scale.set(1.2, 0.3, 1.0);
     this.root.add(this.nameSprite);
 
-    // Load gun GLB asynchronously
-    sharedGltfLoader.loadAsync(MODEL_URL).then((gltf) => {
-      this.gunModel = gltf.scene;
+    this.muzzleAnchor = new Group();
+    this.muzzleAnchor.position.set(FALLBACK_MUZZLE_X_OFFSET, FALLBACK_MUZZLE_Y_OFFSET, FALLBACK_MUZZLE_Z_OFFSET);
+    this.root.add(this.muzzleAnchor);
 
-      // Darken gun materials to distinguish from player's pristine gun
-      gltf.scene.traverse((child) => {
+    // Create muzzle flash regardless of model load state.
+    this.muzzleFlashTex = createMuzzleFlashTexture();
+    this.muzzleFlashMat = new SpriteMaterial({
+      map: this.muzzleFlashTex,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: AdditiveBlending,
+      opacity: 0,
+    });
+    this.muzzleFlash = new Sprite(this.muzzleFlashMat);
+    this.muzzleFlash.visible = false;
+    this.muzzleFlash.renderOrder = 100;
+    this.muzzleFlash.position.set(0, 0, 0);
+    this.muzzleFlash.scale.setScalar(0.15);
+    this.muzzleAnchor.add(this.muzzleFlash);
+
+    this.muzzleLight = new PointLight(0xffd7a0, 0, 3.0, 2);
+    this.muzzleLight.position.set(0, 0, 0);
+    this.muzzleAnchor.add(this.muzzleLight);
+
+    // Load enemy GLB once, then clone per enemy instance.
+    // This avoids repeated glTF parse/texture setup work per spawn.
+    loadEnemyModelTemplate(sharedGltfLoader).then((templateData) => {
+      const modelInstance = cloneSkeleton(templateData.template);
+      const fadeMaterials: Material[] = [];
+
+      modelInstance.traverse((child) => {
         const maybeMesh = child as Mesh;
         if (!maybeMesh.isMesh) return;
-        const maybeMat = maybeMesh.material;
-        if (!maybeMat) return;
-
-        const applyDarken = (mat: MeshStandardMaterial): void => {
-          if (!mat.isMeshStandardMaterial) return;
-          mat.color.multiplyScalar(0.4);
-          mat.roughness = Math.max(mat.roughness, 0.75);
-          mat.metalness = Math.min(mat.metalness, 0.2);
-          mat.needsUpdate = true;
-        };
-
-        if (Array.isArray(maybeMat)) {
-          for (const m of maybeMat) applyDarken(m as MeshStandardMaterial);
+        const meshMaterial = maybeMesh.material;
+        if (Array.isArray(meshMaterial)) {
+          maybeMesh.material = meshMaterial.map((mat) => {
+            const cloned = (mat as Material).clone();
+            fadeMaterials.push(cloned);
+            return cloned;
+          });
         } else {
-          applyDarken(maybeMat as MeshStandardMaterial);
+          const cloned = (meshMaterial as Material).clone();
+          maybeMesh.material = cloned;
+          fadeMaterials.push(cloned);
         }
       });
 
-      // Scale gun to target length
-      const bounds = new Box3().setFromObject(gltf.scene);
-      const size = new Vector3();
-      bounds.getSize(size);
-      const maxDim = Math.max(size.x, size.y, size.z);
+      this.modelFadeMaterials = fadeMaterials;
 
-      this.gunRoot = new Group();
-      // Barrel fixup: same rotation as Ak47ViewModel so barrel faces enemy's +Z forward
-      this.gunRoot.rotation.y = MODEL_FIXUP_YAW_RAD;
-      if (maxDim > 0) {
-        this.gunRoot.scale.setScalar(GUN_TARGET_LENGTH_M / maxDim);
-      }
-      this.gunRoot.add(gltf.scene);
+      this.modelRoot = new Group();
+      this.modelRoot.rotation.y = MODEL_FACING_FIXUP_YAW_RAD;
+      this.modelRoot.scale.setScalar(MODEL_TARGET_HEIGHT_M / templateData.sizeY);
+      modelInstance.position.set(
+        -templateData.center.x,
+        -templateData.minY,
+        -templateData.center.z,
+      );
+      this.modelRoot.add(modelInstance);
+      this.muzzleAnchor.position.copy(templateData.muzzleLocal).add(modelInstance.position);
+      this.modelRoot.add(this.muzzleAnchor);
+      this.root.add(this.modelRoot);
 
-      // Position at arm/shoulder level, slightly to the right of center
-      this.gunRoot.position.set(GUN_X_OFFSET, GUN_Y_OFFSET, 0);
-
-      this.root.add(this.gunRoot);
-
-      // ── Muzzle flash sprite ─────────────────────────────────────────────────
-      this.muzzleFlashTex = createMuzzleFlashTexture();
-      this.muzzleFlashMat = new SpriteMaterial({
-        map: this.muzzleFlashTex,
-        transparent: true,
-        depthWrite: false,
-        depthTest: false,
-        blending: AdditiveBlending,
-        opacity: 0,
-      });
-      this.muzzleFlash = new Sprite(this.muzzleFlashMat);
-      this.muzzleFlash.visible = false;
-      this.muzzleFlash.renderOrder = 100;
-      // Position at muzzle tip: forward along barrel in gunRoot-local coords.
-      // gunRoot faces +Z in world when enemy faces forward; local -Z = barrel tip.
-      this.muzzleFlash.position.set(0, 0, -0.5);
-      this.muzzleFlash.scale.setScalar(0.15);
-      this.gunRoot.add(this.muzzleFlash);
-
-      // ── Point light at muzzle ───────────────────────────────────────────────
-      this.muzzleLight = new PointLight(0xffd7a0, 0, 3.0, 2);
-      this.muzzleLight.position.set(0, 0, -0.5);
-      this.gunRoot.add(this.muzzleLight);
+      this.bodyMesh.visible = false;
+      this.headMesh.visible = false;
+      this.nameSprite.position.y = Math.max(NAME_Y_OFFSET, MODEL_TARGET_HEIGHT_M + 0.4);
     }).catch(() => {
-      // Gun model load failed — enemy still functions without the visual gun
+      // Model load failed — fallback body/head remain visible.
     });
 
     scene.add(this.root);
@@ -249,6 +338,14 @@ export class EnemyVisual {
     if (this.muzzleFlash) this.muzzleFlash.visible = false;
     if (this.muzzleLight) this.muzzleLight.intensity = 0;
     this.muzzleTimerS = 0;
+
+    for (const mat of this.modelFadeMaterials) {
+      if (!mat.transparent) {
+        mat.transparent = true;
+        mat.needsUpdate = true;
+      }
+      mat.depthWrite = false;
+    }
   }
 
   /** Returns true when the fade is fully complete. */
@@ -261,6 +358,9 @@ export class EnemyVisual {
     this.bodyMat.opacity = t;
     this.headMat.opacity = t;
     this.nameMaterial.opacity = t;
+    for (const mat of this.modelFadeMaterials) {
+      mat.opacity = t;
+    }
     if (this.muzzleFlashMat) this.muzzleFlashMat.opacity = 0;
 
     if (this.fadeTimerS <= 0) {
@@ -308,9 +408,6 @@ export class EnemyVisual {
   dispose(scene: Scene): void {
     scene.remove(this.root);
     disposeObjectRoot(this.root);
-    if (this.gunModel) {
-      disposeObjectRoot(this.gunModel);
-    }
     this.nameTexture.dispose();
     this.nameMaterial.dispose();
     if (this.muzzleFlashTex) {
@@ -321,6 +418,10 @@ export class EnemyVisual {
       this.muzzleFlashMat.dispose();
       this.muzzleFlashMat = null;
     }
+    for (const mat of this.modelFadeMaterials) {
+      mat.dispose();
+    }
+    this.modelFadeMaterials = [];
   }
 
   private nextRand(): number {
