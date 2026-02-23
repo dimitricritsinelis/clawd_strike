@@ -2,16 +2,16 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Enemy visuals use `/assets/models/characters/enemy_raider/model.glb`; first-person gun remains `/assets/models/weapons/ak47/ak47.glb`.
-- Enemy aim alignment updated: model now applies a facing fixup yaw so visual orientation matches controller aim direction.
-- Enemy muzzle flash anchor now resolves from model geometry (gun-tip approximation) instead of a fixed hardcoded body offset.
-- Shared-template performance optimization remains in place (single load + per-enemy clone).
-- Canonical compare screenshots for this prompt captured at `artifacts/screenshots/P50_enemy_muzzle_alignment/`.
-- Validation: ✅ `pnpm typecheck` and ✅ `pnpm build`.
-- Smoke run in headed mode reached runtime; automated pointer-lock still throws `WrongDocumentError` in harness context (known issue).
+- Wall generation now reads optional `defaults.wall_thickness` (current runtime default = `0.25m`) from `map_spec.json`.
+- New deterministic wall detail system is active (plinth/cornice/edge trims/pilasters/recess panels/door frames/sign mounts/awning brackets/cable runs).
+- Wall details are zone-aware: main-lane protrusions clamp to `<=0.10m`; global max protrusion default remains `0.15m`.
+- Wall detail meshes are visual-only (instanced, shadow-casting), and wall collisions remain base AABBs only.
+- URL toggles added: `wallDetails` (on/off) + `wallDetailDensity` (0..2 scalar).
+- Canonical compare screenshots for this prompt captured at `artifacts/screenshots/P51_wall_detail_kit/`.
+- Validation: ✅ `pnpm typecheck` and ✅ `pnpm build`; headed smoke confirms pointer lock + movement + collision still working.
 
 ## Canonical Playtest URL
-- `http://localhost:5174/`
+- `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
 
 ## Map Approval Status
 - `NOT APPROVED`
@@ -24,25 +24,34 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P50_enemy_muzzle_alignment`
+- Prompt ID: `P51_wall_detail_kit`
 - What changed:
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/enemies/EnemyVisual.ts`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P50_enemy_muzzle_alignment/before.png`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P50_enemy_muzzle_alignment/after.png`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/wallDetailKit.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/wallDetailPlacer.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/buildBlockout.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/types.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/utils/UrlParams.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/game/Game.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/bootstrap.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/scripts/gen-map-runtime.mjs`
+- `/Users/dimitri/Desktop/clawd-strike/docs/map-design/specs/map_spec.json`
+- `/Users/dimitri/Desktop/clawd-strike/docs/map-design/specs/map_spec_schema.json`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/public/maps/bazaar-map/map_spec.json`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P51_wall_detail_kit/before.png`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P51_wall_detail_kit/after.png`
 - Quick test steps:
 - `pnpm typecheck`
 - `pnpm build`
 - `pnpm dev`
-- Open `http://localhost:5174/`, select `HUMAN`, and verify enemies face the player while firing.
-- Confirm enemy muzzle flash emits from AK tip area during enemy shots.
-- Open `http://localhost:5174/?shot=compare` for deterministic compare capture.
+- Open `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`, click into the canvas, and verify pointer lock + WASD movement + wall collision.
+- Open `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human` for deterministic wall-detail compare framing.
 
 ## Next 3 Tasks
-1. Fine-tune muzzle tip resolver by adding optional named-node hints if future enemy rigs include muzzle/weapon bones.
-2. Add lightweight runtime toggle to visualize enemy muzzle anchor for one-shot alignment checks.
-3. Re-run manual in-browser traversal/combat pass and verify enemy look-at + muzzle FX behavior across all spawn lanes.
+1. Tune wall detail density/protrusion by zone after design review (especially right-wall cable/sign clutter in compare shot).
+2. Add optional `colliders=1` visual overlay pass to verify all new wall details remain non-collidable.
+3. Add one additional deterministic compare shot focused on side-hall service doors to review door-frame rhythm.
 
 ## Known Issues / Risks
 - Runtime generator still warns that some landmark/open-node anchors lie inside clear-travel zones.
-- Automated Playwright pointer-lock smoke can still throw `WrongDocumentError`; this is a harness limitation when loading-screen→runtime handoff occurs.
-- If future enemy models are authored with different forward axes, `MODEL_FACING_FIXUP_YAW_RAD` and muzzle-axis assumptions will need per-model tuning.
+- Headless Playwright runs can fail WebGL context creation on this machine; headed mode is currently reliable for captures.
+- Existing compare camera favors one lane; some new wall-detail variation is easier to assess from additional shots.

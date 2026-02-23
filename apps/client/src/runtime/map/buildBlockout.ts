@@ -1,13 +1,15 @@
 import { BoxGeometry, Group, InstancedMesh, MeshLambertMaterial, Object3D } from "three";
 import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibrary";
 import type { WallMaterialLibrary } from "../render/materials/WallMaterialLibrary";
-import type { RuntimeBlockoutSpec, RuntimeRect } from "./types";
+import type { RuntimeAnchorsSpec, RuntimeBlockoutSpec, RuntimeRect } from "./types";
 import type { RuntimeColliderAabb } from "../sim/collision/WorldColliders";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 import type { RuntimeFloorMode, RuntimeFloorQuality, RuntimeLightingPreset, RuntimeWallMode } from "../utils/UrlParams";
 import { buildPbrFloors } from "./buildPbrFloors";
 import { buildSandAccumulation } from "./buildSandAccumulation";
 import { buildPbrWalls } from "./buildPbrWalls";
+import { buildWallDetailMeshes } from "./wallDetailKit";
+import { buildWallDetailPlacements, type WallDetailPlacementStats } from "./wallDetailPlacer";
 
 const WALKABLE_ZONE_TYPES = new Set([
   "spawn_plaza",
@@ -20,9 +22,12 @@ const WALKABLE_ZONE_TYPES = new Set([
 const STALL_STRIP_ZONE_TYPE = "stall_strip";
 const CLEAR_TRAVEL_ZONE_TYPE = "clear_travel_zone";
 
-const WALL_THICKNESS_M = 0.4;
 const BASE_FLOOR_THICKNESS_M = 0.06;
 const OVERLAY_FLOOR_THICKNESS_M = 0.02;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 export type BoundarySegment = {
   orientation: "vertical" | "horizontal";
@@ -35,6 +40,12 @@ export type BoundarySegment = {
 export type BlockoutBuildResult = {
   root: Group;
   colliders: RuntimeColliderAabb[];
+  wallDetailStats: WallDetailPlacementStats;
+};
+
+export type BlockoutWallDetailOptions = {
+  enabled: boolean;
+  densityScale: number | null;
 };
 
 export type BlockoutBuildOptions = {
@@ -46,6 +57,8 @@ export type BlockoutBuildOptions = {
   lightingPreset: RuntimeLightingPreset;
   floorMaterials: FloorMaterialLibrary | null;
   wallMaterials: WallMaterialLibrary | null;
+  anchors: RuntimeAnchorsSpec | null;
+  wallDetails: BlockoutWallDetailOptions;
 };
 
 function rectContainsPoint(rect: RuntimeRect, x: number, y: number): boolean {
@@ -181,6 +194,7 @@ function createWallInstances(
   segments: BoundarySegment[],
   material: MeshLambertMaterial,
   wallHeightM: number,
+  wallThicknessM: number,
   floorTopY: number,
 ): InstancedMesh<BoxGeometry, MeshLambertMaterial> | null {
   if (segments.length === 0) return null;
@@ -202,15 +216,15 @@ function createWallInstances(
     let sizeZ = 0;
 
     if (segment.orientation === "vertical") {
-      centerX = segment.coord + segment.outward * (WALL_THICKNESS_M * 0.5);
+      centerX = segment.coord + segment.outward * (wallThicknessM * 0.5);
       centerZ = (segment.start + segment.end) * 0.5;
-      sizeX = WALL_THICKNESS_M;
+      sizeX = wallThicknessM;
       sizeZ = lengthM;
     } else {
       centerX = (segment.start + segment.end) * 0.5;
-      centerZ = segment.coord + segment.outward * (WALL_THICKNESS_M * 0.5);
+      centerZ = segment.coord + segment.outward * (wallThicknessM * 0.5);
       sizeX = lengthM;
-      sizeZ = WALL_THICKNESS_M;
+      sizeZ = wallThicknessM;
     }
 
     dummy.position.set(centerX, centerY, centerZ);
@@ -227,6 +241,7 @@ function createWallInstances(
 function appendWallSegmentColliders(
   segments: BoundarySegment[],
   wallHeightM: number,
+  wallThicknessM: number,
   floorTopY: number,
   colliders: RuntimeColliderAabb[],
 ): void {
@@ -241,15 +256,15 @@ function appendWallSegmentColliders(
     let sizeZ = 0;
 
     if (segment.orientation === "vertical") {
-      centerX = segment.coord + segment.outward * (WALL_THICKNESS_M * 0.5);
+      centerX = segment.coord + segment.outward * (wallThicknessM * 0.5);
       centerZ = (segment.start + segment.end) * 0.5;
-      sizeX = WALL_THICKNESS_M;
+      sizeX = wallThicknessM;
       sizeZ = lengthM;
     } else {
       centerX = (segment.start + segment.end) * 0.5;
-      centerZ = segment.coord + segment.outward * (WALL_THICKNESS_M * 0.5);
+      centerZ = segment.coord + segment.outward * (wallThicknessM * 0.5);
       sizeX = lengthM;
-      sizeZ = WALL_THICKNESS_M;
+      sizeZ = wallThicknessM;
     }
 
     colliders.push({
@@ -286,6 +301,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
   const axes = collectAxisCoordinates(walkableRects, spec.playable_boundary);
   const inside = buildInsideGrid(walkableRects, axes.xs, axes.ys);
   const wallSegments = mergeBoundarySegments(extractBoundarySegments(inside, axes.xs, axes.ys));
+  const wallThicknessM = Math.max(0.05, spec.defaults.wall_thickness);
 
   const floorTopY = spec.defaults.floor_height;
   if (options.floorMode === "pbr" && options.floorMaterials) {
@@ -337,7 +353,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
   }
 
   const colliders: RuntimeColliderAabb[] = [];
-  appendWallSegmentColliders(wallSegments, spec.defaults.wall_height, floorTopY, colliders);
+  appendWallSegmentColliders(wallSegments, spec.defaults.wall_height, wallThicknessM, floorTopY, colliders);
 
   if (options.wallMode === "pbr" && options.wallMaterials) {
     const pbrWalls = buildPbrWalls({
@@ -347,7 +363,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       manifest: options.wallMaterials,
       wallHeightM: spec.defaults.wall_height,
       floorTopY,
-      wallThicknessM: WALL_THICKNESS_M,
+      wallThicknessM,
     });
     root.add(pbrWalls);
   } else {
@@ -355,6 +371,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       wallSegments,
       new MeshLambertMaterial({ color: palette.wall }),
       spec.defaults.wall_height,
+      wallThicknessM,
       floorTopY,
     );
     if (wallInstances) {
@@ -362,6 +379,26 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       wallInstances.receiveShadow = true;
       root.add(wallInstances);
     }
+  }
+
+  const wallDetailDensityScale = typeof options.wallDetails.densityScale === "number"
+    ? options.wallDetails.densityScale
+    : 1;
+  const wallDetailPlacements = buildWallDetailPlacements({
+    segments: wallSegments,
+    zones: spec.zones,
+    anchors: options.anchors,
+    seed: options.seed,
+    wallHeightM: spec.defaults.wall_height,
+    wallThicknessM,
+    enabled: spec.wall_details.enabled && options.wallDetails.enabled,
+    detailSeed: typeof spec.wall_details.seed === "number" ? spec.wall_details.seed : null,
+    density: clamp(spec.wall_details.density * wallDetailDensityScale, 0, 1.25),
+    maxProtrusionM: spec.wall_details.maxProtrusion,
+  });
+  if (wallDetailPlacements.instances.length > 0) {
+    const detailRoot = buildWallDetailMeshes(wallDetailPlacements.instances, options.highVis);
+    root.add(detailRoot);
   }
 
   colliders.push({
@@ -399,5 +436,5 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     );
   }
 
-  return { root, colliders };
+  return { root, colliders, wallDetailStats: wallDetailPlacements.stats };
 }

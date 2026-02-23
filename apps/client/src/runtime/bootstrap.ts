@@ -90,6 +90,12 @@ export type RuntimeTextState = {
     spawn: "A" | "B";
     highVis: boolean;
     colliderCount: number;
+    wallDetails: {
+      enabled: boolean;
+      density: number;
+      segmentsDecorated: number;
+      instanceCount: number;
+    };
     error?: string;
   };
   shot: {
@@ -398,6 +404,8 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     propChaos: urlParams.propChaos,
     floorMode: resolvedFloorMode,
     wallMode: resolvedWallMode,
+    wallDetails: urlParams.wallDetails,
+    wallDetailDensity: urlParams.wallDetailDensity,
     floorQuality: urlParams.floorQuality,
     lightingPreset: urlParams.lightingPreset,
     floorMaterials,
@@ -618,6 +626,12 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
         spawn: urlParams.spawn,
         highVis: urlParams.highVis,
         colliderCount: game.getColliderCount(),
+        wallDetails: {
+          enabled: game.getWallDetailStats().enabled,
+          density: game.getWallDetailStats().density,
+          segmentsDecorated: game.getWallDetailStats().segmentsDecorated,
+          instanceCount: game.getWallDetailStats().instanceCount,
+        },
         ...(mapErrorMessage ? { error: mapErrorMessage } : {}),
       },
       shot: {

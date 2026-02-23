@@ -5,6 +5,7 @@ import { EnemyManager, type EnemyHitResult } from "../enemies/EnemyManager";
 import type { WeaponAudio } from "../audio/WeaponAudio";
 import { buildBlockout } from "../map/buildBlockout";
 import { buildProps, type PropsBuildStats } from "../map/buildProps";
+import type { WallDetailPlacementStats } from "../map/wallDetailPlacer";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibrary";
 import type { WallMaterialLibrary } from "../render/materials/WallMaterialLibrary";
@@ -74,6 +75,8 @@ type GameOptions = {
   highVis?: boolean;
   floorMode: RuntimeFloorMode;
   wallMode: RuntimeWallMode;
+  wallDetails: boolean;
+  wallDetailDensity: number | null;
   floorQuality: RuntimeFloorQuality;
   lightingPreset: RuntimeLightingPreset;
   floorMaterials: FloorMaterialLibrary | null;
@@ -125,6 +128,8 @@ export class Game {
   private lightingPreset: RuntimeLightingPreset = "golden";
   private floorMode: RuntimeFloorMode = "blockout";
   private wallMode: RuntimeWallMode = "blockout";
+  private wallDetailsEnabled = true;
+  private wallDetailDensity: number | null = null;
   private floorQuality: RuntimeFloorQuality = "2k";
   private floorMaterials: FloorMaterialLibrary | null = null;
   private wallMaterials: WallMaterialLibrary | null = null;
@@ -157,6 +162,14 @@ export class Game {
     rejectedGapRule: 0,
     visualOnlyLandmarks: 0,
     stallFillersPlaced: 0,
+  };
+  private wallDetailStats: WallDetailPlacementStats = {
+    enabled: false,
+    seed: 1,
+    density: 0,
+    segmentCount: 0,
+    segmentsDecorated: 0,
+    instanceCount: 0,
   };
   private enemyManager: EnemyManager | null = null;
   private playerHealth = 100;
@@ -263,6 +276,8 @@ export class Game {
     this.lightingPreset = options.lightingPreset;
     this.floorMode = options.floorMode;
     this.wallMode = options.wallMode;
+    this.wallDetailsEnabled = options.wallDetails;
+    this.wallDetailDensity = options.wallDetailDensity;
     this.floorQuality = options.floorQuality;
     this.floorMaterials = options.floorMaterials;
     this.wallMaterials = options.wallMaterials;
@@ -363,6 +378,10 @@ export class Game {
 
   getPropsBuildStats(): PropsBuildStats {
     return this.propStats;
+  }
+
+  getWallDetailStats(): WallDetailPlacementStats {
+    return this.wallDetailStats;
   }
 
   onMouseDelta(deltaX: number, deltaY: number): void {
@@ -770,7 +789,13 @@ export class Game {
       lightingPreset: this.lightingPreset,
       floorMaterials: this.floorMaterials,
       wallMaterials: this.wallMaterials,
+      anchors: this.anchorsSpec,
+      wallDetails: {
+        enabled: this.wallDetailsEnabled,
+        densityScale: this.wallDetailDensity,
+      },
     });
+    this.wallDetailStats = builtBlockout.wallDetailStats;
     this.blockoutRoot = builtBlockout.root;
     this.scene.add(builtBlockout.root);
 

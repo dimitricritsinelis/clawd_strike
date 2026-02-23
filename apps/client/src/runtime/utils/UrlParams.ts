@@ -32,6 +32,8 @@ export type RuntimeUrlParams = {
   seed: number | null;
   floorMode: RuntimeFloorMode;
   wallMode: RuntimeWallMode;
+  wallDetails: boolean;
+  wallDetailDensity: number | null;
   floorQuality: RuntimeFloorQuality;
   lightingPreset: RuntimeLightingPreset;
   propVisuals: RuntimePropVisualMode;
@@ -83,6 +85,13 @@ function parseUnitFloat(value: string | null): number | null {
   const parsed = Number.parseFloat(value.trim());
   if (!Number.isFinite(parsed)) return null;
   return Math.max(0, Math.min(1, parsed));
+}
+
+function parseDensityScale(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number.parseFloat(value.trim());
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.min(2, parsed));
 }
 
 function parseFloorMode(value: string | null): RuntimeFloorMode {
@@ -145,6 +154,8 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawWalls = getParam(params, "walls");
   const rawFloorRes = getParam(params, "floorRes", "floor-res");
   const rawLighting = getParam(params, "lighting");
+  const rawWallDetails = getParam(params, "wallDetails", "wall-details");
+  const rawWallDetailDensity = getParam(params, "wallDetailDensity", "wall-detail-density");
   const rawProps = getParam(params, "props", "propVisuals", "prop-visuals");
   const rawPropProfile = getParam(params, "prop-profile", "propProfile");
   const rawPropJitter = getParam(params, "prop-jitter", "propJitter");
@@ -166,6 +177,8 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const seed = parseSeed(rawSeed);
   const floorMode = parseFloorMode(rawFloors);
   const wallMode = parseWallMode(rawWalls);
+  const wallDetails = parseBooleanFlagWithDefault(rawWallDetails, true);
+  const wallDetailDensity = parseDensityScale(rawWallDetailDensity);
   const floorQuality = parseFloorQuality(rawFloorRes);
   const lightingPreset = parseLightingPreset(rawLighting);
   const propVisuals = parsePropVisualMode(rawProps);
@@ -192,6 +205,8 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     seed,
     floorMode,
     wallMode,
+    wallDetails,
+    wallDetailDensity,
     floorQuality,
     lightingPreset,
     propVisuals,
