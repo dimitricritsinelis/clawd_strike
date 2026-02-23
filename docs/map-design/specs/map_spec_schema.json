@@ -12,7 +12,38 @@
       "type": "object"
     },
     "global_dimensions": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "wall_thickness_default": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "wall_details": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "seed": {
+          "type": "number"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "bazaar"
+          ]
+        },
+        "density": {
+          "type": "number"
+        },
+        "maxProtrusion": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": true
     },
     "lanes": {
       "type": "object"

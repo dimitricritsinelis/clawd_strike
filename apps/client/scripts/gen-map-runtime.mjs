@@ -58,6 +58,16 @@ function optionalNumber(value, label) {
   return value;
 }
 
+function optionalBoolean(value, label) {
+  if (value === null || typeof value === "undefined" || value === "") {
+    return undefined;
+  }
+  if (typeof value !== "boolean") {
+    fail(`${label} must be a boolean when provided`);
+  }
+  return value;
+}
+
 function ensurePositive(value, label) {
   if (value <= 0) {
     fail(`${label} must be > 0`);
@@ -247,10 +257,12 @@ function deriveBlockoutSpec(spec, zones) {
 
   const playableBoundary = normalizeRect(globalDimensions.playable_boundary, "global_dimensions.playable_boundary");
   const wallHeight = asNumber(globalDimensions.wall_height_default, "global_dimensions.wall_height_default");
+  const wallThickness = optionalNumber(globalDimensions.wall_thickness_default, "global_dimensions.wall_thickness_default");
   const ceilingHeight = asNumber(globalDimensions.ceiling_height_default, "global_dimensions.ceiling_height_default");
   const floorHeight = asNumber(globalDimensions.floor_height_default, "global_dimensions.floor_height_default");
 
   ensurePositive(wallHeight, "global_dimensions.wall_height_default");
+  if (typeof wallThickness !== "undefined") ensurePositive(wallThickness, "global_dimensions.wall_thickness_default");
   ensurePositive(ceilingHeight, "global_dimensions.ceiling_height_default");
 
   const constraints = spec?.constraints;
@@ -263,13 +275,50 @@ function deriveBlockoutSpec(spec, zones) {
   ensurePositive(minMainLane, "constraints.min_path_width_main_lane");
   ensurePositive(minSideHalls, "constraints.min_path_width_side_halls");
 
+  const wallDetailsRaw = spec?.wall_details;
+  if (wallDetailsRaw && typeof wallDetailsRaw !== "object") {
+    fail("spec.wall_details must be an object when provided");
+  }
+  const wallDetailsStyle =
+    wallDetailsRaw && typeof wallDetailsRaw.style !== "undefined"
+      ? ensureString(wallDetailsRaw.style, "wall_details.style")
+      : "bazaar";
+  if (wallDetailsStyle !== "bazaar") {
+    fail("wall_details.style must be 'bazaar' when provided");
+  }
+
+  const wallDetailDensity =
+    wallDetailsRaw && typeof wallDetailsRaw.density !== "undefined"
+      ? asNumber(wallDetailsRaw.density, "wall_details.density")
+      : 0.48;
+  const wallDetailMaxProtrusion =
+    wallDetailsRaw && typeof wallDetailsRaw.maxProtrusion !== "undefined"
+      ? asNumber(wallDetailsRaw.maxProtrusion, "wall_details.maxProtrusion")
+      : 0.15;
+  const wallDetailSeed =
+    wallDetailsRaw && typeof wallDetailsRaw.seed !== "undefined"
+      ? asNumber(wallDetailsRaw.seed, "wall_details.seed")
+      : undefined;
+  const wallDetailEnabled =
+    wallDetailsRaw && typeof wallDetailsRaw.enabled !== "undefined"
+      ? optionalBoolean(wallDetailsRaw.enabled, "wall_details.enabled")
+      : undefined;
+
   return {
     mapId: MAP_ID,
     playable_boundary: playableBoundary,
     defaults: {
       wall_height: wallHeight,
+      wall_thickness: wallThickness ?? 0.25,
       ceiling_height: ceilingHeight,
       floor_height: floorHeight,
+    },
+    wall_details: {
+      enabled: typeof wallDetailEnabled === "boolean" ? wallDetailEnabled : true,
+      style: wallDetailsStyle,
+      density: Math.max(0, Math.min(1.25, wallDetailDensity)),
+      maxProtrusion: Math.max(0.02, Math.min(0.2, wallDetailMaxProtrusion)),
+      ...(typeof wallDetailSeed === "number" ? { seed: Math.trunc(wallDetailSeed) } : {}),
     },
     zones,
     constraints: {

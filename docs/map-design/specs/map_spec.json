@@ -26,7 +26,14 @@
     },
     "ceiling_height_default": 8.0,
     "wall_height_default": 6.0,
+    "wall_thickness_default": 0.25,
     "floor_height_default": 0.0
+  },
+  "wall_details": {
+    "enabled": true,
+    "style": "bazaar",
+    "density": 0.48,
+    "maxProtrusion": 0.15
   },
   "lanes": {
     "main_bazaar_lane": {

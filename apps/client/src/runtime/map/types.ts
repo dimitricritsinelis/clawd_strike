@@ -20,14 +20,26 @@ export type RuntimeBlockoutSpec = {
   playable_boundary: RuntimeRect;
   defaults: {
     wall_height: number;
+    wall_thickness: number;
     ceiling_height: number;
     floor_height: number;
   };
+  wall_details: RuntimeWallDetailOptions;
   zones: RuntimeBlockoutZone[];
   constraints: {
     min_path_width_main_lane: number;
     min_path_width_side_halls: number;
   };
+};
+
+export type RuntimeWallDetailStyle = "bazaar";
+
+export type RuntimeWallDetailOptions = {
+  enabled: boolean;
+  seed?: number;
+  style: RuntimeWallDetailStyle;
+  density: number;
+  maxProtrusion: number;
 };
 
 export type RuntimeAnchor = {
@@ -115,6 +127,13 @@ function asNumber(value: unknown, source: string): number {
   return value;
 }
 
+function asBoolean(value: unknown, source: string): boolean {
+  if (typeof value !== "boolean") {
+    failParse(source, "expected boolean");
+  }
+  return value;
+}
+
 function asPositiveNumber(value: unknown, source: string): number {
   const numeric = asNumber(value, source);
   if (numeric <= 0) {
@@ -149,6 +168,51 @@ function parseVec3(value: unknown, source: string): { x: number; y: number; z: n
   };
 }
 
+const DEFAULT_WALL_THICKNESS_M = 0.25;
+const DEFAULT_WALL_DETAIL_DENSITY = 0.48;
+const DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M = 0.15;
+
+function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDetailOptions {
+  if (typeof value === "undefined") {
+    return {
+      enabled: true,
+      style: "bazaar",
+      density: DEFAULT_WALL_DETAIL_DENSITY,
+      maxProtrusion: DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M,
+    };
+  }
+
+  const obj = asObject(value, source);
+  const styleRaw = typeof obj.style === "string" ? obj.style : "bazaar";
+  if (styleRaw !== "bazaar") {
+    failParse(`${source}.style`, "expected 'bazaar'");
+  }
+  const style: RuntimeWallDetailStyle = "bazaar";
+
+  const densityRaw =
+    typeof obj.density === "number" && Number.isFinite(obj.density) ? obj.density : DEFAULT_WALL_DETAIL_DENSITY;
+  const maxProtrusionRaw =
+    typeof obj.maxProtrusion === "number" && Number.isFinite(obj.maxProtrusion)
+      ? obj.maxProtrusion
+      : DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M;
+
+  const density = Math.max(0, Math.min(1.25, densityRaw));
+  const maxProtrusion = Math.max(0.02, Math.min(0.2, maxProtrusionRaw));
+
+  const resolved: RuntimeWallDetailOptions = {
+    enabled: typeof obj.enabled === "undefined" ? true : asBoolean(obj.enabled, `${source}.enabled`),
+    style,
+    density,
+    maxProtrusion,
+  };
+
+  if (typeof obj.seed !== "undefined") {
+    resolved.seed = asNumber(obj.seed, `${source}.seed`);
+  }
+
+  return resolved;
+}
+
 export function parseBlockoutSpec(value: unknown, source = "map_spec.json"): RuntimeBlockoutSpec {
   const obj = asObject(value, source);
   const zonesRaw = obj.zones;
@@ -175,9 +239,14 @@ export function parseBlockoutSpec(value: unknown, source = "map_spec.json"): Run
     playable_boundary: parseRect(obj.playable_boundary, `${source}.playable_boundary`),
     defaults: {
       wall_height: asPositiveNumber(defaults.wall_height, `${source}.defaults.wall_height`),
+      wall_thickness:
+        typeof defaults.wall_thickness === "undefined"
+          ? DEFAULT_WALL_THICKNESS_M
+          : asPositiveNumber(defaults.wall_thickness, `${source}.defaults.wall_thickness`),
       ceiling_height: asPositiveNumber(defaults.ceiling_height, `${source}.defaults.ceiling_height`),
       floor_height: asNumber(defaults.floor_height, `${source}.defaults.floor_height`),
     },
+    wall_details: parseWallDetailOptions(obj.wall_details, `${source}.wall_details`),
     zones,
     constraints: {
       min_path_width_main_lane: asPositiveNumber(
