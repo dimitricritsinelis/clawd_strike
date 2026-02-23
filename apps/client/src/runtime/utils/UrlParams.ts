@@ -5,8 +5,10 @@ const DEFAULT_FLOOR_QUALITY = "2k";
 export type RuntimeSpawnId = "A" | "B";
 export type RuntimePropProfile = "subtle" | "medium" | "high";
 export type RuntimeFloorMode = "blockout" | "pbr";
+export type RuntimeWallMode = "blockout" | "pbr";
 export type RuntimeFloorQuality = "1k" | "2k";
 export type RuntimeLightingPreset = "golden" | "flat";
+export type RuntimePropVisualMode = "blockout" | "bazaar";
 export type RuntimePropChaosOptions = {
   profile: RuntimePropProfile;
   jitter: number | null;
@@ -29,8 +31,10 @@ export type RuntimeUrlParams = {
   anchorTypes: string[];
   seed: number | null;
   floorMode: RuntimeFloorMode;
+  wallMode: RuntimeWallMode;
   floorQuality: RuntimeFloorQuality;
   lightingPreset: RuntimeLightingPreset;
+  propVisuals: RuntimePropVisualMode;
   propChaos: RuntimePropChaosOptions;
 };
 
@@ -82,6 +86,12 @@ function parseUnitFloat(value: string | null): number | null {
 }
 
 function parseFloorMode(value: string | null): RuntimeFloorMode {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "blockout") return "blockout";
+  return "pbr";
+}
+
+function parseWallMode(value: string | null): RuntimeWallMode {
   return value?.trim().toLowerCase() === "pbr" ? "pbr" : "blockout";
 }
 
@@ -95,6 +105,10 @@ function parseFloorQuality(value: string | null): RuntimeFloorQuality {
 
 function parseLightingPreset(value: string | null): RuntimeLightingPreset {
   return value?.trim().toLowerCase() === "flat" ? "flat" : "golden";
+}
+
+function parsePropVisualMode(value: string | null): RuntimePropVisualMode {
+  return value?.trim().toLowerCase() === "bazaar" ? "bazaar" : "blockout";
 }
 
 function getParam(params: URLSearchParams, ...keys: string[]): string | null {
@@ -128,8 +142,10 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawAnchorTypes = getParam(params, "anchor-types", "anchorTypes");
   const rawSeed = getParam(params, "seed");
   const rawFloors = getParam(params, "floors");
+  const rawWalls = getParam(params, "walls");
   const rawFloorRes = getParam(params, "floorRes", "floor-res");
   const rawLighting = getParam(params, "lighting");
+  const rawProps = getParam(params, "props", "propVisuals", "prop-visuals");
   const rawPropProfile = getParam(params, "prop-profile", "propProfile");
   const rawPropJitter = getParam(params, "prop-jitter", "propJitter");
   const rawPropCluster = getParam(params, "prop-cluster", "propCluster");
@@ -149,8 +165,10 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const anchorTypes = parseAnchorTypes(rawAnchorTypes);
   const seed = parseSeed(rawSeed);
   const floorMode = parseFloorMode(rawFloors);
+  const wallMode = parseWallMode(rawWalls);
   const floorQuality = parseFloorQuality(rawFloorRes);
   const lightingPreset = parseLightingPreset(rawLighting);
+  const propVisuals = parsePropVisualMode(rawProps);
   const propChaos: RuntimePropChaosOptions = {
     profile: parsePropProfile(rawPropProfile),
     jitter: parseUnitFloat(rawPropJitter),
@@ -173,8 +191,10 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     anchorTypes,
     seed,
     floorMode,
+    wallMode,
     floorQuality,
     lightingPreset,
+    propVisuals,
     propChaos,
   };
 }

@@ -1,0 +1,31 @@
+{
+  "mapId": "bazaar-map",
+  "playableBoundary": {
+    "x": 0,
+    "y": 0,
+    "w": 50,
+    "h": 82
+  },
+  "defaults": {
+    "wall_height": 6,
+    "ceiling_height": 8,
+    "floor_height": 0
+  },
+  "zoneCounts": {
+    "main_lane_segment": 3,
+    "clear_travel_zone": 3,
+    "connector": 4,
+    "cut": 4,
+    "side_hall": 2,
+    "spawn_plaza": 2,
+    "stall_strip": 6
+  },
+  "walkableZoneCount": 15,
+  "wallSegmentCount": 60,
+  "wallColliderCount": 60,
+  "cageColliderCount": 4,
+  "minPathWidths": {
+    "min_path_width_main_lane": 6,
+    "min_path_width_side_halls": 4.5
+  }
+}

@@ -1,0 +1,16 @@
+Category,Examples,Typical Footprint (m),Typical Height (m),Preferred Placement Zone,Gameplay Purpose,Implementation Notes
+Stall_Table,"wood table, fabric-covered counter",1.8 x 0.8,1.0,stall_strip,visual + soft cover,Do not place in clear travel zone; align long axis parallel to lane.
+Rug_Stack,"rolled rugs, hanging textiles",1.2 x 0.6,1.4,stall_strip,occlusion + theme,Can hang vertically on shopfront; avoid fully blocking doorways.
+Pottery_Cluster,"pots, bowls, jars",1.0 x 1.0,0.8,stall_strip / prop_pocket,low cover + clutter,Keep collision simple (1-2 hulls).
+Crate_Stack,"wood crates, produce boxes",1.2 x 1.2,1.2,prop_pocket,primary cover,Use 2-3 crates with stagger to prevent headglitch abuse.
+Barrel_Group,metal/wood barrels,1.0 x 1.0,0.9,prop_pocket,low cover,Avoid placing directly in lane centerline.
+Handcart,"market cart, wheelbarrow",1.6 x 0.8,1.1,prop_pocket / stall_strip,mobile cover silhouette,Angle slightly (10–25°) for visual rhythm; keep nav clearance.
+Sack_Pile,"burlap sacks, grain bags",1.4 x 1.0,0.8,stall_strip / prop_pocket,soft cover,Prefer along walls; reduce grenade spam angles.
+Planter_Box,planter with greenery,1.6 x 0.6,0.9,spawn_plaza / prop_pocket,spawn safety + readability,Use as spawn break-up; avoid hiding spawn exits.
+Half_Wall,"stone half-wall, low parapet",2.0 x 0.5,1.1,spawn_plaza / side_hall_corners,controlled cover,Use sparingly; avoid infinite headglitches.
+Shop_Shutter_Module,shutter + frame + recess,3.0 x 0.6,3.5,shopfront_anchor,theme + silhouette,Place centered on shopfront anchors; add 0.5m recess where possible.
+Sign_Hanging,wood sign + metal bracket,0.8 x 0.1,0.6,signage_anchor,wayfinding,Provide 6–10 unique sign textures for callouts.
+Awning,fabric awning over stall,2.5 x 1.2,0.2,signage_anchor,shade + cover of sightline,Ensure head clearance > 2.2m.
+Cloth_Canopy,overhead cloth spans,varies,varies,cloth_span,lighting + occlusion,Use 3 key spans; allow bullet penetration depending on material.
+Well_Fountain,stone well or small fountain,2.2 x 2.2,1.2,landmark,mid landmark + LoS break,Place offset from clear travel zone; ensure smooth nav around.
+Hero_Arch_Gate,arched doorway + gate elements,9.0 x 1.0,6.0+,hero_landmark,navigation + pacing,Must not create spawn trap sightline; break LoS into spawn plaza.

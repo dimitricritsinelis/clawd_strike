@@ -1,0 +1,25 @@
+id,type,x,y,w,h,label,notes
+BZ_M1,main_lane_segment,20.25,14,9.5,18,Bazaar Main — BZ-M1 (Spice Market),"Dense spice-market character. Stall strips on edges. Clusters near entry, open node near mid cut."
+BZ_M2_JOG,main_lane_segment,22.75,32,8.5,18,Bazaar Main — BZ-M2 (Fabric & Textile JOG),"Wider stalls, fewer count. Jog +2.0m East breaks LoS. Asymmetric left/right stall count. Well node at Y=41."
+BZ_M3,main_lane_segment,20.25,50,9.5,18,"Bazaar Main — BZ-M3 (Rug & Craft, approaching Arch)","Sparse at south, denser approaching arch. Hero arch zone (Y=65-68) has no stalls. One diagonal stall near north cut."
+CLEAR_M1,clear_travel_zone,22,14,6,18,Clear Travel Zone — M1,NO props/shops.
+CLEAR_M2,clear_travel_zone,24,32,6,18,Clear Travel Zone — M2,NO props/shops.
+CLEAR_M3,clear_travel_zone,22,50,6,18,Clear Travel Zone — M3,NO props/shops.
+CONN_NE,connector,36,70,6,4,Spawn B ↔ East Hall Connector,Widened to match hall expansion. Short connector; maintain quick flank access.
+CONN_NW,connector,8,70,6,4,Spawn B ↔ West Hall Connector,Widened to match hall expansion. Short connector; maintain quick flank access.
+CONN_SE,connector,36,8,6,4,Spawn A ↔ East Hall Connector,Widened to match hall expansion. Short connector; maintain quick flank access.
+CONN_SW,connector,8,8,6,4,Spawn A ↔ West Hall Connector,Widened to match hall expansion. Short connector; maintain quick flank access.
+CUT_E_MID,cut,29.75,24.5,12.25,3,Mid Cut (East),Extended to reach widened east hall inner edge at x=42.0.
+CUT_E_NORTH,cut,29.75,56,12.25,3,North Cut (East),Extended to reach widened east hall inner edge at x=42.0.
+CUT_W_MID,cut,8,24.5,12.25,3,Mid Cut (West),Extended to reach widened west hall inner edge at x=8.0.
+CUT_W_NORTH,cut,8,56,12.25,3,North Cut (West),Extended to reach widened west hall inner edge at x=8.0.
+SH_E,side_hall,42,10,6.5,62,East Side Hall (Widened),6.5m total / 4.5m clear. Lighter dressing than west hall. Service character.
+SH_W,side_hall,1.5,10,6.5,62,West Side Hall (Widened),6.5m total / 4.5m clear. Goods stacks against outer wall. Heavier dressing than east hall. Service character.
+SPAWN_A_COURTYARD,spawn_plaza,14,0,22,14,Spawn A — Courtyard,Spawn safety cover + quick access to all lanes via bazaar center and side connectors.
+SPAWN_B_GATE_PLAZA,spawn_plaza,14,68,22,14,Spawn B — Gate Plaza,Spawn safety cover + landmark arch threshold into bazaar.
+STALL_M1_L,stall_strip,20.25,14,1.75,18,Stall Strip M1 (L),Edge-only decor + stalls; never intrude into CLEAR_M1.
+STALL_M1_R,stall_strip,28,14,1.75,18,Stall Strip M1 (R),Edge-only decor + stalls; never intrude into CLEAR_M1.
+STALL_M2_L,stall_strip,22.75,32,1.25,18,Stall Strip M2 (L),Edge-only decor + stalls; never intrude into CLEAR_M2.
+STALL_M2_R,stall_strip,30,32,1.25,18,Stall Strip M2 (R),Edge-only decor + stalls; never intrude into CLEAR_M2.
+STALL_M3_L,stall_strip,20.25,50,1.75,18,Stall Strip M3 (L),Edge-only decor + stalls; never intrude into CLEAR_M3.
+STALL_M3_R,stall_strip,28,50,1.75,18,Stall Strip M3 (R),Edge-only decor + stalls; never intrude into CLEAR_M3.

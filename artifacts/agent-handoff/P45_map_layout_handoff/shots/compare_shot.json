@@ -1,0 +1,28 @@
+{
+  "alias": "SHOT_BLOCKOUT_COMPARE",
+  "shot": {
+    "id": "SHOT_BLOCKOUT_COMPARE",
+    "label": "Blockout compare",
+    "description": "Canonical deterministic compare shot for gameplay-facing captures.",
+    "camera": {
+      "pos": {
+        "x": 25,
+        "y": 7,
+        "z": 1.7
+      },
+      "lookAt": {
+        "x": 25,
+        "y": 20,
+        "z": 1.7
+      },
+      "fovDeg": 75
+    },
+    "durationSec": 4,
+    "tags": [
+      "compare",
+      "gameplay",
+      "spawnA"
+    ]
+  },
+  "canonicalCompareUrl": "http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human&floors=pbr&lighting=golden"
+}

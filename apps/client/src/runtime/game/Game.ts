@@ -7,6 +7,8 @@ import { buildBlockout } from "../map/buildBlockout";
 import { buildProps, type PropsBuildStats } from "../map/buildProps";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibrary";
+import type { WallMaterialLibrary } from "../render/materials/WallMaterialLibrary";
+import type { PropModelLibrary } from "../render/models/PropModelLibrary";
 import type { RuntimeAnchorsSpec, RuntimeBlockoutSpec } from "../map/types";
 import {
   PLAYER_EYE_HEIGHT_M,
@@ -21,7 +23,9 @@ import type {
   RuntimeFloorQuality,
   RuntimeLightingPreset,
   RuntimePropChaosOptions,
+  RuntimePropVisualMode,
   RuntimeSpawnId,
+  RuntimeWallMode,
 } from "../utils/UrlParams";
 import type { Ak47ShotEvent } from "../weapons/Ak47FireController";
 import { Ak47Weapon, type Ak47AmmoSnapshot } from "../weapons/Ak47Weapon";
@@ -69,9 +73,13 @@ type GameOptions = {
   debug?: boolean;
   highVis?: boolean;
   floorMode: RuntimeFloorMode;
+  wallMode: RuntimeWallMode;
   floorQuality: RuntimeFloorQuality;
   lightingPreset: RuntimeLightingPreset;
   floorMaterials: FloorMaterialLibrary | null;
+  wallMaterials: WallMaterialLibrary | null;
+  propVisuals: RuntimePropVisualMode;
+  propModels: PropModelLibrary | null;
   onTogglePerfHud?: () => void;
   mountEl?: HTMLElement;
   anchorsDebug?: {
@@ -116,8 +124,12 @@ export class Game {
   private highVis = false;
   private lightingPreset: RuntimeLightingPreset = "golden";
   private floorMode: RuntimeFloorMode = "blockout";
+  private wallMode: RuntimeWallMode = "blockout";
   private floorQuality: RuntimeFloorQuality = "2k";
   private floorMaterials: FloorMaterialLibrary | null = null;
+  private wallMaterials: WallMaterialLibrary | null = null;
+  private propVisuals: RuntimePropVisualMode = "blockout";
+  private propModels: PropModelLibrary | null = null;
   private propChaos: RuntimePropChaosOptions = {
     profile: "subtle",
     jitter: null,
@@ -250,8 +262,12 @@ export class Game {
     this.highVis = options.highVis ?? false;
     this.lightingPreset = options.lightingPreset;
     this.floorMode = options.floorMode;
+    this.wallMode = options.wallMode;
     this.floorQuality = options.floorQuality;
     this.floorMaterials = options.floorMaterials;
+    this.wallMaterials = options.wallMaterials;
+    this.propVisuals = options.propVisuals;
+    this.propModels = options.propModels;
     this.propChaos = options.propChaos;
     this.freezeInput = options.freezeInput ?? false;
     this.spawn = options.spawn ?? "A";
@@ -624,15 +640,15 @@ export class Game {
       return;
     }
 
-    this.scene.background = new Color(0xF6E7D1);
-    this.scene.fog = new FogExp2(0xF6E7D1, 0.0065);
+    this.scene.background = new Color(0xF9E6C4);
+    this.scene.fog = new FogExp2(0xF9E6C4, 0.009);
 
-    const ambient = new AmbientLight(0xFFF3E3, 0.22);
-    const hemi = new HemisphereLight(0xCFE7FF, 0xE0B07A, 0.55);
+    const ambient = new AmbientLight(0xFFEFD4, 0.52);
+    const hemi = new HemisphereLight(0xFFEBCB, 0xE2B684, 1.0);
     hemi.position.set(0, 50, 0);
 
-    const sun = new DirectionalLight(0xFFD2A1, 1.35);
-    sun.position.set(-60, 80, -25);
+    const sun = new DirectionalLight(0xFFD39C, 1.42);
+    sun.position.set(-32, 88, -10);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.camera.near = 1;
@@ -645,8 +661,8 @@ export class Game {
     sun.shadow.normalBias = 0.02;
     sun.target.position.set(25, 0, 41);
 
-    const fill = new DirectionalLight(0xBFD9FF, 0.20);
-    fill.position.set(60, 40, 20);
+    const fill = new DirectionalLight(0xFFD7A3, 0.52);
+    fill.position.set(54, 38, 28);
     fill.castShadow = false;
 
     this.scene.add(ambient, hemi, sun, sun.target, fill);
@@ -749,9 +765,11 @@ export class Game {
       highVis: this.highVis,
       seed: runtimeSeed,
       floorMode: this.floorMode,
+      wallMode: this.wallMode,
       floorQuality: this.floorQuality,
       lightingPreset: this.lightingPreset,
       floorMaterials: this.floorMaterials,
+      wallMaterials: this.wallMaterials,
     });
     this.blockoutRoot = builtBlockout.root;
     this.scene.add(builtBlockout.root);
@@ -780,6 +798,8 @@ export class Game {
         anchors: this.anchorsSpec,
         seedOverride: this.seedOverride,
         propChaos: this.propChaos,
+        propVisuals: this.propVisuals,
+        propModels: this.propModels,
         highVis: this.highVis,
       });
       this.propsRoot = builtProps.root;

@@ -1,0 +1,70 @@
+{
+  "packId": "bazaar_wall_textures_pack_v4",
+  "version": 4,
+  "notes": "Runtime wall PBR set (local fetch-only pack).",
+  "materials": [
+    {
+      "id": "painted_plaster_013",
+      "tileSizeM": 2.8,
+      "tintHex": "#F6E5C9",
+      "albedoBoost": 1.06,
+      "roughness": 0.96,
+      "normalScale": 0.36,
+      "aoIntensity": 0.42,
+      "textures": {
+        "1k": {
+          "albedo": "textures/ambientcg_paintedplaster013/2k/ambientcg_paintedplaster013_2k_albedo.png",
+          "normal": "textures/ambientcg_paintedplaster013/2k/ambientcg_paintedplaster013_2k_normal_gl.png",
+          "arm": "textures/ambientcg_paintedplaster013/2k/ambientcg_paintedplaster013_2k_roughness.png"
+        },
+        "2k": {
+          "albedo": "textures/ambientcg_paintedplaster013/2k/ambientcg_paintedplaster013_2k_albedo.png",
+          "normal": "textures/ambientcg_paintedplaster013/2k/ambientcg_paintedplaster013_2k_normal_gl.png",
+          "arm": "textures/ambientcg_paintedplaster013/2k/ambientcg_paintedplaster013_2k_roughness.png"
+        }
+      }
+    },
+    {
+      "id": "painted_plaster_016",
+      "tileSizeM": 3.1,
+      "tintHex": "#F3DEB9",
+      "albedoBoost": 1.03,
+      "roughness": 0.97,
+      "normalScale": 0.32,
+      "aoIntensity": 0.36,
+      "textures": {
+        "1k": {
+          "albedo": "textures/ambientcg_paintedplaster016/2k/ambientcg_paintedplaster016_2k_albedo.png",
+          "normal": "textures/ambientcg_paintedplaster016/2k/ambientcg_paintedplaster016_2k_normal_gl.png",
+          "arm": "textures/ambientcg_paintedplaster016/2k/ambientcg_paintedplaster016_2k_roughness.png"
+        },
+        "2k": {
+          "albedo": "textures/ambientcg_paintedplaster016/2k/ambientcg_paintedplaster016_2k_albedo.png",
+          "normal": "textures/ambientcg_paintedplaster016/2k/ambientcg_paintedplaster016_2k_normal_gl.png",
+          "arm": "textures/ambientcg_paintedplaster016/2k/ambientcg_paintedplaster016_2k_roughness.png"
+        }
+      }
+    },
+    {
+      "id": "bricks_095",
+      "tileSizeM": 1.6,
+      "tintHex": "#E8D7BC",
+      "albedoBoost": 1.0,
+      "roughness": 0.98,
+      "normalScale": 0.28,
+      "aoIntensity": 0.32,
+      "textures": {
+        "1k": {
+          "albedo": "textures/ambientcg_bricks095/2k/ambientcg_bricks095_2k_albedo.png",
+          "normal": "textures/ambientcg_bricks095/2k/ambientcg_bricks095_2k_normal_gl.png",
+          "arm": "textures/ambientcg_bricks095/2k/ambientcg_bricks095_2k_roughness.png"
+        },
+        "2k": {
+          "albedo": "textures/ambientcg_bricks095/2k/ambientcg_bricks095_2k_albedo.png",
+          "normal": "textures/ambientcg_bricks095/2k/ambientcg_bricks095_2k_normal_gl.png",
+          "arm": "textures/ambientcg_bricks095/2k/ambientcg_bricks095_2k_roughness.png"
+        }
+      }
+    }
+  ]
+}

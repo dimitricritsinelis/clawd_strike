@@ -1,0 +1,10 @@
+id,type,x,y,w,h,label
+CLEAR_M1,clear_travel_zone,22,14,6,18,Clear Travel Zone — M1
+CLEAR_M2,clear_travel_zone,24,32,6,18,Clear Travel Zone — M2
+CLEAR_M3,clear_travel_zone,22,50,6,18,Clear Travel Zone — M3
+STALL_M1_L,stall_strip,20.25,14,1.75,18,Stall Strip M1 (L)
+STALL_M1_R,stall_strip,28,14,1.75,18,Stall Strip M1 (R)
+STALL_M2_L,stall_strip,22.75,32,1.25,18,Stall Strip M2 (L)
+STALL_M2_R,stall_strip,30,32,1.25,18,Stall Strip M2 (R)
+STALL_M3_L,stall_strip,20.25,50,1.75,18,Stall Strip M3 (L)
+STALL_M3_R,stall_strip,28,50,1.75,18,Stall Strip M3 (R)

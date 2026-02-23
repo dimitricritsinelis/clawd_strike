@@ -7,6 +7,8 @@ import { resolveShot } from "./map/shots";
 import type { RuntimeMapAssets } from "./map/types";
 import { Renderer } from "./render/Renderer";
 import { FloorMaterialLibrary } from "./render/materials/FloorMaterialLibrary";
+import { WallMaterialLibrary } from "./render/materials/WallMaterialLibrary";
+import { PropModelLibrary } from "./render/models/PropModelLibrary";
 import { WeaponAudio } from "./audio/WeaponAudio";
 import { AmmoHud } from "./ui/AmmoHud";
 import { HealthHud } from "./ui/HealthHud";
@@ -26,7 +28,10 @@ type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["
 
 const OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M = 10;
 const PERF_SCENE_SAMPLE_INTERVAL_MS = 300;
+const POINTER_LOCK_BANNER_GRACE_MS = 2600;
 const FLOOR_MANIFEST_URL = "/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json";
+const WALL_MANIFEST_URL = "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v4/materials.json";
+const PROP_MANIFEST_URL = "/assets/models/environment/bazaar/props/bazaar_prop_models_pack_v1/models.json";
 
 type ScenePerfSnapshot = {
   materials: number;
@@ -331,6 +336,32 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     }
   }
 
+  let resolvedWallMode = urlParams.wallMode;
+  let wallMaterials: WallMaterialLibrary | null = null;
+  if (resolvedWallMode === "pbr") {
+    try {
+      wallMaterials = await WallMaterialLibrary.load(WALL_MANIFEST_URL);
+    } catch (error) {
+      resolvedWallMode = "blockout";
+      appendWarning(
+        `Failed to load wall PBR pack. Falling back to blockout walls.\n${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  let resolvedPropVisuals = urlParams.propVisuals;
+  let propModels: PropModelLibrary | null = null;
+  if (resolvedPropVisuals === "bazaar") {
+    try {
+      propModels = await PropModelLibrary.load(PROP_MANIFEST_URL);
+    } catch (error) {
+      resolvedPropVisuals = "blockout";
+      appendWarning(
+        `Failed to load bazaar prop model pack. Falling back to blockout props.\n${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   const startViewModelLoad = (): void => {
     if (!viewModelEnabled || disposed || viewModelLoadStarted || viewModel) {
       return;
@@ -366,9 +397,13 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     seedOverride: urlParams.seed,
     propChaos: urlParams.propChaos,
     floorMode: resolvedFloorMode,
+    wallMode: resolvedWallMode,
     floorQuality: urlParams.floorQuality,
     lightingPreset: urlParams.lightingPreset,
     floorMaterials,
+    wallMaterials,
+    propVisuals: resolvedPropVisuals,
+    propModels,
     freezeInput: inputFrozen,
     spawn: urlParams.spawn,
     debug: urlParams.debug,
@@ -387,10 +422,11 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       // Enemy hit detection: re-raycast against enemy AABBs to see if the bullet hit one
       if (shot.hit && shot.hitPoint) {
         const camPos = game.camera.position;
-        const camFwd = new Vector3();
+        const camFwd = camFwdScratch;
         game.camera.getWorldDirection(camFwd);
         const hp = shot.hitPoint;
-        const worldHitDist = camPos.distanceTo(new Vector3(hp.x, hp.y, hp.z));
+        const hitPoint = hitPointScratch.set(hp.x, hp.y, hp.z);
+        const worldHitDist = camPos.distanceTo(hitPoint);
         const enemyHit = game.checkEnemyRaycastHit(camPos, camFwd, worldHitDist + 0.1);
         if (enemyHit.hit && enemyHit.distance <= worldHitDist + 0.05) {
           // Hit-zone multiplier: head=4× (instant kill), legs=0.75×, body=1×
@@ -520,9 +556,12 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       onLockChange: (locked) => {
         game.setPointerLocked(locked);
         if (locked) {
+          pointerLockBannerGraceMs = POINTER_LOCK_BANNER_GRACE_MS;
           startViewModelLoad();
           weaponAudio.ensureResumedFromGesture();
           weaponAudio.startAmbient(); // begin wind loop once audio is unlocked
+        } else {
+          pointerLockBannerGraceMs = 0;
         }
       },
       onMouseDelta: (deltaX, deltaY) => {
@@ -537,6 +576,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   let previousFrameTime = performance.now();
   let previousHealth = 100;
   let footstepTimerS = 0;
+  let pointerLockBannerGraceMs = 0;
   // Accumulated mouse delta for weapon sway (reset each frame after feeding to viewmodel)
   let swayMouseDeltaX = 0;
   let swayMouseDeltaY = 0;
@@ -564,6 +604,8 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     instancedMeshes: 0,
     instancedInstances: 0,
   };
+  const camFwdScratch = new Vector3();
+  const hitPointScratch = new Vector3();
 
   const state = (): RuntimeTextState => {
     const yawPitch = game.getYawPitchDeg();
@@ -721,6 +763,11 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     } else {
       timerHud.start();
     }
+    pointerLockBannerGraceMs = Math.max(0, pointerLockBannerGraceMs - clampedMs);
+    const docWithWebkitFullscreen = document as Document & { webkitFullscreenElement?: Element | null };
+    const fullscreenElement = document.fullscreenElement ?? docWithWebkitFullscreen.webkitFullscreenElement ?? null;
+    const chromeBannerLikelyVisible = pointerLockBannerGraceMs > 0 || Boolean(fullscreenElement);
+    timerHud.setChromeBannerClearance(chromeBannerLikelyVisible);
     timerHud.update(dt);
 
     // ── Always-on effects ────────────────────────────────────────────────────
@@ -860,6 +907,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     pauseMenu.dispose();
     fadeOverlay.dispose();
     window.removeEventListener("keydown", onKeyDownPause);
+    propModels?.dispose();
     viewModel?.dispose();
     renderer.dispose();
     crosshair.remove();

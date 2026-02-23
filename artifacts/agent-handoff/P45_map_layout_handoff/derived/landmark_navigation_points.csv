@@ -1,0 +1,6 @@
+id,type,zone,x,y,z,yaw_deg,radius_or_width_m,notes
+LMK_HERO_ARCH_01,hero_landmark,BZ_M3,25,68,0,0,,Hero arch/gate threshold between BZ_M3 and Spawn B Gate Plaza. Ensure ~6m vertical clearance.
+LMK_MID_WELL_01,landmark,BZ_M2_JOG,27,41,0,0,,Mid landmark (well/fountain); keep clear travel zone intact. Surrounded by open courtyard node and two angled stalls.
+NODE_M1_OPEN_01,open_node,BZ_M1,25,22.5,0,0,5,Intentional gap node at M1 mid-section. width_m=radiusM. Creates junction feel between spice cluster A and B.
+NODE_M2_COURT_01,open_node,BZ_M2_JOG,27,40.2,0,0,4,Open courtyard node around well landmark. width_m=radiusM. No filler props within radius except well.
+NODE_M3_ARCH_CLEAR_01,open_node,BZ_M3,25,66.5,0,0,6,Arch approach clear zone. width_m=radiusM=6m. No stalls or filler props. Arch is a solo landmark read.

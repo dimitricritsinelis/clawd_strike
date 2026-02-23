@@ -1,0 +1,2579 @@
+--- docs/map-design/specs/map_spec.json	2026-02-17 20:53:33
++++ apps/client/public/maps/bazaar-map/map_spec.json	2026-02-22 15:53:11
+@@ -1,92 +1,27 @@
+ {
+-  "metadata": {
+-    "map_name": "Bazaar Slice",
+-    "version": "2.3",
+-    "design_intent": "3-lane marketplace (main bazaar + two side service halls) for 10 players (5v5) FPS.",
+-    "player_count_target": 10,
+-    "game_perspective": "first_person",
+-    "units": "meters",
+-    "coordinate_system": {
+-      "origin": "southwest_corner_of_playable_boundary",
+-      "axes": {
+-        "x": "east(+)",
+-        "y": "north(+)",
+-        "z": "up(+)"
+-      },
+-      "yaw_degrees": "0=+Y(north), 90=+X(east), 180=-Y(south), 270=-X(west)"
+-    }
++  "mapId": "bazaar-map",
++  "playable_boundary": {
++    "x": 0,
++    "y": 0,
++    "w": 50,
++    "h": 82
+   },
+-  "global_dimensions": {
+-    "playable_boundary": {
+-      "shape": "rect",
+-      "x": 0.0,
+-      "y": 0.0,
+-      "w": 50.0,
+-      "h": 82.0
+-    },
+-    "ceiling_height_default": 8.0,
+-    "wall_height_default": 6.0,
+-    "floor_height_default": 0.0
++  "defaults": {
++    "wall_height": 6,
++    "ceiling_height": 8,
++    "floor_height": 0
+   },
+-  "lanes": {
+-    "main_bazaar_lane": {
+-      "type": "primary",
+-      "segments": [
+-        "BZ_M1",
+-        "BZ_M2_JOG",
+-        "BZ_M3"
+-      ],
+-      "clear_travel_zone_width": 6.0,
+-      "notes": "Shops/props confined to stall strips and marked prop pockets. Keep center 6.0m continuously navigable."
+-    },
+-    "west_side_hall": {
+-      "type": "secondary",
+-      "segment": "SH_W",
+-      "clear_width_target": 4.5,
+-      "notes": "Widened to 6.5m total / 4.5m clear. Feels like a real service alley; room for wall-side goods stacks."
+-    },
+-    "east_side_hall": {
+-      "type": "secondary",
+-      "segment": "SH_E",
+-      "clear_width_target": 4.5,
+-      "notes": "Widened to 6.5m total / 4.5m clear. Mirror of west hall with slightly lighter dressing."
+-    }
+-  },
+   "zones": [
+     {
+-      "id": "SPAWN_A_COURTYARD",
+-      "type": "spawn_plaza",
+-      "rect": {
+-        "x": 14.0,
+-        "y": 0.0,
+-        "w": 22.0,
+-        "h": 14.0
+-      },
+-      "label": "Spawn A \u2014 Courtyard",
+-      "notes": "Spawn safety cover + quick access to all lanes via bazaar center and side connectors."
+-    },
+-    {
+-      "id": "SPAWN_B_GATE_PLAZA",
+-      "type": "spawn_plaza",
+-      "rect": {
+-        "x": 14.0,
+-        "y": 68.0,
+-        "w": 22.0,
+-        "h": 14.0
+-      },
+-      "label": "Spawn B \u2014 Gate Plaza",
+-      "notes": "Spawn safety cover + landmark arch threshold into bazaar."
+-    },
+-    {
+       "id": "BZ_M1",
+       "type": "main_lane_segment",
+       "rect": {
+         "x": 20.25,
+-        "y": 14.0,
++        "y": 14,
+         "w": 9.5,
+-        "h": 18.0
++        "h": 18
+       },
+-      "label": "Bazaar Main \u2014 BZ-M1 (Spice Market)",
++      "label": "Bazaar Main — BZ-M1 (Spice Market)",
+       "notes": "Dense spice-market character. Stall strips on edges. Clusters near entry, open node near mid cut."
+     },
+     {
+@@ -94,11 +29,11 @@
+       "type": "main_lane_segment",
+       "rect": {
+         "x": 22.75,
+-        "y": 32.0,
++        "y": 32,
+         "w": 8.5,
+-        "h": 18.0
++        "h": 18
+       },
+-      "label": "Bazaar Main \u2014 BZ-M2 (Fabric & Textile JOG)",
++      "label": "Bazaar Main — BZ-M2 (Fabric & Textile JOG)",
+       "notes": "Wider stalls, fewer count. Jog +2.0m East breaks LoS. Asymmetric left/right stall count. Well node at Y=41."
+     },
+     {
+@@ -106,177 +41,201 @@
+       "type": "main_lane_segment",
+       "rect": {
+         "x": 20.25,
+-        "y": 50.0,
++        "y": 50,
+         "w": 9.5,
+-        "h": 18.0
++        "h": 18
+       },
+-      "label": "Bazaar Main \u2014 BZ-M3 (Rug & Craft, approaching Arch)",
++      "label": "Bazaar Main — BZ-M3 (Rug & Craft, approaching Arch)",
+       "notes": "Sparse at south, denser approaching arch. Hero arch zone (Y=65-68) has no stalls. One diagonal stall near north cut."
+     },
+     {
+-      "id": "SH_W",
+-      "type": "side_hall",
++      "id": "CLEAR_M1",
++      "type": "clear_travel_zone",
+       "rect": {
+-        "x": 1.5,
+-        "y": 10.0,
+-        "w": 6.5,
+-        "h": 62.0
++        "x": 22,
++        "y": 14,
++        "w": 6,
++        "h": 18
+       },
+-      "label": "West Side Hall (Widened)",
+-      "notes": "6.5m total / 4.5m clear. Goods stacks against outer wall. Heavier dressing than east hall. Service character."
++      "label": "Clear Travel Zone — M1",
++      "notes": "NO props/shops."
+     },
+     {
+-      "id": "SH_E",
+-      "type": "side_hall",
++      "id": "CLEAR_M2",
++      "type": "clear_travel_zone",
+       "rect": {
+-        "x": 42.0,
+-        "y": 10.0,
+-        "w": 6.5,
+-        "h": 62.0
++        "x": 24,
++        "y": 32,
++        "w": 6,
++        "h": 18
+       },
+-      "label": "East Side Hall (Widened)",
+-      "notes": "6.5m total / 4.5m clear. Lighter dressing than west hall. Service character."
++      "label": "Clear Travel Zone — M2",
++      "notes": "NO props/shops."
+     },
+     {
+-      "id": "CONN_SW",
++      "id": "CLEAR_M3",
++      "type": "clear_travel_zone",
++      "rect": {
++        "x": 22,
++        "y": 50,
++        "w": 6,
++        "h": 18
++      },
++      "label": "Clear Travel Zone — M3",
++      "notes": "NO props/shops."
++    },
++    {
++      "id": "CONN_NE",
+       "type": "connector",
+       "rect": {
+-        "x": 8.0,
+-        "y": 8.0,
+-        "w": 6.0,
+-        "h": 4.0
++        "x": 36,
++        "y": 70,
++        "w": 6,
++        "h": 4
+       },
+-      "label": "Spawn A \u2194 West Hall Connector",
++      "label": "Spawn B ↔ East Hall Connector",
+       "notes": "Widened to match hall expansion. Short connector; maintain quick flank access."
+     },
+     {
+-      "id": "CONN_SE",
++      "id": "CONN_NW",
+       "type": "connector",
+       "rect": {
+-        "x": 36.0,
+-        "y": 8.0,
+-        "w": 6.0,
+-        "h": 4.0
++        "x": 8,
++        "y": 70,
++        "w": 6,
++        "h": 4
+       },
+-      "label": "Spawn A \u2194 East Hall Connector",
++      "label": "Spawn B ↔ West Hall Connector",
+       "notes": "Widened to match hall expansion. Short connector; maintain quick flank access."
+     },
+     {
+-      "id": "CONN_NW",
++      "id": "CONN_SE",
+       "type": "connector",
+       "rect": {
+-        "x": 8.0,
+-        "y": 70.0,
+-        "w": 6.0,
+-        "h": 4.0
++        "x": 36,
++        "y": 8,
++        "w": 6,
++        "h": 4
+       },
+-      "label": "Spawn B \u2194 West Hall Connector",
++      "label": "Spawn A ↔ East Hall Connector",
+       "notes": "Widened to match hall expansion. Short connector; maintain quick flank access."
+     },
+     {
+-      "id": "CONN_NE",
++      "id": "CONN_SW",
+       "type": "connector",
+       "rect": {
+-        "x": 36.0,
+-        "y": 70.0,
+-        "w": 6.0,
+-        "h": 4.0
++        "x": 8,
++        "y": 8,
++        "w": 6,
++        "h": 4
+       },
+-      "label": "Spawn B \u2194 East Hall Connector",
++      "label": "Spawn A ↔ West Hall Connector",
+       "notes": "Widened to match hall expansion. Short connector; maintain quick flank access."
+     },
+     {
+-      "id": "CUT_W_MID",
++      "id": "CUT_E_MID",
+       "type": "cut",
+       "rect": {
+-        "x": 8.0,
++        "x": 29.75,
+         "y": 24.5,
+         "w": 12.25,
+-        "h": 3.0
++        "h": 3
+       },
+-      "label": "Mid Cut (West)",
+-      "notes": "Extended to reach widened west hall inner edge at x=8.0."
++      "label": "Mid Cut (East)",
++      "notes": "Extended to reach widened east hall inner edge at x=42.0."
+     },
+     {
+-      "id": "CUT_E_MID",
++      "id": "CUT_E_NORTH",
+       "type": "cut",
+       "rect": {
+         "x": 29.75,
+-        "y": 24.5,
++        "y": 56,
+         "w": 12.25,
+-        "h": 3.0
++        "h": 3
+       },
+-      "label": "Mid Cut (East)",
++      "label": "North Cut (East)",
+       "notes": "Extended to reach widened east hall inner edge at x=42.0."
+     },
+     {
+-      "id": "CUT_W_NORTH",
++      "id": "CUT_W_MID",
+       "type": "cut",
+       "rect": {
+-        "x": 8.0,
+-        "y": 56.0,
++        "x": 8,
++        "y": 24.5,
+         "w": 12.25,
+-        "h": 3.0
++        "h": 3
+       },
+-      "label": "North Cut (West)",
++      "label": "Mid Cut (West)",
+       "notes": "Extended to reach widened west hall inner edge at x=8.0."
+     },
+     {
+-      "id": "CUT_E_NORTH",
++      "id": "CUT_W_NORTH",
+       "type": "cut",
+       "rect": {
+-        "x": 29.75,
+-        "y": 56.0,
++        "x": 8,
++        "y": 56,
+         "w": 12.25,
+-        "h": 3.0
++        "h": 3
+       },
+-      "label": "North Cut (East)",
+-      "notes": "Extended to reach widened east hall inner edge at x=42.0."
++      "label": "North Cut (West)",
++      "notes": "Extended to reach widened west hall inner edge at x=8.0."
+     },
+     {
+-      "id": "CLEAR_M1",
+-      "type": "clear_travel_zone",
++      "id": "SH_E",
++      "type": "side_hall",
+       "rect": {
+-        "x": 22.0,
+-        "y": 14.0,
+-        "w": 6.0,
+-        "h": 18.0
++        "x": 42,
++        "y": 10,
++        "w": 6.5,
++        "h": 62
+       },
+-      "label": "Clear Travel Zone \u2014 M1",
+-      "notes": "NO props/shops."
++      "label": "East Side Hall (Widened)",
++      "notes": "6.5m total / 4.5m clear. Lighter dressing than west hall. Service character."
+     },
+     {
+-      "id": "CLEAR_M2",
+-      "type": "clear_travel_zone",
++      "id": "SH_W",
++      "type": "side_hall",
+       "rect": {
+-        "x": 24.0,
+-        "y": 32.0,
+-        "w": 6.0,
+-        "h": 18.0
++        "x": 1.5,
++        "y": 10,
++        "w": 6.5,
++        "h": 62
+       },
+-      "label": "Clear Travel Zone \u2014 M2",
+-      "notes": "NO props/shops."
++      "label": "West Side Hall (Widened)",
++      "notes": "6.5m total / 4.5m clear. Goods stacks against outer wall. Heavier dressing than east hall. Service character."
+     },
+     {
+-      "id": "CLEAR_M3",
+-      "type": "clear_travel_zone",
++      "id": "SPAWN_A_COURTYARD",
++      "type": "spawn_plaza",
+       "rect": {
+-        "x": 22.0,
+-        "y": 50.0,
+-        "w": 6.0,
+-        "h": 18.0
++        "x": 14,
++        "y": 0,
++        "w": 22,
++        "h": 14
+       },
+-      "label": "Clear Travel Zone \u2014 M3",
+-      "notes": "NO props/shops."
++      "label": "Spawn A — Courtyard",
++      "notes": "Spawn safety cover + quick access to all lanes via bazaar center and side connectors."
+     },
+     {
++      "id": "SPAWN_B_GATE_PLAZA",
++      "type": "spawn_plaza",
++      "rect": {
++        "x": 14,
++        "y": 68,
++        "w": 22,
++        "h": 14
++      },
++      "label": "Spawn B — Gate Plaza",
++      "notes": "Spawn safety cover + landmark arch threshold into bazaar."
++    },
++    {
+       "id": "STALL_M1_L",
+       "type": "stall_strip",
+       "rect": {
+         "x": 20.25,
+-        "y": 14.0,
++        "y": 14,
+         "w": 1.75,
+-        "h": 18.0
++        "h": 18
+       },
+       "label": "Stall Strip M1 (L)",
+       "notes": "Edge-only decor + stalls; never intrude into CLEAR_M1."
+@@ -285,10 +244,10 @@
+       "id": "STALL_M1_R",
+       "type": "stall_strip",
+       "rect": {
+-        "x": 28.0,
+-        "y": 14.0,
++        "x": 28,
++        "y": 14,
+         "w": 1.75,
+-        "h": 18.0
++        "h": 18
+       },
+       "label": "Stall Strip M1 (R)",
+       "notes": "Edge-only decor + stalls; never intrude into CLEAR_M1."
+@@ -298,9 +257,9 @@
+       "type": "stall_strip",
+       "rect": {
+         "x": 22.75,
+-        "y": 32.0,
++        "y": 32,
+         "w": 1.25,
+-        "h": 18.0
++        "h": 18
+       },
+       "label": "Stall Strip M2 (L)",
+       "notes": "Edge-only decor + stalls; never intrude into CLEAR_M2."
+@@ -309,10 +268,10 @@
+       "id": "STALL_M2_R",
+       "type": "stall_strip",
+       "rect": {
+-        "x": 30.0,
+-        "y": 32.0,
++        "x": 30,
++        "y": 32,
+         "w": 1.25,
+-        "h": 18.0
++        "h": 18
+       },
+       "label": "Stall Strip M2 (R)",
+       "notes": "Edge-only decor + stalls; never intrude into CLEAR_M2."
+@@ -322,9 +281,9 @@
+       "type": "stall_strip",
+       "rect": {
+         "x": 20.25,
+-        "y": 50.0,
++        "y": 50,
+         "w": 1.75,
+-        "h": 18.0
++        "h": 18
+       },
+       "label": "Stall Strip M3 (L)",
+       "notes": "Edge-only decor + stalls; never intrude into CLEAR_M3."
+@@ -333,1317 +292,1133 @@
+       "id": "STALL_M3_R",
+       "type": "stall_strip",
+       "rect": {
+-        "x": 28.0,
+-        "y": 50.0,
++        "x": 28,
++        "y": 50,
+         "w": 1.75,
+-        "h": 18.0
++        "h": 18
+       },
+       "label": "Stall Strip M3 (R)",
+       "notes": "Edge-only decor + stalls; never intrude into CLEAR_M3."
+     }
+   ],
+-  "connectivity": {
+-    "cuts": [
+-      "CUT_W_MID",
+-      "CUT_E_MID",
+-      "CUT_W_NORTH",
+-      "CUT_E_NORTH"
+-    ],
+-    "spawn_side_connectors": [
+-      "CONN_SW",
+-      "CONN_SE",
+-      "CONN_NW",
+-      "CONN_NE"
+-    ]
+-  },
+-  "landmarks": {
+-    "hero_arch_gate": {
+-      "anchor_id": "LMK_HERO_ARCH_01"
+-    },
+-    "mid_landmark": {
+-      "anchor_id": "LMK_MID_WELL_01"
+-    }
+-  },
+   "constraints": {
+-    "no_block_zone": "Clear travel zones must remain unobstructed by props/shops. Temporary gameplay items only (e.g., pickups) allowed if they do not block.",
+-    "min_path_width_main_lane": 6.0,
++    "min_path_width_main_lane": 6,
+     "min_path_width_side_halls": 4.5
+   },
+   "anchors": [
+     {
++      "id": "CLOTH_SPAN_01",
++      "type": "cloth_canopy_span",
++      "zone": "BZ_M1",
++      "pos": {
++        "x": 20.25,
++        "y": 20,
++        "z": 6
++      },
++      "endPos": {
++        "x": 29.75,
++        "y": 20,
++        "z": 6
++      },
++      "widthM": 9.5,
++      "heightM": 6,
++      "notes": "Overhead cloth canopy span. Add slight sag and torn edges; supports at signage anchors."
++    },
++    {
++      "id": "CLOTH_SPAN_02",
++      "type": "cloth_canopy_span",
++      "zone": "BZ_M2_JOG",
++      "pos": {
++        "x": 22.75,
++        "y": 41,
++        "z": 6
++      },
++      "endPos": {
++        "x": 31.25,
++        "y": 41,
++        "z": 6
++      },
++      "widthM": 8.5,
++      "heightM": 6,
++      "notes": "Overhead cloth canopy span over jog segment. Use mixed opacity cloth for lighting variation."
++    },
++    {
++      "id": "CLOTH_SPAN_03",
++      "type": "cloth_canopy_span",
++      "zone": "BZ_M3",
++      "pos": {
++        "x": 20.25,
++        "y": 62,
++        "z": 6
++      },
++      "endPos": {
++        "x": 29.75,
++        "y": 62,
++        "z": 6
++      },
++      "widthM": 9.5,
++      "heightM": 6,
++      "notes": "Overhead cloth canopy span near north segment. Coordinate with hero arch sightline."
++    },
++    {
++      "id": "LMK_HERO_ARCH_01",
++      "type": "hero_landmark",
++      "zone": "BZ_M3",
++      "pos": {
++        "x": 25,
++        "y": 68,
++        "z": 0
++      },
++      "yawDeg": 0,
++      "notes": "Hero arch/gate threshold between BZ_M3 and Spawn B Gate Plaza. Ensure ~6m vertical clearance."
++    },
++    {
++      "id": "LMK_MID_WELL_01",
++      "type": "landmark",
++      "zone": "BZ_M2_JOG",
++      "pos": {
++        "x": 27,
++        "y": 41,
++        "z": 0
++      },
++      "yawDeg": 0,
++      "notes": "Mid landmark (well/fountain); keep clear travel zone intact. Surrounded by open courtyard node and two angled stalls."
++    },
++    {
+       "id": "M1_SHOP_L_01",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 15.5,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.2,
+-      "height_m": 2.6,
++      "pos": {
++        "x": 21,
++        "y": 15.5,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 1.2,
++      "heightM": 2.6,
+       "notes": "Narrow spice stall. Dense cluster A entry."
+     },
+     {
+       "id": "M1_SHOP_L_02",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 17.2,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.4,
+-      "height_m": 3.2,
++      "pos": {
++        "x": 21,
++        "y": 17.2,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 2.4,
++      "heightM": 3.2,
+       "notes": "Medium spice/herb stall. Dense cluster A."
+     },
+     {
+       "id": "M1_SHOP_L_03",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 18.8,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.0,
+-      "height_m": 2.4,
++      "pos": {
++        "x": 21,
++        "y": 18.8,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 1,
++      "heightM": 2.4,
+       "notes": "Tiny chai vendor stall. Dense cluster A."
+     },
+     {
+       "id": "M1_SHOP_L_04",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 20.4,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": 2.9,
++      "pos": {
++        "x": 21,
++        "y": 20.4,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 1.8,
++      "heightM": 2.9,
+       "notes": "End of cluster A before open node gap."
+     },
+     {
+       "id": "M1_SHOP_L_05",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 25.2,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.8,
+-      "height_m": 3.4,
++      "pos": {
++        "x": 21,
++        "y": 25.2,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 2.8,
++      "heightM": 3.4,
+       "notes": "Wide spice merchant after open node. Cluster B."
+     },
+     {
+       "id": "M1_SHOP_L_06",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 27.8,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.5,
+-      "height_m": 2.8,
++      "pos": {
++        "x": 21,
++        "y": 27.8,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 1.5,
++      "heightM": 2.8,
+       "notes": "Mid-width stall. Cluster B."
+     },
+     {
+       "id": "M1_SHOP_L_07",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 30.1,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.9,
+-      "height_m": 3.0,
++      "pos": {
++        "x": 21,
++        "y": 30.1,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 1.9,
++      "heightM": 3,
+       "notes": "Near mid cut. Last stall before cut gap. Cluster B."
+     },
+     {
+-      "id": "M1_SIGN_L_01",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 15.5,
+-      "z": 3.2,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.2,
+-      "height_m": "",
+-      "notes": "Sign above M1 L01."
+-    },
+-    {
+-      "id": "M1_SIGN_L_02",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 17.2,
+-      "z": 3.4,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.2,
+-      "height_m": "",
+-      "notes": "Wide awning sign above M1 L02."
+-    },
+-    {
+-      "id": "M1_SIGN_L_03",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 25.2,
+-      "z": 3.6,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.5,
+-      "height_m": "",
+-      "notes": "Prominent sign above wide merchant M1 L05."
+-    },
+-    {
+-      "id": "M1_SIGN_L_04",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 30.1,
+-      "z": 3.2,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.6,
+-      "height_m": "",
+-      "notes": "Sign above cut-adjacent stall M1 L07."
+-    },
+-    {
+       "id": "M1_SHOP_R_01",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 15.0,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.2,
+-      "height_m": 3.1,
++      "pos": {
++        "x": 29.75,
++        "y": 15,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 2.2,
++      "heightM": 3.1,
+       "notes": "Right side entry stall. Faces west into bazaar. Cluster A."
+     },
+     {
+       "id": "M1_SHOP_R_02",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 17.8,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.4,
+-      "height_m": 2.5,
++      "pos": {
++        "x": 29.75,
++        "y": 17.8,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.4,
++      "heightM": 2.5,
+       "notes": "Narrow stall. Cluster A."
+     },
+     {
+       "id": "M1_SHOP_R_03",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 19.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 3.0,
+-      "height_m": 3.5,
++      "pos": {
++        "x": 29.75,
++        "y": 19.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 3,
++      "heightM": 3.5,
+       "notes": "Wide produce vendor. Tallest stall M1 right. End of cluster A (gap follows)."
+     },
+     {
+       "id": "M1_SHOP_R_04",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 23.8,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.6,
+-      "height_m": 2.7,
++      "pos": {
++        "x": 29.75,
++        "y": 23.8,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.6,
++      "heightM": 2.7,
+       "notes": "After gap. Cluster B."
+     },
+     {
+       "id": "M1_SHOP_R_05",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 25.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.0,
+-      "height_m": 3.0,
++      "pos": {
++        "x": 29.75,
++        "y": 25.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 2,
++      "heightM": 3,
+       "notes": "Cluster B."
+     },
+     {
+       "id": "M1_SHOP_R_06",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 27.2,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.2,
+-      "height_m": 2.4,
++      "pos": {
++        "x": 29.75,
++        "y": 27.2,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.2,
++      "heightM": 2.4,
+       "notes": "Narrow end-stall. Cluster B."
+     },
+     {
+       "id": "M1_SHOP_R_07",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 29.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": 2.8,
++      "pos": {
++        "x": 29.75,
++        "y": 29.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.8,
++      "heightM": 2.8,
+       "notes": "Near cut. Slightly isolated. Cluster B end."
+     },
+     {
++      "id": "M1_SIGN_L_01",
++      "type": "signage_anchor",
++      "zone": "BZ_M1",
++      "pos": {
++        "x": 21,
++        "y": 15.5,
++        "z": 3.2
++      },
++      "yawDeg": 90,
++      "widthM": 1.2,
++      "notes": "Sign above M1 L01."
++    },
++    {
++      "id": "M1_SIGN_L_02",
++      "type": "signage_anchor",
++      "zone": "BZ_M1",
++      "pos": {
++        "x": 21,
++        "y": 17.2,
++        "z": 3.4
++      },
++      "yawDeg": 90,
++      "widthM": 2.2,
++      "notes": "Wide awning sign above M1 L02."
++    },
++    {
++      "id": "M1_SIGN_L_03",
++      "type": "signage_anchor",
++      "zone": "BZ_M1",
++      "pos": {
++        "x": 21,
++        "y": 25.2,
++        "z": 3.6
++      },
++      "yawDeg": 90,
++      "widthM": 2.5,
++      "notes": "Prominent sign above wide merchant M1 L05."
++    },
++    {
++      "id": "M1_SIGN_L_04",
++      "type": "signage_anchor",
++      "zone": "BZ_M1",
++      "pos": {
++        "x": 21,
++        "y": 30.1,
++        "z": 3.2
++      },
++      "yawDeg": 90,
++      "widthM": 1.6,
++      "notes": "Sign above cut-adjacent stall M1 L07."
++    },
++    {
+       "id": "M1_SIGN_R_01",
+       "type": "signage_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 15.0,
+-      "z": 3.3,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": "",
++      "pos": {
++        "x": 29.75,
++        "y": 15,
++        "z": 3.3
++      },
++      "yawDeg": 270,
++      "widthM": 1.8,
+       "notes": "Sign above M1 R01."
+     },
+     {
+       "id": "M1_SIGN_R_02",
+       "type": "signage_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 19.5,
+-      "z": 3.6,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.8,
+-      "height_m": "",
++      "pos": {
++        "x": 29.75,
++        "y": 19.5,
++        "z": 3.6
++      },
++      "yawDeg": 270,
++      "widthM": 2.8,
+       "notes": "Wide awning above large produce vendor M1 R03."
+     },
+     {
+       "id": "M1_SIGN_R_03",
+       "type": "signage_anchor",
+       "zone": "BZ_M1",
+-      "x": 29.75,
+-      "y": 25.5,
+-      "z": 3.2,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.6,
+-      "height_m": "",
++      "pos": {
++        "x": 29.75,
++        "y": 25.5,
++        "z": 3.2
++      },
++      "yawDeg": 270,
++      "widthM": 1.6,
+       "notes": "Sign above M1 R05."
+     },
+     {
+       "id": "M2_SHOP_L_01",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 34.5,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.8,
+-      "height_m": 3.3,
++      "pos": {
++        "x": 23.5,
++        "y": 34.5,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 2.8,
++      "heightM": 3.3,
+       "notes": "Wide fabric merchant. M2 left cluster A."
+     },
+     {
+       "id": "M2_SHOP_L_02",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 37.5,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 3.2,
+-      "height_m": 3.6,
++      "pos": {
++        "x": 23.5,
++        "y": 37.5,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 3.2,
++      "heightM": 3.6,
+       "notes": "Largest stall on left side. Textile display. Cluster A."
+     },
+     {
+       "id": "M2_SHOP_L_03",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 41.8,
+-      "z": 0.0,
+-      "yaw_deg": 80.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.4,
+-      "height_m": 3.1,
++      "pos": {
++        "x": 23.5,
++        "y": 41.8,
++        "z": 0
++      },
++      "yawDeg": 80,
++      "widthM": 2.4,
++      "heightM": 3.1,
+       "notes": "Slightly angled toward well (yaw=80 not 90). Faces diagonally near well landmark. Open courtyard gap precedes this."
+     },
+     {
+       "id": "M2_SHOP_L_04",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 44.0,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": 2.7,
++      "pos": {
++        "x": 23.5,
++        "y": 44,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 1.8,
++      "heightM": 2.7,
+       "notes": "Narrower stall at north end of jog. Cluster B."
+     },
+     {
+       "id": "M2_SHOP_L_05",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 46.8,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.6,
+-      "height_m": 3.2,
++      "pos": {
++        "x": 23.5,
++        "y": 46.8,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 2.6,
++      "heightM": 3.2,
+       "notes": "Wide textile near north end. Cluster B end."
+     },
+     {
+-      "id": "M2_SIGN_L_01",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 34.5,
+-      "z": 3.5,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.5,
+-      "height_m": "",
+-      "notes": "Fabric merchant sign M2 L01."
+-    },
+-    {
+-      "id": "M2_SIGN_L_02",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 37.5,
+-      "z": 3.8,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 3.0,
+-      "height_m": "",
+-      "notes": "Large overhead awning/sign for big textile stall M2 L02."
+-    },
+-    {
+-      "id": "M2_SIGN_L_03",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M2_JOG",
+-      "x": 23.5,
+-      "y": 46.8,
+-      "z": 3.4,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.2,
+-      "height_m": "",
+-      "notes": "Sign above M2 L05."
+-    },
+-    {
+       "id": "M2_SHOP_R_01",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 33.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.0,
+-      "height_m": 3.0,
++      "pos": {
++        "x": 31,
++        "y": 33.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 2,
++      "heightM": 3,
+       "notes": "Right jog entry stall. Asymmetric: starts offset vs left side. Cluster A."
+     },
+     {
+       "id": "M2_SHOP_R_02",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 36.0,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.5,
+-      "height_m": 2.6,
++      "pos": {
++        "x": 31,
++        "y": 36,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.5,
++      "heightM": 2.6,
+       "notes": "Narrow stall. Cluster A."
+     },
+     {
+       "id": "M2_SHOP_R_03",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 38.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.5,
+-      "height_m": 3.2,
++      "pos": {
++        "x": 31,
++        "y": 38.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 2.5,
++      "heightM": 3.2,
+       "notes": "Mid right. Cluster A end (open courtyard node follows at Y=40-42)."
+     },
+     {
+       "id": "M2_SHOP_R_04",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 42.8,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": 2.8,
++      "pos": {
++        "x": 31,
++        "y": 42.8,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.8,
++      "heightM": 2.8,
+       "notes": "After gap. Near well node. Cluster B."
+     },
+     {
+       "id": "M2_SHOP_R_05",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 45.2,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 3.0,
+-      "height_m": 3.5,
++      "pos": {
++        "x": 31,
++        "y": 45.2,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 3,
++      "heightM": 3.5,
+       "notes": "Wide textile display. Tallest stall M2 right. Cluster B."
+     },
+     {
+       "id": "M2_SHOP_R_06",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 47.8,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.2,
+-      "height_m": 2.5,
++      "pos": {
++        "x": 31,
++        "y": 47.8,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.2,
++      "heightM": 2.5,
+       "notes": "Narrow end stall near north jog boundary. Cluster B end."
+     },
+     {
++      "id": "M2_SIGN_L_01",
++      "type": "signage_anchor",
++      "zone": "BZ_M2_JOG",
++      "pos": {
++        "x": 23.5,
++        "y": 34.5,
++        "z": 3.5
++      },
++      "yawDeg": 90,
++      "widthM": 2.5,
++      "notes": "Fabric merchant sign M2 L01."
++    },
++    {
++      "id": "M2_SIGN_L_02",
++      "type": "signage_anchor",
++      "zone": "BZ_M2_JOG",
++      "pos": {
++        "x": 23.5,
++        "y": 37.5,
++        "z": 3.8
++      },
++      "yawDeg": 90,
++      "widthM": 3,
++      "notes": "Large overhead awning/sign for big textile stall M2 L02."
++    },
++    {
++      "id": "M2_SIGN_L_03",
++      "type": "signage_anchor",
++      "zone": "BZ_M2_JOG",
++      "pos": {
++        "x": 23.5,
++        "y": 46.8,
++        "z": 3.4
++      },
++      "yawDeg": 90,
++      "widthM": 2.2,
++      "notes": "Sign above M2 L05."
++    },
++    {
+       "id": "M2_SIGN_R_01",
+       "type": "signage_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 36.0,
+-      "z": 3.3,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.4,
+-      "height_m": "",
++      "pos": {
++        "x": 31,
++        "y": 36,
++        "z": 3.3
++      },
++      "yawDeg": 270,
++      "widthM": 1.4,
+       "notes": "Sign above M2 R02."
+     },
+     {
+       "id": "M2_SIGN_R_02",
+       "type": "signage_anchor",
+       "zone": "BZ_M2_JOG",
+-      "x": 31.0,
+-      "y": 45.2,
+-      "z": 3.7,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.8,
+-      "height_m": "",
++      "pos": {
++        "x": 31,
++        "y": 45.2,
++        "z": 3.7
++      },
++      "yawDeg": 270,
++      "widthM": 2.8,
+       "notes": "Large awning above wide textile display M2 R05."
+     },
+     {
+       "id": "M3_SHOP_L_01",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 52.5,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": 2.9,
++      "pos": {
++        "x": 21,
++        "y": 52.5,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 1.8,
++      "heightM": 2.9,
+       "notes": "M3 left sparse entry. Rug & craft character. Cluster A."
+     },
+     {
+       "id": "M3_SHOP_L_02",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 55.2,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.5,
+-      "height_m": 3.3,
++      "pos": {
++        "x": 21,
++        "y": 55.2,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 2.5,
++      "heightM": 3.3,
+       "notes": "Wide rug merchant. End of cluster A (5m gap follows)."
+     },
+     {
+       "id": "M3_SHOP_L_03",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 61.2,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.0,
+-      "height_m": 3.1,
++      "pos": {
++        "x": 21,
++        "y": 61.2,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 2,
++      "heightM": 3.1,
+       "notes": "Dense cluster B approaching arch. Craft vendor."
+     },
+     {
+       "id": "M3_SHOP_L_04",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 63.8,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.8,
+-      "height_m": 3.5,
++      "pos": {
++        "x": 21,
++        "y": 63.8,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "widthM": 2.8,
++      "heightM": 3.5,
+       "notes": "Wide craft/textile. Last stall before arch clear zone. Cluster B end."
+     },
+     {
+-      "id": "M3_SIGN_L_01",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 52.5,
+-      "z": 3.2,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.6,
+-      "height_m": "",
+-      "notes": "Sign above M3 L01."
+-    },
+-    {
+-      "id": "M3_SIGN_L_02",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 55.2,
+-      "z": 3.5,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.2,
+-      "height_m": "",
+-      "notes": "Sign above wide rug merchant M3 L02."
+-    },
+-    {
+-      "id": "M3_SIGN_L_03",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 61.2,
+-      "z": 3.4,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": "",
+-      "notes": "Sign above M3 L03."
+-    },
+-    {
+-      "id": "M3_SIGN_L_04",
+-      "type": "signage_anchor",
+-      "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 63.8,
+-      "z": 3.7,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.6,
+-      "height_m": "",
+-      "notes": "Large banner above last craft stall. Increasingly ornate approaching arch."
+-    },
+-    {
+       "id": "M3_SHOP_R_01",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 51.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.2,
+-      "height_m": 3.0,
++      "pos": {
++        "x": 29.75,
++        "y": 51.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 2.2,
++      "heightM": 3,
+       "notes": "M3 right entry. Slightly offset from left. Cluster A."
+     },
+     {
+       "id": "M3_SHOP_R_02",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 54.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.6,
+-      "height_m": 2.6,
++      "pos": {
++        "x": 29.75,
++        "y": 54.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.6,
++      "heightM": 2.6,
+       "notes": "Narrow stall. Cluster A."
+     },
+     {
+       "id": "M3_SHOP_R_03",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 57.2,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.8,
+-      "height_m": 3.4,
++      "pos": {
++        "x": 29.75,
++        "y": 57.2,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 2.8,
++      "heightM": 3.4,
+       "notes": "Wide stall at north cut junction. End cluster A (long gap follows)."
+     },
+     {
+       "id": "M3_SHOP_R_04",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 62.8,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.4,
+-      "height_m": 2.7,
++      "pos": {
++        "x": 29.75,
++        "y": 62.8,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 1.4,
++      "heightM": 2.7,
+       "notes": "Cluster B approaching arch. Craft stall."
+     },
+     {
+       "id": "M3_SHOP_R_05",
+       "type": "shopfront_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 65.2,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.0,
+-      "height_m": 3.1,
++      "pos": {
++        "x": 29.75,
++        "y": 65.2,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "widthM": 2,
++      "heightM": 3.1,
+       "notes": "Last stall before arch. Cluster B end."
+     },
+     {
+-      "id": "M3_SIGN_R_01",
++      "id": "M3_SIGN_L_01",
+       "type": "signage_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 51.5,
+-      "z": 3.2,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": "",
+-      "notes": "Sign above M3 R01."
++      "pos": {
++        "x": 21,
++        "y": 52.5,
++        "z": 3.2
++      },
++      "yawDeg": 90,
++      "widthM": 1.6,
++      "notes": "Sign above M3 L01."
+     },
+     {
+-      "id": "M3_SIGN_R_02",
++      "id": "M3_SIGN_L_02",
+       "type": "signage_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 57.2,
+-      "z": 3.5,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 2.5,
+-      "height_m": "",
+-      "notes": "Prominent sign above wide corner stall M3 R03."
++      "pos": {
++        "x": 21,
++        "y": 55.2,
++        "z": 3.5
++      },
++      "yawDeg": 90,
++      "widthM": 2.2,
++      "notes": "Sign above wide rug merchant M3 L02."
+     },
+     {
+-      "id": "M3_SIGN_R_03",
++      "id": "M3_SIGN_L_03",
+       "type": "signage_anchor",
+       "zone": "BZ_M3",
+-      "x": 29.75,
+-      "y": 65.2,
+-      "z": 3.6,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 1.8,
+-      "height_m": "",
+-      "notes": "Decorative banner near arch. Increasing ornamentation toward landmark."
++      "pos": {
++        "x": 21,
++        "y": 61.2,
++        "z": 3.4
++      },
++      "yawDeg": 90,
++      "widthM": 1.8,
++      "notes": "Sign above M3 L03."
+     },
+     {
+-      "id": "SHW_DOOR_01",
+-      "type": "service_door_anchor",
+-      "zone": "SH_W",
+-      "x": 2.2,
+-      "y": 13.5,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Service door near south connector. West outer wall face. South cluster pair 1/2."
++      "id": "M3_SIGN_L_04",
++      "type": "signage_anchor",
++      "zone": "BZ_M3",
++      "pos": {
++        "x": 21,
++        "y": 63.8,
++        "z": 3.7
++      },
++      "yawDeg": 90,
++      "widthM": 2.6,
++      "notes": "Large banner above last craft stall. Increasingly ornate approaching arch."
+     },
+     {
+-      "id": "SHW_DOOR_02",
+-      "type": "service_door_anchor",
+-      "zone": "SH_W",
+-      "x": 2.2,
+-      "y": 16.0,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Second south cluster door. Goods stack implied between."
++      "id": "M3_SIGN_R_01",
++      "type": "signage_anchor",
++      "zone": "BZ_M3",
++      "pos": {
++        "x": 29.75,
++        "y": 51.5,
++        "z": 3.2
++      },
++      "yawDeg": 270,
++      "widthM": 1.8,
++      "notes": "Sign above M3 R01."
+     },
+     {
+-      "id": "SHW_DOOR_03",
+-      "type": "service_door_anchor",
+-      "zone": "SH_W",
+-      "x": 2.2,
+-      "y": 41.0,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Single isolated mid-hall door. Reinforces alley rhythm."
+-    },
+-    {
+-      "id": "SHW_DOOR_04",
+-      "type": "service_door_anchor",
+-      "zone": "SH_W",
+-      "x": 2.2,
+-      "y": 64.5,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "North cluster first door near north connector."
+-    },
+-    {
+-      "id": "SHW_DOOR_05",
+-      "type": "service_door_anchor",
+-      "zone": "SH_W",
+-      "x": 2.2,
+-      "y": 67.0,
+-      "z": 0.0,
+-      "yaw_deg": 90.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "North cluster second door. Clustered pair."
+-    },
+-    {
+-      "id": "SHE_DOOR_01",
+-      "type": "service_door_anchor",
+-      "zone": "SH_E",
+-      "x": 47.8,
+-      "y": 13.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Service door near south connector. East outer wall face. South cluster pair 1/2."
+-    },
+-    {
+-      "id": "SHE_DOOR_02",
+-      "type": "service_door_anchor",
+-      "zone": "SH_E",
+-      "x": 47.8,
+-      "y": 16.0,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Second south cluster door."
+-    },
+-    {
+-      "id": "SHE_DOOR_03",
+-      "type": "service_door_anchor",
+-      "zone": "SH_E",
+-      "x": 47.8,
+-      "y": 41.0,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Single isolated mid-hall door."
+-    },
+-    {
+-      "id": "SHE_DOOR_04",
+-      "type": "service_door_anchor",
+-      "zone": "SH_E",
+-      "x": 47.8,
+-      "y": 64.5,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "North cluster first door."
+-    },
+-    {
+-      "id": "SHE_DOOR_05",
+-      "type": "service_door_anchor",
+-      "zone": "SH_E",
+-      "x": 47.8,
+-      "y": 67.0,
+-      "z": 0.0,
+-      "yaw_deg": 270.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "North cluster second door."
++      "id": "M3_SIGN_R_02",
++      "type": "signage_anchor",
++      "zone": "BZ_M3",
++      "pos": {
++        "x": 29.75,
++        "y": 57.2,
++        "z": 3.5
++      },
++      "yawDeg": 270,
++      "widthM": 2.5,
++      "notes": "Prominent sign above wide corner stall M3 R03."
+     },
+     {
+-      "id": "LMK_HERO_ARCH_01",
+-      "type": "hero_landmark",
++      "id": "M3_SIGN_R_03",
++      "type": "signage_anchor",
+       "zone": "BZ_M3",
+-      "x": 25.0,
+-      "y": 68.0,
+-      "z": 0.0,
+-      "yaw_deg": 0.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Hero arch/gate threshold between BZ_M3 and Spawn B Gate Plaza. Ensure ~6m vertical clearance."
++      "pos": {
++        "x": 29.75,
++        "y": 65.2,
++        "z": 3.6
++      },
++      "yawDeg": 270,
++      "widthM": 1.8,
++      "notes": "Decorative banner near arch. Increasing ornamentation toward landmark."
+     },
+     {
+-      "id": "LMK_MID_WELL_01",
+-      "type": "landmark",
+-      "zone": "BZ_M2_JOG",
+-      "x": 27.0,
+-      "y": 41.0,
+-      "z": 0.0,
+-      "yaw_deg": 0.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Mid landmark (well/fountain); keep clear travel zone intact. Surrounded by open courtyard node and two angled stalls."
+-    },
+-    {
+       "id": "NODE_M1_OPEN_01",
+       "type": "open_node",
+       "zone": "BZ_M1",
+-      "x": 25.0,
+-      "y": 22.5,
+-      "z": 0.0,
+-      "yaw_deg": 0.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 5.0,
+-      "height_m": "",
++      "pos": {
++        "x": 25,
++        "y": 22.5,
++        "z": 0
++      },
++      "yawDeg": 0,
++      "widthM": 5,
+       "notes": "Intentional gap node at M1 mid-section. width_m=radiusM. Creates junction feel between spice cluster A and B."
+     },
+     {
+       "id": "NODE_M2_COURT_01",
+       "type": "open_node",
+       "zone": "BZ_M2_JOG",
+-      "x": 27.0,
+-      "y": 40.2,
+-      "z": 0.0,
+-      "yaw_deg": 0.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 4.0,
+-      "height_m": "",
++      "pos": {
++        "x": 27,
++        "y": 40.2,
++        "z": 0
++      },
++      "yawDeg": 0,
++      "widthM": 4,
+       "notes": "Open courtyard node around well landmark. width_m=radiusM. No filler props within radius except well."
+     },
+     {
+       "id": "NODE_M3_ARCH_CLEAR_01",
+       "type": "open_node",
+       "zone": "BZ_M3",
+-      "x": 25.0,
+-      "y": 66.5,
+-      "z": 0.0,
+-      "yaw_deg": 0.0,
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": 6.0,
+-      "height_m": "",
++      "pos": {
++        "x": 25,
++        "y": 66.5,
++        "z": 0
++      },
++      "yawDeg": 0,
++      "widthM": 6,
+       "notes": "Arch approach clear zone. width_m=radiusM=6m. No stalls or filler props. Arch is a solo landmark read."
+     },
+     {
+-      "id": "PP_SPAWN_A_01",
+-      "type": "spawn_cover",
+-      "zone": "SPAWN_A_COURTYARD",
+-      "x": 20.0,
+-      "y": 8.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Crates + planters (spawn safety)."
++      "id": "PP_M1_EAST_NEAR_CUT",
++      "type": "cover_cluster",
++      "zone": "BZ_M1",
++      "pos": {
++        "x": 29,
++        "y": 24.5,
++        "z": 0
++      },
++      "notes": "Edge cover near east mid cut entrance (crates/pottery)."
+     },
+     {
+-      "id": "PP_SPAWN_A_02",
+-      "type": "spawn_cover",
+-      "zone": "SPAWN_A_COURTYARD",
+-      "x": 30.0,
+-      "y": 8.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Low cover (bags/rugs) near exit; do not block main push."
+-    },
+-    {
+-      "id": "PP_SPAWN_B_01",
+-      "type": "spawn_cover",
+-      "zone": "SPAWN_B_GATE_PLAZA",
+-      "x": 20.0,
+-      "y": 74.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Crates + half-walls (spawn safety)."
+-    },
+-    {
+-      "id": "PP_SPAWN_B_02",
+-      "type": "spawn_cover",
+-      "zone": "SPAWN_B_GATE_PLAZA",
+-      "x": 30.0,
+-      "y": 74.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Low cover near arch approach; avoid headglitch dominance."
+-    },
+-    {
+       "id": "PP_M1_WEST_NEAR_CUT",
+       "type": "cover_cluster",
+       "zone": "BZ_M1",
+-      "x": 21.0,
+-      "y": 24.5,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
++      "pos": {
++        "x": 21,
++        "y": 24.5,
++        "z": 0
++      },
+       "notes": "Edge cover near west mid cut entrance (carts/barrels)."
+     },
+     {
+-      "id": "PP_M1_EAST_NEAR_CUT",
++      "id": "PP_M2_EAST_NEAR_JOG",
+       "type": "cover_cluster",
+-      "zone": "BZ_M1",
+-      "x": 29.0,
+-      "y": 24.5,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Edge cover near east mid cut entrance (crates/pottery)."
++      "zone": "BZ_M2_JOG",
++      "pos": {
++        "x": 31.2,
++        "y": 44,
++        "z": 0
++      },
++      "notes": "Jog-side cover; asymmetric placement for rhythm."
+     },
+     {
+       "id": "PP_M2_WEST_NEAR_JOG",
+       "type": "cover_cluster",
+       "zone": "BZ_M2_JOG",
+-      "x": 23.2,
+-      "y": 38.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
++      "pos": {
++        "x": 23.2,
++        "y": 38,
++        "z": 0
++      },
+       "notes": "Jog-side cover; break mid-lane LoS without blocking."
+     },
+     {
+-      "id": "PP_M2_EAST_NEAR_JOG",
++      "id": "PP_M3_EAST_NEAR_CUT",
+       "type": "cover_cluster",
+-      "zone": "BZ_M2_JOG",
+-      "x": 31.2,
+-      "y": 44.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Jog-side cover; asymmetric placement for rhythm."
++      "zone": "BZ_M3",
++      "pos": {
++        "x": 29,
++        "y": 56,
++        "z": 0
++      },
++      "notes": "Edge cover near east north cut entrance."
+     },
+     {
+       "id": "PP_M3_WEST_NEAR_CUT",
+       "type": "cover_cluster",
+       "zone": "BZ_M3",
+-      "x": 21.0,
+-      "y": 56.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
++      "pos": {
++        "x": 21,
++        "y": 56,
++        "z": 0
++      },
+       "notes": "Edge cover near west north cut entrance."
+     },
+     {
+-      "id": "PP_M3_EAST_NEAR_CUT",
++      "id": "PP_SHE_MID",
+       "type": "cover_cluster",
+-      "zone": "BZ_M3",
+-      "x": 29.0,
+-      "y": 56.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "Edge cover near east north cut entrance."
++      "zone": "SH_E",
++      "pos": {
++        "x": 45.5,
++        "y": 26,
++        "z": 0
++      },
++      "notes": "East hall cover at mid cut approach."
+     },
+     {
++      "id": "PP_SHE_NORTH",
++      "type": "cover_cluster",
++      "zone": "SH_E",
++      "pos": {
++        "x": 45.5,
++        "y": 58,
++        "z": 0
++      },
++      "notes": "East hall cover at north cut approach."
++    },
++    {
+       "id": "PP_SHW_MID",
+       "type": "cover_cluster",
+       "zone": "SH_W",
+-      "x": 4.5,
+-      "y": 26.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
++      "pos": {
++        "x": 4.5,
++        "y": 26,
++        "z": 0
++      },
+       "notes": "West hall cover at mid cut approach. In wider hall, crate stack against outer wall."
+     },
+     {
+-      "id": "PP_SHE_MID",
+-      "type": "cover_cluster",
+-      "zone": "SH_E",
+-      "x": 45.5,
+-      "y": 26.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "East hall cover at mid cut approach."
+-    },
+-    {
+       "id": "PP_SHW_NORTH",
+       "type": "cover_cluster",
+       "zone": "SH_W",
+-      "x": 4.5,
+-      "y": 58.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
++      "pos": {
++        "x": 4.5,
++        "y": 58,
++        "z": 0
++      },
+       "notes": "West hall cover at north cut approach."
+     },
+     {
+-      "id": "PP_SHE_NORTH",
+-      "type": "cover_cluster",
++      "id": "PP_SPAWN_A_01",
++      "type": "spawn_cover",
++      "zone": "SPAWN_A_COURTYARD",
++      "pos": {
++        "x": 20,
++        "y": 8,
++        "z": 0
++      },
++      "notes": "Crates + planters (spawn safety)."
++    },
++    {
++      "id": "PP_SPAWN_A_02",
++      "type": "spawn_cover",
++      "zone": "SPAWN_A_COURTYARD",
++      "pos": {
++        "x": 30,
++        "y": 8,
++        "z": 0
++      },
++      "notes": "Low cover (bags/rugs) near exit; do not block main push."
++    },
++    {
++      "id": "PP_SPAWN_B_01",
++      "type": "spawn_cover",
++      "zone": "SPAWN_B_GATE_PLAZA",
++      "pos": {
++        "x": 20,
++        "y": 74,
++        "z": 0
++      },
++      "notes": "Crates + half-walls (spawn safety)."
++    },
++    {
++      "id": "PP_SPAWN_B_02",
++      "type": "spawn_cover",
++      "zone": "SPAWN_B_GATE_PLAZA",
++      "pos": {
++        "x": 30,
++        "y": 74,
++        "z": 0
++      },
++      "notes": "Low cover near arch approach; avoid headglitch dominance."
++    },
++    {
++      "id": "SHE_DOOR_01",
++      "type": "service_door_anchor",
+       "zone": "SH_E",
+-      "x": 45.5,
+-      "y": 58.0,
+-      "z": 0.0,
+-      "yaw_deg": "",
+-      "end_x": "",
+-      "end_y": "",
+-      "end_z": "",
+-      "width_m": "",
+-      "height_m": "",
+-      "notes": "East hall cover at north cut approach."
++      "pos": {
++        "x": 47.8,
++        "y": 13.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "notes": "Service door near south connector. East outer wall face. South cluster pair 1/2."
+     },
+     {
+-      "id": "CLOTH_SPAN_01",
+-      "type": "cloth_canopy_span",
+-      "zone": "BZ_M1",
+-      "x": 20.25,
+-      "y": 20.0,
+-      "z": 6.0,
+-      "yaw_deg": "",
+-      "end_x": 29.75,
+-      "end_y": 20.0,
+-      "end_z": 6.0,
+-      "width_m": 9.5,
+-      "height_m": 6.0,
+-      "notes": "Overhead cloth canopy span. Add slight sag and torn edges; supports at signage anchors."
++      "id": "SHE_DOOR_02",
++      "type": "service_door_anchor",
++      "zone": "SH_E",
++      "pos": {
++        "x": 47.8,
++        "y": 16,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "notes": "Second south cluster door."
+     },
+     {
+-      "id": "CLOTH_SPAN_02",
+-      "type": "cloth_canopy_span",
+-      "zone": "BZ_M2_JOG",
+-      "x": 22.75,
+-      "y": 41.0,
+-      "z": 6.0,
+-      "yaw_deg": "",
+-      "end_x": 31.25,
+-      "end_y": 41.0,
+-      "end_z": 6.0,
+-      "width_m": 8.5,
+-      "height_m": 6.0,
+-      "notes": "Overhead cloth canopy span over jog segment. Use mixed opacity cloth for lighting variation."
++      "id": "SHE_DOOR_03",
++      "type": "service_door_anchor",
++      "zone": "SH_E",
++      "pos": {
++        "x": 47.8,
++        "y": 41,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "notes": "Single isolated mid-hall door."
+     },
+     {
+-      "id": "CLOTH_SPAN_03",
+-      "type": "cloth_canopy_span",
+-      "zone": "BZ_M3",
+-      "x": 20.25,
+-      "y": 62.0,
+-      "z": 6.0,
+-      "yaw_deg": "",
+-      "end_x": 29.75,
+-      "end_y": 62.0,
+-      "end_z": 6.0,
+-      "width_m": 9.5,
+-      "height_m": 6.0,
+-      "notes": "Overhead cloth canopy span near north segment. Coordinate with hero arch sightline."
++      "id": "SHE_DOOR_04",
++      "type": "service_door_anchor",
++      "zone": "SH_E",
++      "pos": {
++        "x": 47.8,
++        "y": 64.5,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "notes": "North cluster first door."
++    },
++    {
++      "id": "SHE_DOOR_05",
++      "type": "service_door_anchor",
++      "zone": "SH_E",
++      "pos": {
++        "x": 47.8,
++        "y": 67,
++        "z": 0
++      },
++      "yawDeg": 270,
++      "notes": "North cluster second door."
++    },
++    {
++      "id": "SHW_DOOR_01",
++      "type": "service_door_anchor",
++      "zone": "SH_W",
++      "pos": {
++        "x": 2.2,
++        "y": 13.5,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "notes": "Service door near south connector. West outer wall face. South cluster pair 1/2."
++    },
++    {
++      "id": "SHW_DOOR_02",
++      "type": "service_door_anchor",
++      "zone": "SH_W",
++      "pos": {
++        "x": 2.2,
++        "y": 16,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "notes": "Second south cluster door. Goods stack implied between."
++    },
++    {
++      "id": "SHW_DOOR_03",
++      "type": "service_door_anchor",
++      "zone": "SH_W",
++      "pos": {
++        "x": 2.2,
++        "y": 41,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "notes": "Single isolated mid-hall door. Reinforces alley rhythm."
++    },
++    {
++      "id": "SHW_DOOR_04",
++      "type": "service_door_anchor",
++      "zone": "SH_W",
++      "pos": {
++        "x": 2.2,
++        "y": 64.5,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "notes": "North cluster first door near north connector."
++    },
++    {
++      "id": "SHW_DOOR_05",
++      "type": "service_door_anchor",
++      "zone": "SH_W",
++      "pos": {
++        "x": 2.2,
++        "y": 67,
++        "z": 0
++      },
++      "yawDeg": 90,
++      "notes": "North cluster second door. Clustered pair."
+     }
+   ]
+ }

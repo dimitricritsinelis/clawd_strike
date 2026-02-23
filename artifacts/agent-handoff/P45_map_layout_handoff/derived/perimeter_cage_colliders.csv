@@ -1,0 +1,5 @@
+collider_id,kind,min_x,min_y,min_z,max_x,max_y,max_z
+cage-S,wall,-0.5,0,-0.5,50.5,4,0
+cage-N,wall,-0.5,0,82,50.5,4,82.5
+cage-W,wall,-0.5,0,0,0,4,82
+cage-E,wall,50,0,0,50.5,4,82

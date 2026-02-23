@@ -1,0 +1,7 @@
+id,rule_type,zone,shape,x,y,w,h,radiusM,notes
+CLEAR_M1,clear_travel_zone,CLEAR_M1,rect,22,14,6,18,,NO props/shops.
+CLEAR_M2,clear_travel_zone,CLEAR_M2,rect,24,32,6,18,,NO props/shops.
+CLEAR_M3,clear_travel_zone,CLEAR_M3,rect,22,50,6,18,,NO props/shops.
+NODE_M1_OPEN_01,open_node_keep_clear,BZ_M1,circle,25,22.5,,,5,Intentional gap node at M1 mid-section. width_m=radiusM. Creates junction feel between spice cluster A and B.
+NODE_M2_COURT_01,open_node_keep_clear,BZ_M2_JOG,circle,27,40.2,,,4,Open courtyard node around well landmark. width_m=radiusM. No filler props within radius except well.
+NODE_M3_ARCH_CLEAR_01,open_node_keep_clear,BZ_M3,circle,25,66.5,,,6,Arch approach clear zone. width_m=radiusM=6m. No stalls or filler props. Arch is a solo landmark read.

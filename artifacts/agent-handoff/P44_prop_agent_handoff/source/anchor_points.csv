@@ -1,0 +1,104 @@
+id,type,zone,x,y,z,yaw_deg,end_x,end_y,end_z,width_m,height_m,notes
+M1_SHOP_L_01,shopfront_anchor,BZ_M1,21.125,16.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SHOP_R_01,shopfront_anchor,BZ_M1,28.875,16.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SIGN_L_01,signage_anchor,BZ_M1,21.125,16.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SIGN_R_01,signage_anchor,BZ_M1,28.875,16.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SHOP_L_02,shopfront_anchor,BZ_M1,21.125,19.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SHOP_R_02,shopfront_anchor,BZ_M1,28.875,19.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SIGN_L_02,signage_anchor,BZ_M1,21.125,19.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SIGN_R_02,signage_anchor,BZ_M1,28.875,19.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SHOP_L_03,shopfront_anchor,BZ_M1,21.125,22.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SHOP_R_03,shopfront_anchor,BZ_M1,28.875,22.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SIGN_L_03,signage_anchor,BZ_M1,21.125,22.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SIGN_R_03,signage_anchor,BZ_M1,28.875,22.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SHOP_L_04,shopfront_anchor,BZ_M1,21.125,25.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SHOP_R_04,shopfront_anchor,BZ_M1,28.875,25.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SIGN_L_04,signage_anchor,BZ_M1,21.125,25.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SIGN_R_04,signage_anchor,BZ_M1,28.875,25.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SHOP_L_05,shopfront_anchor,BZ_M1,21.125,28.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SHOP_R_05,shopfront_anchor,BZ_M1,28.875,28.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SIGN_L_05,signage_anchor,BZ_M1,21.125,28.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SIGN_R_05,signage_anchor,BZ_M1,28.875,28.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SHOP_L_06,shopfront_anchor,BZ_M1,21.125,31.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SHOP_R_06,shopfront_anchor,BZ_M1,28.875,31.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M1_SIGN_L_06,signage_anchor,BZ_M1,21.125,31.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M1_SIGN_R_06,signage_anchor,BZ_M1,28.875,31.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SHOP_L_01,shopfront_anchor,BZ_M2_JOG,23.375,34.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SHOP_R_01,shopfront_anchor,BZ_M2_JOG,30.625,34.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SIGN_L_01,signage_anchor,BZ_M2_JOG,23.375,34.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SIGN_R_01,signage_anchor,BZ_M2_JOG,30.625,34.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SHOP_L_02,shopfront_anchor,BZ_M2_JOG,23.375,37.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SHOP_R_02,shopfront_anchor,BZ_M2_JOG,30.625,37.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SIGN_L_02,signage_anchor,BZ_M2_JOG,23.375,37.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SIGN_R_02,signage_anchor,BZ_M2_JOG,30.625,37.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SHOP_L_03,shopfront_anchor,BZ_M2_JOG,23.375,40.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SHOP_R_03,shopfront_anchor,BZ_M2_JOG,30.625,40.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SIGN_L_03,signage_anchor,BZ_M2_JOG,23.375,40.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SIGN_R_03,signage_anchor,BZ_M2_JOG,30.625,40.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SHOP_L_04,shopfront_anchor,BZ_M2_JOG,23.375,43.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SHOP_R_04,shopfront_anchor,BZ_M2_JOG,30.625,43.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SIGN_L_04,signage_anchor,BZ_M2_JOG,23.375,43.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SIGN_R_04,signage_anchor,BZ_M2_JOG,30.625,43.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SHOP_L_05,shopfront_anchor,BZ_M2_JOG,23.375,46.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SHOP_R_05,shopfront_anchor,BZ_M2_JOG,30.625,46.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SIGN_L_05,signage_anchor,BZ_M2_JOG,23.375,46.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SIGN_R_05,signage_anchor,BZ_M2_JOG,30.625,46.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SHOP_L_06,shopfront_anchor,BZ_M2_JOG,23.375,49.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SHOP_R_06,shopfront_anchor,BZ_M2_JOG,30.625,49.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M2_SIGN_L_06,signage_anchor,BZ_M2_JOG,23.375,49.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M2_SIGN_R_06,signage_anchor,BZ_M2_JOG,30.625,49.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SHOP_L_01,shopfront_anchor,BZ_M3,21.125,52.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SHOP_R_01,shopfront_anchor,BZ_M3,28.875,52.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SIGN_L_01,signage_anchor,BZ_M3,21.125,52.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SIGN_R_01,signage_anchor,BZ_M3,28.875,52.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SHOP_L_02,shopfront_anchor,BZ_M3,21.125,55.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SHOP_R_02,shopfront_anchor,BZ_M3,28.875,55.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SIGN_L_02,signage_anchor,BZ_M3,21.125,55.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SIGN_R_02,signage_anchor,BZ_M3,28.875,55.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SHOP_L_03,shopfront_anchor,BZ_M3,21.125,58.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SHOP_R_03,shopfront_anchor,BZ_M3,28.875,58.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SIGN_L_03,signage_anchor,BZ_M3,21.125,58.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SIGN_R_03,signage_anchor,BZ_M3,28.875,58.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SHOP_L_04,shopfront_anchor,BZ_M3,21.125,61.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SHOP_R_04,shopfront_anchor,BZ_M3,28.875,61.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SIGN_L_04,signage_anchor,BZ_M3,21.125,61.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SIGN_R_04,signage_anchor,BZ_M3,28.875,61.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SHOP_L_05,shopfront_anchor,BZ_M3,21.125,64.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SHOP_R_05,shopfront_anchor,BZ_M3,28.875,64.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SIGN_L_05,signage_anchor,BZ_M3,21.125,64.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SIGN_R_05,signage_anchor,BZ_M3,28.875,64.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SHOP_L_06,shopfront_anchor,BZ_M3,21.125,67.0,0.0,90.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SHOP_R_06,shopfront_anchor,BZ_M3,28.875,67.0,0.0,270.0,,,,,,Place shutter/door module in stall strip; face into bazaar.
+M3_SIGN_L_06,signage_anchor,BZ_M3,21.125,67.0,3.2,90.0,,,,,,Hanging sign/awning anchor above shopfront.
+M3_SIGN_R_06,signage_anchor,BZ_M3,28.875,67.0,3.2,270.0,,,,,,Hanging sign/awning anchor above shopfront.
+SHW_DOOR_01,service_door_anchor,SH_W,8.75,14.0,0.0,270.0,,,,,,Service door/alcove anchor along inner wall of west hall.
+SHW_DOOR_02,service_door_anchor,SH_W,8.75,26.0,0.0,270.0,,,,,,Service door/alcove anchor along inner wall of west hall.
+SHW_DOOR_03,service_door_anchor,SH_W,8.75,38.0,0.0,270.0,,,,,,Service door/alcove anchor along inner wall of west hall.
+SHW_DOOR_04,service_door_anchor,SH_W,8.75,50.0,0.0,270.0,,,,,,Service door/alcove anchor along inner wall of west hall.
+SHW_DOOR_05,service_door_anchor,SH_W,8.75,62.0,0.0,270.0,,,,,,Service door/alcove anchor along inner wall of west hall.
+SHW_DOOR_06,service_door_anchor,SH_W,8.75,70.0,0.0,270.0,,,,,,Service door/alcove anchor along inner wall of west hall.
+SHE_DOOR_01,service_door_anchor,SH_E,41.25,14.0,0.0,90.0,,,,,,Service door/alcove anchor along inner wall of east hall.
+SHE_DOOR_02,service_door_anchor,SH_E,41.25,26.0,0.0,90.0,,,,,,Service door/alcove anchor along inner wall of east hall.
+SHE_DOOR_03,service_door_anchor,SH_E,41.25,38.0,0.0,90.0,,,,,,Service door/alcove anchor along inner wall of east hall.
+SHE_DOOR_04,service_door_anchor,SH_E,41.25,50.0,0.0,90.0,,,,,,Service door/alcove anchor along inner wall of east hall.
+SHE_DOOR_05,service_door_anchor,SH_E,41.25,62.0,0.0,90.0,,,,,,Service door/alcove anchor along inner wall of east hall.
+SHE_DOOR_06,service_door_anchor,SH_E,41.25,70.0,0.0,90.0,,,,,,Service door/alcove anchor along inner wall of east hall.
+LMK_HERO_ARCH_01,hero_landmark,BZ_M3,25.0,68.0,0.0,0.0,,,,,,Hero arch/gate threshold between BZ_M3 and Spawn B Gate Plaza. Ensure ~6m vertical clearance.
+LMK_MID_WELL_01,landmark,BZ_M2_JOG,27.0,41.0,0.0,0.0,,,,,,Mid landmark (well/fountain) used to break LoS; keep clear travel zone intact (place in stall strip edge or shallow recess).
+PP_SPAWN_A_01,spawn_cover,SPAWN_A_COURTYARD,20.0,8.0,0.0,,,,,,,Crates + planters (spawn safety).
+PP_SPAWN_A_02,spawn_cover,SPAWN_A_COURTYARD,30.0,8.0,0.0,,,,,,,Low cover (bags/rugs) near exit; do not block main push.
+PP_SPAWN_B_01,spawn_cover,SPAWN_B_GATE_PLAZA,20.0,74.0,0.0,,,,,,,Crates + half-walls (spawn safety).
+PP_SPAWN_B_02,spawn_cover,SPAWN_B_GATE_PLAZA,30.0,74.0,0.0,,,,,,,Low cover near arch approach; avoid headglitch dominance.
+PP_M1_WEST_NEAR_CUT,cover_cluster,BZ_M1,21.0,24.5,0.0,,,,,,,Edge cover near west mid cut entrance (carts/barrels).
+PP_M1_EAST_NEAR_CUT,cover_cluster,BZ_M1,29.0,24.5,0.0,,,,,,,Edge cover near east mid cut entrance (crates/pottery).
+PP_M2_WEST_NEAR_JOG,cover_cluster,BZ_M2_JOG,23.0,38.0,0.0,,,,,,,Jog-side cover; break mid-lane LoS without blocking.
+PP_M2_EAST_NEAR_JOG,cover_cluster,BZ_M2_JOG,31.0,44.0,0.0,,,,,,,Jog-side cover; asymmetric placement for rhythm.
+PP_M3_WEST_NEAR_CUT,cover_cluster,BZ_M3,21.0,56.0,0.0,,,,,,,Edge cover near west north cut entrance.
+PP_M3_EAST_NEAR_CUT,cover_cluster,BZ_M3,29.0,56.0,0.0,,,,,,,Edge cover near east north cut entrance.
+PP_SHW_MID,cover_cluster,SH_W,7.0,26.0,0.0,,,,,,,Side hall cover at mid cut approach.
+PP_SHE_MID,cover_cluster,SH_E,43.0,26.0,0.0,,,,,,,Side hall cover at mid cut approach.
+PP_SHW_NORTH,cover_cluster,SH_W,7.0,58.0,0.0,,,,,,,Side hall cover at north cut approach.
+PP_SHE_NORTH,cover_cluster,SH_E,43.0,58.0,0.0,,,,,,,Side hall cover at north cut approach.
+CLOTH_SPAN_01,cloth_canopy_span,BZ_M1,20.25,20.0,6.0,,29.75,20.0,6.0,9.5,6.0,Overhead cloth canopy span. Add slight sag and torn edges; supports at signage anchors.
+CLOTH_SPAN_02,cloth_canopy_span,BZ_M2_JOG,22.75,41.0,6.0,,31.25,41.0,6.0,8.5,6.0,Overhead cloth canopy span over jog segment. Use mixed opacity cloth for lighting variation.
+CLOTH_SPAN_03,cloth_canopy_span,BZ_M3,20.25,62.0,6.0,,29.75,62.0,6.0,9.5,6.0,Overhead cloth canopy span near north segment. Coordinate with hero arch sightline.

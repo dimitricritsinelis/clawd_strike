@@ -1,0 +1,7 @@
+placement_group,source_anchor_type,anchor_count,required_variants,sizing_hint,notes
+shopfront_modules,shopfront_anchor,34,narrow/medium/wide facade variants,Support widths from ~1.2m to ~3.2m,Respect yaw and keep center lane clear.
+signage_awning,signage_anchor,19,small/medium/large signs + fabric awnings,Support widths from ~1.2m to ~3.0m,Mount at z from anchor position.
+cover_clusters,cover_cluster,10,crate/barrel/sack/cart mixes,Low/medium cover; preserve traversal lanes,Favor asymmetric rhythm left/right.
+spawn_cover,spawn_cover,4,planter + crate + low-wall kits,Never block spawn exits,Prioritize spawn safety readability.
+service_doors,service_door_anchor,10,door module + trim + clutter set,Wall-mounted set dressing,Use hall outer wall orientation via yaw.
+canopy_spans,cloth_canopy_span,3,cloth span meshes with mild sag,Use pos/endPos and widthM,Keep hero arch read clear near north segment.

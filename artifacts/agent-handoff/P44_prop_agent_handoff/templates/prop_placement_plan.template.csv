@@ -1,0 +1,2 @@
+placement_id,anchor_id,anchor_type,zone,asset_id_or_prefab,variant,footprint_w_m,footprint_d_m,height_m,yaw_deg,offset_x_m,offset_y_m,collision_enabled,collision_shape,cover_class,blocks_line_of_sight,clearance_rule,notes
+EXAMPLE_001,M1_SHOP_L_01,shopfront_anchor,BZ_M1,shop_fabric_01,wide,2.4,0.8,3.2,90,0,0,true,aabb,soft_cover,true,do_not_enter_clear_travel_zone,replace with real plan entries

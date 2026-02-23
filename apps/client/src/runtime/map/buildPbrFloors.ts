@@ -49,14 +49,14 @@ const FLOOR_MACRO_SETTINGS: Record<
   { colorAmplitude: number; roughnessAmplitude: number; frequency: number }
 > = {
   red_sandstone_pavement: {
-    colorAmplitude: 0.06,
-    roughnessAmplitude: 0.045,
-    frequency: 0.075,
+    colorAmplitude: 0.015,
+    roughnessAmplitude: 0.012,
+    frequency: 0.065,
   },
   cobblestone_floor_02: {
-    colorAmplitude: 0.05,
-    roughnessAmplitude: 0.04,
-    frequency: 0.085,
+    colorAmplitude: 0.012,
+    roughnessAmplitude: 0.01,
+    frequency: 0.075,
   },
 };
 

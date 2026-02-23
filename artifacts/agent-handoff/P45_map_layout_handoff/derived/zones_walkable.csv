@@ -1,0 +1,16 @@
+id,type,x,y,w,h,label
+BZ_M1,main_lane_segment,20.25,14,9.5,18,Bazaar Main — BZ-M1 (Spice Market)
+BZ_M2_JOG,main_lane_segment,22.75,32,8.5,18,Bazaar Main — BZ-M2 (Fabric & Textile JOG)
+BZ_M3,main_lane_segment,20.25,50,9.5,18,"Bazaar Main — BZ-M3 (Rug & Craft, approaching Arch)"
+CONN_NE,connector,36,70,6,4,Spawn B ↔ East Hall Connector
+CONN_NW,connector,8,70,6,4,Spawn B ↔ West Hall Connector
+CONN_SE,connector,36,8,6,4,Spawn A ↔ East Hall Connector
+CONN_SW,connector,8,8,6,4,Spawn A ↔ West Hall Connector
+CUT_E_MID,cut,29.75,24.5,12.25,3,Mid Cut (East)
+CUT_E_NORTH,cut,29.75,56,12.25,3,North Cut (East)
+CUT_W_MID,cut,8,24.5,12.25,3,Mid Cut (West)
+CUT_W_NORTH,cut,8,56,12.25,3,North Cut (West)
+SH_E,side_hall,42,10,6.5,62,East Side Hall (Widened)
+SH_W,side_hall,1.5,10,6.5,62,West Side Hall (Widened)
+SPAWN_A_COURTYARD,spawn_plaza,14,0,22,14,Spawn A — Courtyard
+SPAWN_B_GATE_PLAZA,spawn_plaza,14,68,22,14,Spawn B — Gate Plaza

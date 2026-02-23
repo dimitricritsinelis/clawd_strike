@@ -1,0 +1,86 @@
+id,type,zone,x,y,z,end_x,end_y,end_z,yawDeg,widthM,heightM,notes
+CLOTH_SPAN_01,cloth_canopy_span,BZ_M1,20.25,20,6,29.75,20,6,,9.5,6,Overhead cloth canopy span. Add slight sag and torn edges; supports at signage anchors.
+CLOTH_SPAN_02,cloth_canopy_span,BZ_M2_JOG,22.75,41,6,31.25,41,6,,8.5,6,Overhead cloth canopy span over jog segment. Use mixed opacity cloth for lighting variation.
+CLOTH_SPAN_03,cloth_canopy_span,BZ_M3,20.25,62,6,29.75,62,6,,9.5,6,Overhead cloth canopy span near north segment. Coordinate with hero arch sightline.
+LMK_HERO_ARCH_01,hero_landmark,BZ_M3,25,68,0,,,,0,,,Hero arch/gate threshold between BZ_M3 and Spawn B Gate Plaza. Ensure ~6m vertical clearance.
+LMK_MID_WELL_01,landmark,BZ_M2_JOG,27,41,0,,,,0,,,Mid landmark (well/fountain); keep clear travel zone intact. Surrounded by open courtyard node and two angled stalls.
+M1_SHOP_L_01,shopfront_anchor,BZ_M1,21,15.5,0,,,,90,1.2,2.6,Narrow spice stall. Dense cluster A entry.
+M1_SHOP_L_02,shopfront_anchor,BZ_M1,21,17.2,0,,,,90,2.4,3.2,Medium spice/herb stall. Dense cluster A.
+M1_SHOP_L_03,shopfront_anchor,BZ_M1,21,18.8,0,,,,90,1,2.4,Tiny chai vendor stall. Dense cluster A.
+M1_SHOP_L_04,shopfront_anchor,BZ_M1,21,20.4,0,,,,90,1.8,2.9,End of cluster A before open node gap.
+M1_SHOP_L_05,shopfront_anchor,BZ_M1,21,25.2,0,,,,90,2.8,3.4,Wide spice merchant after open node. Cluster B.
+M1_SHOP_L_06,shopfront_anchor,BZ_M1,21,27.8,0,,,,90,1.5,2.8,Mid-width stall. Cluster B.
+M1_SHOP_L_07,shopfront_anchor,BZ_M1,21,30.1,0,,,,90,1.9,3,Near mid cut. Last stall before cut gap. Cluster B.
+M1_SHOP_R_01,shopfront_anchor,BZ_M1,29.75,15,0,,,,270,2.2,3.1,Right side entry stall. Faces west into bazaar. Cluster A.
+M1_SHOP_R_02,shopfront_anchor,BZ_M1,29.75,17.8,0,,,,270,1.4,2.5,Narrow stall. Cluster A.
+M1_SHOP_R_03,shopfront_anchor,BZ_M1,29.75,19.5,0,,,,270,3,3.5,Wide produce vendor. Tallest stall M1 right. End of cluster A (gap follows).
+M1_SHOP_R_04,shopfront_anchor,BZ_M1,29.75,23.8,0,,,,270,1.6,2.7,After gap. Cluster B.
+M1_SHOP_R_05,shopfront_anchor,BZ_M1,29.75,25.5,0,,,,270,2,3,Cluster B.
+M1_SHOP_R_06,shopfront_anchor,BZ_M1,29.75,27.2,0,,,,270,1.2,2.4,Narrow end-stall. Cluster B.
+M1_SHOP_R_07,shopfront_anchor,BZ_M1,29.75,29.5,0,,,,270,1.8,2.8,Near cut. Slightly isolated. Cluster B end.
+M1_SIGN_L_01,signage_anchor,BZ_M1,21,15.5,3.2,,,,90,1.2,,Sign above M1 L01.
+M1_SIGN_L_02,signage_anchor,BZ_M1,21,17.2,3.4,,,,90,2.2,,Wide awning sign above M1 L02.
+M1_SIGN_L_03,signage_anchor,BZ_M1,21,25.2,3.6,,,,90,2.5,,Prominent sign above wide merchant M1 L05.
+M1_SIGN_L_04,signage_anchor,BZ_M1,21,30.1,3.2,,,,90,1.6,,Sign above cut-adjacent stall M1 L07.
+M1_SIGN_R_01,signage_anchor,BZ_M1,29.75,15,3.3,,,,270,1.8,,Sign above M1 R01.
+M1_SIGN_R_02,signage_anchor,BZ_M1,29.75,19.5,3.6,,,,270,2.8,,Wide awning above large produce vendor M1 R03.
+M1_SIGN_R_03,signage_anchor,BZ_M1,29.75,25.5,3.2,,,,270,1.6,,Sign above M1 R05.
+M2_SHOP_L_01,shopfront_anchor,BZ_M2_JOG,23.5,34.5,0,,,,90,2.8,3.3,Wide fabric merchant. M2 left cluster A.
+M2_SHOP_L_02,shopfront_anchor,BZ_M2_JOG,23.5,37.5,0,,,,90,3.2,3.6,Largest stall on left side. Textile display. Cluster A.
+M2_SHOP_L_03,shopfront_anchor,BZ_M2_JOG,23.5,41.8,0,,,,80,2.4,3.1,Slightly angled toward well (yaw=80 not 90). Faces diagonally near well landmark. Open courtyard gap precedes this.
+M2_SHOP_L_04,shopfront_anchor,BZ_M2_JOG,23.5,44,0,,,,90,1.8,2.7,Narrower stall at north end of jog. Cluster B.
+M2_SHOP_L_05,shopfront_anchor,BZ_M2_JOG,23.5,46.8,0,,,,90,2.6,3.2,Wide textile near north end. Cluster B end.
+M2_SHOP_R_01,shopfront_anchor,BZ_M2_JOG,31,33.5,0,,,,270,2,3,Right jog entry stall. Asymmetric: starts offset vs left side. Cluster A.
+M2_SHOP_R_02,shopfront_anchor,BZ_M2_JOG,31,36,0,,,,270,1.5,2.6,Narrow stall. Cluster A.
+M2_SHOP_R_03,shopfront_anchor,BZ_M2_JOG,31,38.5,0,,,,270,2.5,3.2,Mid right. Cluster A end (open courtyard node follows at Y=40-42).
+M2_SHOP_R_04,shopfront_anchor,BZ_M2_JOG,31,42.8,0,,,,270,1.8,2.8,After gap. Near well node. Cluster B.
+M2_SHOP_R_05,shopfront_anchor,BZ_M2_JOG,31,45.2,0,,,,270,3,3.5,Wide textile display. Tallest stall M2 right. Cluster B.
+M2_SHOP_R_06,shopfront_anchor,BZ_M2_JOG,31,47.8,0,,,,270,1.2,2.5,Narrow end stall near north jog boundary. Cluster B end.
+M2_SIGN_L_01,signage_anchor,BZ_M2_JOG,23.5,34.5,3.5,,,,90,2.5,,Fabric merchant sign M2 L01.
+M2_SIGN_L_02,signage_anchor,BZ_M2_JOG,23.5,37.5,3.8,,,,90,3,,Large overhead awning/sign for big textile stall M2 L02.
+M2_SIGN_L_03,signage_anchor,BZ_M2_JOG,23.5,46.8,3.4,,,,90,2.2,,Sign above M2 L05.
+M2_SIGN_R_01,signage_anchor,BZ_M2_JOG,31,36,3.3,,,,270,1.4,,Sign above M2 R02.
+M2_SIGN_R_02,signage_anchor,BZ_M2_JOG,31,45.2,3.7,,,,270,2.8,,Large awning above wide textile display M2 R05.
+M3_SHOP_L_01,shopfront_anchor,BZ_M3,21,52.5,0,,,,90,1.8,2.9,M3 left sparse entry. Rug & craft character. Cluster A.
+M3_SHOP_L_02,shopfront_anchor,BZ_M3,21,55.2,0,,,,90,2.5,3.3,Wide rug merchant. End of cluster A (5m gap follows).
+M3_SHOP_L_03,shopfront_anchor,BZ_M3,21,61.2,0,,,,90,2,3.1,Dense cluster B approaching arch. Craft vendor.
+M3_SHOP_L_04,shopfront_anchor,BZ_M3,21,63.8,0,,,,90,2.8,3.5,Wide craft/textile. Last stall before arch clear zone. Cluster B end.
+M3_SHOP_R_01,shopfront_anchor,BZ_M3,29.75,51.5,0,,,,270,2.2,3,M3 right entry. Slightly offset from left. Cluster A.
+M3_SHOP_R_02,shopfront_anchor,BZ_M3,29.75,54.5,0,,,,270,1.6,2.6,Narrow stall. Cluster A.
+M3_SHOP_R_03,shopfront_anchor,BZ_M3,29.75,57.2,0,,,,270,2.8,3.4,Wide stall at north cut junction. End cluster A (long gap follows).
+M3_SHOP_R_04,shopfront_anchor,BZ_M3,29.75,62.8,0,,,,270,1.4,2.7,Cluster B approaching arch. Craft stall.
+M3_SHOP_R_05,shopfront_anchor,BZ_M3,29.75,65.2,0,,,,270,2,3.1,Last stall before arch. Cluster B end.
+M3_SIGN_L_01,signage_anchor,BZ_M3,21,52.5,3.2,,,,90,1.6,,Sign above M3 L01.
+M3_SIGN_L_02,signage_anchor,BZ_M3,21,55.2,3.5,,,,90,2.2,,Sign above wide rug merchant M3 L02.
+M3_SIGN_L_03,signage_anchor,BZ_M3,21,61.2,3.4,,,,90,1.8,,Sign above M3 L03.
+M3_SIGN_L_04,signage_anchor,BZ_M3,21,63.8,3.7,,,,90,2.6,,Large banner above last craft stall. Increasingly ornate approaching arch.
+M3_SIGN_R_01,signage_anchor,BZ_M3,29.75,51.5,3.2,,,,270,1.8,,Sign above M3 R01.
+M3_SIGN_R_02,signage_anchor,BZ_M3,29.75,57.2,3.5,,,,270,2.5,,Prominent sign above wide corner stall M3 R03.
+M3_SIGN_R_03,signage_anchor,BZ_M3,29.75,65.2,3.6,,,,270,1.8,,Decorative banner near arch. Increasing ornamentation toward landmark.
+NODE_M1_OPEN_01,open_node,BZ_M1,25,22.5,0,,,,0,5,,Intentional gap node at M1 mid-section. width_m=radiusM. Creates junction feel between spice cluster A and B.
+NODE_M2_COURT_01,open_node,BZ_M2_JOG,27,40.2,0,,,,0,4,,Open courtyard node around well landmark. width_m=radiusM. No filler props within radius except well.
+NODE_M3_ARCH_CLEAR_01,open_node,BZ_M3,25,66.5,0,,,,0,6,,Arch approach clear zone. width_m=radiusM=6m. No stalls or filler props. Arch is a solo landmark read.
+PP_M1_EAST_NEAR_CUT,cover_cluster,BZ_M1,29,24.5,0,,,,,,,Edge cover near east mid cut entrance (crates/pottery).
+PP_M1_WEST_NEAR_CUT,cover_cluster,BZ_M1,21,24.5,0,,,,,,,Edge cover near west mid cut entrance (carts/barrels).
+PP_M2_EAST_NEAR_JOG,cover_cluster,BZ_M2_JOG,31.2,44,0,,,,,,,Jog-side cover; asymmetric placement for rhythm.
+PP_M2_WEST_NEAR_JOG,cover_cluster,BZ_M2_JOG,23.2,38,0,,,,,,,Jog-side cover; break mid-lane LoS without blocking.
+PP_M3_EAST_NEAR_CUT,cover_cluster,BZ_M3,29,56,0,,,,,,,Edge cover near east north cut entrance.
+PP_M3_WEST_NEAR_CUT,cover_cluster,BZ_M3,21,56,0,,,,,,,Edge cover near west north cut entrance.
+PP_SHE_MID,cover_cluster,SH_E,45.5,26,0,,,,,,,East hall cover at mid cut approach.
+PP_SHE_NORTH,cover_cluster,SH_E,45.5,58,0,,,,,,,East hall cover at north cut approach.
+PP_SHW_MID,cover_cluster,SH_W,4.5,26,0,,,,,,,"West hall cover at mid cut approach. In wider hall, crate stack against outer wall."
+PP_SHW_NORTH,cover_cluster,SH_W,4.5,58,0,,,,,,,West hall cover at north cut approach.
+PP_SPAWN_A_01,spawn_cover,SPAWN_A_COURTYARD,20,8,0,,,,,,,Crates + planters (spawn safety).
+PP_SPAWN_A_02,spawn_cover,SPAWN_A_COURTYARD,30,8,0,,,,,,,Low cover (bags/rugs) near exit; do not block main push.
+PP_SPAWN_B_01,spawn_cover,SPAWN_B_GATE_PLAZA,20,74,0,,,,,,,Crates + half-walls (spawn safety).
+PP_SPAWN_B_02,spawn_cover,SPAWN_B_GATE_PLAZA,30,74,0,,,,,,,Low cover near arch approach; avoid headglitch dominance.
+SHE_DOOR_01,service_door_anchor,SH_E,47.8,13.5,0,,,,270,,,Service door near south connector. East outer wall face. South cluster pair 1/2.
+SHE_DOOR_02,service_door_anchor,SH_E,47.8,16,0,,,,270,,,Second south cluster door.
+SHE_DOOR_03,service_door_anchor,SH_E,47.8,41,0,,,,270,,,Single isolated mid-hall door.
+SHE_DOOR_04,service_door_anchor,SH_E,47.8,64.5,0,,,,270,,,North cluster first door.
+SHE_DOOR_05,service_door_anchor,SH_E,47.8,67,0,,,,270,,,North cluster second door.
+SHW_DOOR_01,service_door_anchor,SH_W,2.2,13.5,0,,,,90,,,Service door near south connector. West outer wall face. South cluster pair 1/2.
+SHW_DOOR_02,service_door_anchor,SH_W,2.2,16,0,,,,90,,,Second south cluster door. Goods stack implied between.
+SHW_DOOR_03,service_door_anchor,SH_W,2.2,41,0,,,,90,,,Single isolated mid-hall door. Reinforces alley rhythm.
+SHW_DOOR_04,service_door_anchor,SH_W,2.2,64.5,0,,,,90,,,North cluster first door near north connector.
+SHW_DOOR_05,service_door_anchor,SH_W,2.2,67,0,,,,90,,,North cluster second door. Clustered pair.

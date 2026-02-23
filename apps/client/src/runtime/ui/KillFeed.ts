@@ -15,56 +15,64 @@ export class KillFeed {
   constructor(mountEl: HTMLElement) {
     this.root = document.createElement("div");
     this.root.style.position = "absolute";
-    this.root.style.top = "86px";
+    // Share the same top-right anchor as ScoreHud so the two HUDs align cleanly.
+    this.root.style.top = "136px";
     this.root.style.right = "22px";
     this.root.style.zIndex = "24";
     this.root.style.display = "flex";
-    this.root.style.flexDirection = "column-reverse";
-    this.root.style.gap = "6px";
+    this.root.style.flexDirection = "column";
+    this.root.style.gap = "8px";
     this.root.style.pointerEvents = "none";
-    this.root.style.minWidth = "180px";
+    this.root.style.minWidth = "168px";
+    this.root.style.alignItems = "flex-end";
 
     mountEl.append(this.root);
   }
 
   /** @param isHeadshot Pass true to use headshot phrasing and gold tint. */
   addKill(killerName: string, enemyName: string, isHeadshot = false): void {
-    // Trim to MAX_ENTRIES by removing oldest
+    // Trim to MAX_ENTRIES by removing oldest (last visible row).
     if (this.entries.length >= MAX_ENTRIES) {
-      const oldest = this.entries.shift();
+      const oldest = this.entries.pop();
       if (oldest) {
         oldest.el.remove();
       }
     }
 
     const el = document.createElement("div");
-    el.style.padding = "6px 10px";
-    el.style.borderRadius = "8px";
-    el.style.border = "1px solid rgba(230, 238, 248, 0.2)";
-    el.style.background = "rgba(6, 10, 16, 0.56)";
-    el.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.28)";
-    el.style.backdropFilter = "blur(1.5px)";
-    el.style.color = isHeadshot ? "#ffe84e" : "#e8f0fa";
+    el.style.padding = "8px 12px 9px";
+    el.style.borderRadius = "6px";
+    el.style.border = "1px solid rgba(255,255,255,0.08)";
+    el.style.background = "rgba(8, 16, 28, 0.68)";
+    el.style.boxShadow = "0 6px 16px rgba(0, 0, 0, 0.24)";
+    el.style.color = isHeadshot ? "#ffd700" : "rgba(228, 238, 252, 0.92)";
     el.style.fontFamily = '"Segoe UI", Tahoma, Verdana, sans-serif';
-    el.style.fontSize = "13px";
-    el.style.fontWeight = "600";
-    el.style.letterSpacing = "0.01em";
+    el.style.fontSize = "14px";
+    el.style.fontWeight = "700";
+    el.style.lineHeight = "1.1";
+    el.style.letterSpacing = "0.08em";
+    el.style.textTransform = "uppercase";
+    el.style.textAlign = "center";
+    el.style.textShadow = "0 1px 2px rgba(0, 0, 0, 0.9)";
+    el.style.whiteSpace = "nowrap";
     el.style.opacity = "1";
-    // Slide-in from right + fade-out transition
-    el.style.transform = "translateX(220px)";
-    el.style.transition = `transform 0.18s cubic-bezier(0.34,1.56,0.64,1), opacity ${KILL_FADE_S}s ease-out`;
+    // Slide-in from right + fade-out transition.
+    el.style.transform = "translateX(20px)";
+    el.style.transition = `transform 0.16s ease-out, opacity ${KILL_FADE_S}s ease-out`;
+    const killer = killerName.toUpperCase();
+    const enemy = enemyName.toUpperCase();
     el.textContent = isHeadshot
-      ? `${killerName} headshot ${enemyName}`
-      : `${killerName} killed ${enemyName}`;
+      ? `${killer} HEADSHOT ${enemy}`
+      : `${killer} KILLED ${enemy}`;
 
-    this.root.append(el);
+    this.root.prepend(el);
 
     // Trigger slide-in on next paint
     requestAnimationFrame(() => {
       el.style.transform = "translateX(0)";
     });
 
-    this.entries.push({ el, timerS: KILL_DISPLAY_S, fadingOut: false });
+    this.entries.unshift({ el, timerS: KILL_DISPLAY_S, fadingOut: false });
   }
 
   update(deltaSeconds: number): void {

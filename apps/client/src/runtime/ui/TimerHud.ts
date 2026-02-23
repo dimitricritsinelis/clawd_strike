@@ -7,6 +7,8 @@
 export class TimerHud {
   readonly root: HTMLDivElement;
   private readonly timeEl: HTMLSpanElement;
+  private readonly baseTopPx = 14;
+  private readonly bannerClearanceTopPx = 46;
 
   private elapsedS = 0;
   private running = false;
@@ -17,7 +19,7 @@ export class TimerHud {
     this.root = document.createElement("div");
     Object.assign(this.root.style, {
       position: "absolute",
-      top: "20px",
+      top: `${this.baseTopPx}px`,
       left: "50%",
       transform: "translateX(-50%)",
       zIndex: "22",
@@ -26,18 +28,19 @@ export class TimerHud {
       justifyContent: "center",
       background: "rgba(8, 16, 28, 0.55)",
       border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: "5px",
-      padding: "3px 14px 4px",
+      borderRadius: "10px",
+      padding: "6px 28px 8px",
       pointerEvents: "none",
       userSelect: "none",
-      minWidth: "74px",
+      minWidth: "148px",
       transformOrigin: "center center",
+      transition: "top 140ms ease-out",
     });
 
     this.timeEl = document.createElement("span");
     Object.assign(this.timeEl.style, {
       fontFamily: '"Segoe UI", Tahoma, Verdana, sans-serif',
-      fontSize: "15px",
+      fontSize: "30px",
       fontWeight: "600",
       fontVariantNumeric: "tabular-nums",
       letterSpacing: "0.06em",
@@ -106,6 +109,14 @@ export class TimerHud {
 
   setVisible(visible: boolean): void {
     this.root.style.display = visible ? "flex" : "none";
+  }
+
+  /**
+   * When browser pointer-lock/fullscreen safety banners are expected,
+   * shift the timer downward so native Chrome UI does not overlap it.
+   */
+  setChromeBannerClearance(active: boolean): void {
+    this.root.style.top = `${active ? this.bannerClearanceTopPx : this.baseTopPx}px`;
   }
 
   dispose(): void {

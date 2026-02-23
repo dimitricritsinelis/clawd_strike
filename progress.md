@@ -2,17 +2,17 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Bazaar prop runtime pack remains `bazaar_prop_models_pack_v1` with `props=bazaar` opt-in.
-- P34 fixes floating canopy placement with top-aligned dressing (`canopy`, `serviceDoor`, `signage`) instead of always bottom-aligning dressed meshes.
-- Canopy models now rotate to horizontal slab orientation, use non-uniform fit-to-target scaling, and render double-sided from below.
-- Shopfront dressed model selection is now structure-only (`pp_market_stand`) to remove oversized crate/bag storefronts.
-- Stall-strip filler now skips `clear_travel_zone` rectangles to reduce visual clutter in main traversal lanes.
-- Deterministic compare screenshots captured for P34 and review gate passed (`pos/yaw/pitch/fov drift = 0`).
+- Runtime layout-focused handoff bundle created at `artifacts/agent-handoff/bazaar_map_layout_handoff_P45.zip`.
+- Bundle is geometry-first: zones, walkable adjacency, wall segments, wall/cage colliders, runtime-vs-design diff, and blockout wall-generation code reference.
+- Prop-orchestration templates were intentionally removed from the new handoff focus.
+- Canonical compare view metadata included for deterministic planning context (`shots/compare_shot.json`).
+- Latest compare screenshot included in handoff bundle for visual grounding (`refs/latest_runtime_compare_view.png`).
 - Validation: ✅ `pnpm typecheck` and ✅ `pnpm build`.
-- Dev server restarted on `5174`; canonical compare URL opened for manual smoke.
+- Build warnings remain about landmark/open-node anchors located inside clear travel zones (expected but should stay explicit).
+- Bazaar packs are local/fetch-style assets and remain untracked.
 
 ## Canonical Playtest URL
-- `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&walls=pbr&lighting=golden&shot=compare&autostart=human&props=bazaar`
+- `http://localhost:5174/`
 
 ## Map Approval Status
 - `NOT APPROVED`
@@ -22,30 +22,31 @@
 pnpm dev
 pnpm typecheck
 pnpm build
-pnpm --filter @clawd-strike/client fetch:bazaar-walls-sky --force
-pnpm --filter @clawd-strike/client fetch:bazaar-props --force
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P34_map_visual_polish`
+- Prompt ID: `P45_map_layout_handoff`
 - What changed:
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/map/buildProps.ts`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/before.png`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/before_state.json`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/after.png`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/after_state.json`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P34_map_visual_polish/review.json`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/agent-handoff/P45_map_layout_handoff/README.md`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/agent-handoff/P45_map_layout_handoff/derived/wall_segments.csv`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/agent-handoff/P45_map_layout_handoff/derived/wall_colliders.csv`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/agent-handoff/P45_map_layout_handoff/derived/walkable_zone_adjacency.csv`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/agent-handoff/P45_map_layout_handoff/templates/layout_agent_prompt.md`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/agent-handoff/bazaar_map_layout_handoff_P45.zip`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P45_map_layout_handoff/before.png`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P45_map_layout_handoff/after.png`
 - Quick test steps:
-- `pnpm dev`
-- Open canonical URL above for deterministic compare framing.
-- Optional traversal URL: `http://127.0.0.1:5174/?map=bazaar-map&floors=pbr&walls=pbr&lighting=golden&autostart=human&props=bazaar`
+- `pnpm typecheck`
+- `pnpm build`
+- Unzip handoff package and provide `templates/layout_agent_prompt.md` + `derived/wall_segments.csv` + `derived/zones_walkable.csv` to the external map-layout agent.
 
 ## Next 3 Tasks
-1. Add 2-3 additional CC0 market stall/counter meshes to improve shopfront variety without reintroducing tiny repeated visuals.
-2. Move per-model fit/offset values from code into manifest-driven metadata (`models.json` overrides).
-3. Add `propsDebug=1` overlay (pivot, wall-normal, chosen model id) to speed visual tuning loops.
+1. Receive `layout_change_plan.md` + `wall_change_list.csv` from external agent based on the P45 handoff pack.
+2. Validate proposed wall edits against `min_path_width_*` constraints and spawn-to-spawn connectivity.
+3. Apply approved geometry edits in runtime spec and regenerate compare screenshots.
 
 ## Known Issues / Risks
 - Automated movement smoke in Playwright still reports `WrongDocumentError` during pointer-lock request after loading→runtime transition.
+- Runtime generator warns that some landmark/open-node anchors are inside clear-travel zones; gameplay-intent valid, but external planners may misread as conflicts without guidance.
 - Canopy visuals are conservative (small spans skipped) until better dedicated drape models are integrated.
 - Compare-shot mode freezes input by design; traversal checks require non-shot URLs.
