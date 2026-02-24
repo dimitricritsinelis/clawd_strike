@@ -32,6 +32,7 @@ const POINTER_LOCK_BANNER_GRACE_MS = 2600;
 const FLOOR_MANIFEST_URL = "/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json";
 const WALL_MANIFEST_URL = "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v4/materials.json";
 const PROP_MANIFEST_URL = "/assets/models/environment/bazaar/props/bazaar_prop_models_pack_v1/models.json";
+const MAP_PROPS_ENABLED = false;
 
 type ScenePerfSnapshot = {
   materials: number;
@@ -355,9 +356,9 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     }
   }
 
-  let resolvedPropVisuals = urlParams.propVisuals;
+  let resolvedPropVisuals = MAP_PROPS_ENABLED ? urlParams.propVisuals : "blockout";
   let propModels: PropModelLibrary | null = null;
-  if (resolvedPropVisuals === "bazaar") {
+  if (MAP_PROPS_ENABLED && resolvedPropVisuals === "bazaar") {
     try {
       propModels = await PropModelLibrary.load(PROP_MANIFEST_URL);
     } catch (error) {

@@ -36,6 +36,7 @@ const LOOK_SENSITIVITY = 0.002;
 const MIN_PITCH = -(Math.PI / 2) + 0.001;
 const MAX_PITCH = (Math.PI / 2) - 0.001;
 const RAD_TO_DEG = 180 / Math.PI;
+const MAP_PROPS_ENABLED = false;
 
 // ── Camera shake constants ────────────────────────────────────────────────────
 /** Shake impulse added per bullet fired while trigger held (metres). */
@@ -805,7 +806,7 @@ export class Game {
       profile: this.propChaos.profile,
       jitter: this.propChaos.jitter ?? 0.34,
       cluster: this.propChaos.cluster ?? 0.56,
-      density: this.propChaos.density ?? 0.44,
+      density: MAP_PROPS_ENABLED ? (this.propChaos.density ?? 0.44) : 0,
       totalAnchors: this.anchorsSpec?.anchors.length ?? 0,
       candidatesTotal: 0,
       collidersPlaced: 0,
@@ -816,7 +817,7 @@ export class Game {
       stallFillersPlaced: 0,
     };
 
-    if (this.anchorsSpec) {
+    if (MAP_PROPS_ENABLED && this.anchorsSpec) {
       const builtProps = buildProps({
         mapId: this.mapId,
         blockout: blockoutSpec,

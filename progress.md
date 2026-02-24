@@ -2,10 +2,9 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Removed the loading-screen information panel UI entirely from DOM/CSS/preload flow.
-- Deleted info-panel image assets from runtime public directory.
-- Deleted source panel image from art-source (`information-screen.png`).
-- Restored loading actions sizing rules to direct values (no panel-dependent CSS vars).
+- Map props are now globally disabled in runtime (no prop spawning, no prop colliders).
+- Bazaar prop model loading is disabled in bootstrap, even if URL requests bazaar prop visuals.
+- Runtime text-state now reports zero props: `density: 0`, `collidersPlaced: 0`, `candidatesTotal: 0`.
 - Validation: ✅ `pnpm typecheck` and ✅ `pnpm build`.
 - Smoke checks: dev server restarted; canonical URL opened; headed Playwright run reported no console errors.
 
@@ -23,24 +22,21 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P70_remove_info_screen`
+- Prompt ID: `P71_disable_all_props`
 - What changed:
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/index.html`
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/styles.css`
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/loading-screen/assets.ts`
-- `/Users/dimitri/Desktop/clawd-strike/art-source/loading-screen/information-screen.png` (deleted)
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/public/loading-screen/assets/loading-info-panel-desktop.png` (deleted)
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/public/loading-screen/assets/loading-info-panel-mobile.png` (deleted)
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P70_remove_info_screen/before.png`
-- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P70_remove_info_screen/after.png`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/bootstrap.ts`
+- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/runtime/game/Game.ts`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P71_disable_all_props/before.png`
+- `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P71_disable_all_props/after.png`
 - `/Users/dimitri/Desktop/clawd-strike/progress.md`
 - Quick test steps:
 - `pnpm typecheck`
 - `pnpm build`
-- `pnpm dev` then open `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
+- `pnpm dev` then open `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
+- verify runtime state shows props density/colliders at zero
 
 ## Next 3 Tasks
-1. Decide whether `#info-btn` should remain decorative or be wired to a real help/info surface.
+1. Decide whether to keep props hard-disabled or gate with an explicit URL flag (`props=off`) for quick toggling.
 2. Wire `#skills-md-btn` to a real in-game/help destination instead of banner placeholder.
 3. Add an explicit way to return from Agent submenu back to Human/Agent choices.
 
