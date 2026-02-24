@@ -66,6 +66,34 @@
     <link
       rel="preload"
       as="image"
+      href="/loading-screen/assets/loading-button-skill-md-desktop.webp"
+      type="image/webp"
+      media="(min-width: 821px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/loading-screen/assets/loading-button-skill-md-mobile.webp"
+      type="image/webp"
+      media="(max-width: 820px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/loading-screen/assets/loading-button-enter-agent-mode-desktop.webp"
+      type="image/webp"
+      media="(min-width: 821px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/loading-screen/assets/loading-button-enter-agent-mode-mobile.webp"
+      type="image/webp"
+      media="(max-width: 820px)"
+    />
+    <link
+      rel="preload"
+      as="image"
       href="/loading-screen/assets/loading-mute-desktop.webp"
       type="image/webp"
       media="(min-width: 821px)"
@@ -74,6 +102,20 @@
       rel="preload"
       as="image"
       href="/loading-screen/assets/loading-mute-mobile.webp"
+      type="image/webp"
+      media="(max-width: 820px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/loading-screen/assets/loading-info-desktop.webp"
+      type="image/webp"
+      media="(min-width: 821px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/loading-screen/assets/loading-info-mobile.webp"
       type="image/webp"
       media="(max-width: 820px)"
     />
@@ -86,7 +128,7 @@
         <div id="start" data-assets-ready="false">
           <button
             id="mute-toggle-btn"
-            class="is-unmuted"
+            class="corner-toggle-btn is-unmuted"
             type="button"
             aria-label="Mute loading ambience"
             aria-pressed="false"
@@ -115,6 +157,38 @@
               <img
                 class="mute-icon"
                 src="/loading-screen/assets/loading-mute-desktop.png"
+                width="180"
+                height="127"
+                alt=""
+                aria-hidden="true"
+              />
+            </picture>
+          </button>
+          <button id="info-btn" class="corner-toggle-btn" type="button" aria-label="Game info">
+            <picture>
+              <source
+                media="(max-width: 820px)"
+                srcset="/loading-screen/assets/loading-info-mobile.webp"
+                type="image/webp"
+              />
+              <source
+                media="(max-width: 820px)"
+                srcset="/loading-screen/assets/loading-info-mobile.avif"
+                type="image/avif"
+              />
+              <source
+                media="(min-width: 821px)"
+                srcset="/loading-screen/assets/loading-info-desktop.webp"
+                type="image/webp"
+              />
+              <source
+                media="(min-width: 821px)"
+                srcset="/loading-screen/assets/loading-info-desktop.avif"
+                type="image/avif"
+              />
+              <img
+                class="info-icon"
+                src="/loading-screen/assets/loading-info-desktop.png"
                 width="180"
                 height="127"
                 alt=""
@@ -155,13 +229,19 @@
               </picture>
             </div>
             <div class="actions">
-              <div class="option-art">
+              <div class="name-entry">
+                <input
+                  type="text"
+                  id="player-name-input"
+                  class="name-input"
+                  placeholder="Enter callsign…"
+                  maxlength="24"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="option-art" data-action-set="primary">
                 <picture>
-                  <source
-                    media="(max-width: 820px)"
-                    srcset="/loading-screen/assets/loading-button-human-mobile.webp"
-                    type="image/webp"
-                  />
                   <source
                     media="(max-width: 820px)"
                     srcset="/loading-screen/assets/loading-button-human-mobile.avif"
@@ -169,13 +249,18 @@
                   />
                   <source
                     media="(min-width: 821px)"
-                    srcset="/loading-screen/assets/loading-button-human-desktop.webp"
+                    srcset="/loading-screen/assets/loading-button-human-desktop.avif"
+                    type="image/avif"
+                  />
+                  <source
+                    media="(max-width: 820px)"
+                    srcset="/loading-screen/assets/loading-button-human-mobile.webp"
                     type="image/webp"
                   />
                   <source
                     media="(min-width: 821px)"
-                    srcset="/loading-screen/assets/loading-button-human-desktop.avif"
-                    type="image/avif"
+                    srcset="/loading-screen/assets/loading-button-human-desktop.webp"
+                    type="image/webp"
                   />
                   <img
                     class="option-img"
@@ -188,13 +273,8 @@
                 </picture>
                 <button id="single-player-btn" class="hit" aria-label="Human">Human</button>
               </div>
-              <div class="option-art">
+              <div class="option-art" data-action-set="primary">
                 <picture>
-                  <source
-                    media="(max-width: 820px)"
-                    srcset="/loading-screen/assets/loading-button-agent-mobile.webp"
-                    type="image/webp"
-                  />
                   <source
                     media="(max-width: 820px)"
                     srcset="/loading-screen/assets/loading-button-agent-mobile.avif"
@@ -202,13 +282,18 @@
                   />
                   <source
                     media="(min-width: 821px)"
-                    srcset="/loading-screen/assets/loading-button-agent-desktop.webp"
+                    srcset="/loading-screen/assets/loading-button-agent-desktop.avif"
+                    type="image/avif"
+                  />
+                  <source
+                    media="(max-width: 820px)"
+                    srcset="/loading-screen/assets/loading-button-agent-mobile.webp"
                     type="image/webp"
                   />
                   <source
                     media="(min-width: 821px)"
-                    srcset="/loading-screen/assets/loading-button-agent-desktop.avif"
-                    type="image/avif"
+                    srcset="/loading-screen/assets/loading-button-agent-desktop.webp"
+                    type="image/webp"
                   />
                   <img
                     class="option-img"
@@ -220,6 +305,74 @@
                   />
                 </picture>
                 <button id="multi-player-btn" class="hit" aria-label="Agent">Agent</button>
+              </div>
+              <div class="option-art" data-action-set="agent">
+                <picture>
+                  <source
+                    media="(max-width: 820px)"
+                    srcset="/loading-screen/assets/loading-button-skill-md-mobile.avif"
+                    type="image/avif"
+                  />
+                  <source
+                    media="(min-width: 821px)"
+                    srcset="/loading-screen/assets/loading-button-skill-md-desktop.avif"
+                    type="image/avif"
+                  />
+                  <source
+                    media="(max-width: 820px)"
+                    srcset="/loading-screen/assets/loading-button-skill-md-mobile.webp"
+                    type="image/webp"
+                  />
+                  <source
+                    media="(min-width: 821px)"
+                    srcset="/loading-screen/assets/loading-button-skill-md-desktop.webp"
+                    type="image/webp"
+                  />
+                  <img
+                    class="option-img"
+                    src="/loading-screen/assets/loading-button-skill-md-desktop.png"
+                    width="620"
+                    height="413"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                </picture>
+                <button id="skills-md-btn" class="hit" aria-label="Open skills.md">Open skills.md</button>
+              </div>
+              <div class="option-art" data-action-set="agent">
+                <picture>
+                  <source
+                    media="(max-width: 820px)"
+                    srcset="/loading-screen/assets/loading-button-enter-agent-mode-mobile.avif"
+                    type="image/avif"
+                  />
+                  <source
+                    media="(min-width: 821px)"
+                    srcset="/loading-screen/assets/loading-button-enter-agent-mode-desktop.avif"
+                    type="image/avif"
+                  />
+                  <source
+                    media="(max-width: 820px)"
+                    srcset="/loading-screen/assets/loading-button-enter-agent-mode-mobile.webp"
+                    type="image/webp"
+                  />
+                  <source
+                    media="(min-width: 821px)"
+                    srcset="/loading-screen/assets/loading-button-enter-agent-mode-desktop.webp"
+                    type="image/webp"
+                  />
+                  <img
+                    class="option-img"
+                    src="/loading-screen/assets/loading-button-enter-agent-mode-desktop.png"
+                    width="620"
+                    height="413"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                </picture>
+                <button id="enter-agent-mode-btn" class="hit" aria-label="Enter agent mode">
+                  Enter agent mode
+                </button>
               </div>
             </div>
           </div>

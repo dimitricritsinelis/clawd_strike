@@ -3,7 +3,7 @@ import type { LoadingScreenMode } from "./types";
 type LoadingScreenUICallbacks = {
   onWarmupAudio: () => void;
   onMuteToggle: () => void;
-  onSelectMode: (mode: LoadingScreenMode) => void;
+  onSelectMode: (mode: LoadingScreenMode, playerName: string) => void;
 };
 
 export type LoadingScreenUI = {
@@ -19,6 +19,8 @@ export type LoadingScreenUI = {
   };
 };
 
+const SKILLS_MD_PLACEHOLDER_URL = "https://www.moltbook.com/skill.md";
+
 function getRequiredEl<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
   if (!el) throw new Error(`Missing required loading screen element: ${selector}`);
@@ -30,10 +32,14 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   const muteToggleBtn = getRequiredEl<HTMLButtonElement>("#mute-toggle-btn");
   const singlePlayerBtn = getRequiredEl<HTMLButtonElement>("#single-player-btn");
   const multiPlayerBtn = getRequiredEl<HTMLButtonElement>("#multi-player-btn");
+  const skillsMdBtn = getRequiredEl<HTMLButtonElement>("#skills-md-btn");
+  const enterAgentModeBtn = getRequiredEl<HTMLButtonElement>("#enter-agent-mode-btn");
   const modeBanner = getRequiredEl<HTMLDivElement>("#mode-banner");
+  const playerNameInput = getRequiredEl<HTMLInputElement>("#player-name-input");
 
   let disposed = false;
   let bannerTimer: number | null = null;
+  start.dataset.agentSubmenu = "false";
 
   function clearBannerTimer() {
     if (bannerTimer === null) return;
@@ -53,12 +59,37 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
   function onSelectHuman() {
     if (disposed) return;
-    callbacks.onSelectMode("human");
+    callbacks.onSelectMode("human", playerNameInput.value.trim());
   }
 
   function onSelectAgent() {
     if (disposed) return;
-    callbacks.onSelectMode("agent");
+    start.dataset.agentSubmenu = "true";
+  }
+
+  function showTransientBanner(message: string) {
+    modeBanner.textContent = message;
+    modeBanner.classList.add("show");
+
+    clearBannerTimer();
+    bannerTimer = window.setTimeout(() => {
+      modeBanner.classList.remove("show");
+      bannerTimer = null;
+    }, 2200);
+  }
+
+  function onOpenSkillsMd() {
+    if (disposed) return;
+    showTransientBanner("Opening skills.md");
+    const openedWindow = window.open(SKILLS_MD_PLACEHOLDER_URL, "_blank", "noopener,noreferrer");
+    if (!openedWindow) {
+      window.location.href = SKILLS_MD_PLACEHOLDER_URL;
+    }
+  }
+
+  function onEnterAgentMode() {
+    if (disposed) return;
+    callbacks.onSelectMode("agent", playerNameInput.value.trim());
   }
 
   start.addEventListener("pointerdown", onWarmupAudio, { passive: true });
@@ -66,6 +97,8 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   muteToggleBtn.addEventListener("click", onMuteToggleClick);
   singlePlayerBtn.addEventListener("click", onSelectHuman);
   multiPlayerBtn.addEventListener("click", onSelectAgent);
+  skillsMdBtn.addEventListener("click", onOpenSkillsMd);
+  enterAgentModeBtn.addEventListener("click", onEnterAgentMode);
 
   return {
     show() {
@@ -86,6 +119,8 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       muteToggleBtn.removeEventListener("click", onMuteToggleClick);
       singlePlayerBtn.removeEventListener("click", onSelectHuman);
       multiPlayerBtn.removeEventListener("click", onSelectAgent);
+      skillsMdBtn.removeEventListener("click", onOpenSkillsMd);
+      enterAgentModeBtn.removeEventListener("click", onEnterAgentMode);
     },
     setMuteState(muted) {
       muteToggleBtn.classList.toggle("is-muted", muted);
@@ -99,14 +134,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       muteToggleBtn.classList.add("flash");
     },
     showBanner(message) {
-      modeBanner.textContent = message;
-      modeBanner.classList.add("show");
-
-      clearBannerTimer();
-      bannerTimer = window.setTimeout(() => {
-        modeBanner.classList.remove("show");
-        bannerTimer = null;
-      }, 2200);
+      showTransientBanner(message);
     },
     getState() {
       return {

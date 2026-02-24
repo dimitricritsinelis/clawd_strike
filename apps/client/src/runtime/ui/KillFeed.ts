@@ -16,15 +16,16 @@ export class KillFeed {
     this.root = document.createElement("div");
     this.root.style.position = "absolute";
     // Share the same top-right anchor as ScoreHud so the two HUDs align cleanly.
-    this.root.style.top = "136px";
+    this.root.style.top = "116px";
     this.root.style.right = "22px";
     this.root.style.zIndex = "24";
     this.root.style.display = "flex";
     this.root.style.flexDirection = "column";
     this.root.style.gap = "8px";
     this.root.style.pointerEvents = "none";
-    this.root.style.minWidth = "168px";
-    this.root.style.alignItems = "flex-end";
+    this.root.style.width = "300px";
+    this.root.style.minWidth = "300px";
+    this.root.style.alignItems = "stretch";
 
     mountEl.append(this.root);
   }
@@ -55,6 +56,8 @@ export class KillFeed {
     el.style.textAlign = "center";
     el.style.textShadow = "0 1px 2px rgba(0, 0, 0, 0.9)";
     el.style.whiteSpace = "nowrap";
+    el.style.width = "100%";
+    el.style.boxSizing = "border-box";
     el.style.opacity = "1";
     // Slide-in from right + fade-out transition.
     el.style.transform = "translateX(20px)";

@@ -28,6 +28,7 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
   const loadingAmbient = new LoadingAmbientAudio({ ...DEFAULT_AUDIO, ...(options.audio ?? {}) });
   let disposed = false;
   let selectedMode: LoadingScreenMode | null = null;
+  let selectedPlayerName: string = "";
 
   const ui = createLoadingScreenUI({
     onWarmupAudio: () => {
@@ -46,9 +47,10 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
       ui.setMuteState(loadingAmbient.isMuted());
       ui.flashMuteToggle();
     },
-    onSelectMode: (mode) => {
+    onSelectMode: (mode, playerName) => {
       if (disposed) return;
       selectedMode = mode;
+      selectedPlayerName = playerName;
       if (!loadingAmbient.isMuted()) {
         void loadingAmbient.start();
       }
@@ -105,6 +107,7 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
         muteState: loadingAmbient.isMuted() ? "muted" : "unmuted",
         messageVisible: uiState.bannerVisible,
         selectedMode,
+        selectedPlayerName,
       },
       gameplay: {
         active: false,

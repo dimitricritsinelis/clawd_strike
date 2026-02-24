@@ -14,7 +14,10 @@ function getCriticalAssetUrls(variant: DeviceVariant): string[] {
       "/loading-screen/assets/loading-logo-mobile.webp",
       "/loading-screen/assets/loading-button-human-mobile.webp",
       "/loading-screen/assets/loading-button-agent-mobile.webp",
+      "/loading-screen/assets/loading-button-skill-md-mobile.webp",
+      "/loading-screen/assets/loading-button-enter-agent-mode-mobile.webp",
       "/loading-screen/assets/loading-mute-mobile.webp",
+      "/loading-screen/assets/loading-info-mobile.webp",
     ];
   }
 
@@ -23,7 +26,10 @@ function getCriticalAssetUrls(variant: DeviceVariant): string[] {
     "/loading-screen/assets/loading-logo-desktop.webp",
     "/loading-screen/assets/loading-button-human-desktop.webp",
     "/loading-screen/assets/loading-button-agent-desktop.webp",
+    "/loading-screen/assets/loading-button-skill-md-desktop.webp",
+    "/loading-screen/assets/loading-button-enter-agent-mode-desktop.webp",
     "/loading-screen/assets/loading-mute-desktop.webp",
+    "/loading-screen/assets/loading-info-desktop.webp",
   ];
 }
 

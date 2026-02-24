@@ -6,9 +6,14 @@ export class ScoreHud {
   readonly root: HTMLDivElement;
   private readonly killsEl: HTMLSpanElement;
   private readonly headshotsEl: HTMLSpanElement;
+  private readonly scoreEl: HTMLSpanElement;
 
   private kills = 0;
   private headshots = 0;
+  private score = 0;
+  private readonly SCORE_BASE = 0;
+  private readonly SCORE_PER_KILL = 10;
+  private readonly SCORE_PER_HEADSHOT = 2.5;
 
   constructor(mountEl: HTMLElement, playerName = "Operator") {
     this.root = document.createElement("div");
@@ -27,7 +32,9 @@ export class ScoreHud {
       padding: "8px 12px 9px",
       pointerEvents: "none",
       userSelect: "none",
-      minWidth: "168px",
+      width: "300px",
+      minWidth: "300px",
+      boxSizing: "border-box",
     });
 
     const nameEl = document.createElement("div");
@@ -49,7 +56,7 @@ export class ScoreHud {
     const labels = document.createElement("div");
     Object.assign(labels.style, {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      gridTemplateColumns: "1fr 1fr 1fr",
       width: "100%",
       columnGap: "10px",
       fontFamily: '"Segoe UI", Tahoma, Verdana, sans-serif',
@@ -65,13 +72,15 @@ export class ScoreHud {
     killsLabel.textContent = "Kills";
     const hsLabel = document.createElement("div");
     hsLabel.textContent = "Headshots";
-    labels.append(killsLabel, hsLabel);
+    const scoreLabel = document.createElement("div");
+    scoreLabel.textContent = "Score";
+    labels.append(killsLabel, hsLabel, scoreLabel);
 
     // Numeric display: total kills
     const row = document.createElement("div");
     Object.assign(row.style, {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      gridTemplateColumns: "1fr 1fr 1fr",
       alignItems: "center",
       width: "100%",
       columnGap: "10px",
@@ -99,7 +108,17 @@ export class ScoreHud {
     });
     this.headshotsEl.textContent = "0";
 
-    row.append(this.killsEl, this.headshotsEl);
+    this.scoreEl = document.createElement("span");
+    Object.assign(this.scoreEl.style, {
+      fontSize: "30px",
+      fontWeight: "700",
+      color: "#e8f0ff",
+      lineHeight: "1",
+      textAlign: "center",
+    });
+    this.scoreEl.textContent = this.formatScore(this.score);
+
+    row.append(this.killsEl, this.headshotsEl, this.scoreEl);
     this.root.append(nameEl, labels, row);
     mountEl.append(this.root);
   }
@@ -108,30 +127,41 @@ export class ScoreHud {
 
   addKill(): void {
     this.kills += 1;
+    this.score += this.SCORE_PER_KILL;
     this.killsEl.textContent = String(this.kills);
+    this.scoreEl.textContent = this.formatScore(this.score);
     // Flash gold on kill
     this.killsEl.style.color = "#ffd700";
+    this.scoreEl.style.color = "#ffd700";
     setTimeout(() => {
       this.killsEl.style.color = "#e8f0ff";
+      this.scoreEl.style.color = "#e8f0ff";
     }, 300);
   }
 
   addHeadshot(): void {
     this.headshots += 1;
+    this.score += this.SCORE_PER_HEADSHOT;
     this.headshotsEl.textContent = String(this.headshots);
+    this.scoreEl.textContent = this.formatScore(this.score);
     this.headshotsEl.style.color = "#ffd700";
+    this.scoreEl.style.color = "#ffd700";
     setTimeout(() => {
       this.headshotsEl.style.color = "#e8f0ff";
+      this.scoreEl.style.color = "#e8f0ff";
     }, 300);
   }
 
   reset(): void {
     this.kills = 0;
     this.headshots = 0;
+    this.score = this.SCORE_BASE;
     this.killsEl.textContent = "0";
     this.headshotsEl.textContent = "0";
+    this.scoreEl.textContent = this.formatScore(this.score);
     this.killsEl.style.color = "#e8f0ff";
     this.headshotsEl.style.color = "#e8f0ff";
+    this.scoreEl.style.color = "#e8f0ff";
   }
 
   setVisible(visible: boolean): void {
@@ -140,5 +170,9 @@ export class ScoreHud {
 
   dispose(): void {
     this.root.remove();
+  }
+
+  private formatScore(value: number): string {
+    return value.toLocaleString("en-US");
   }
 }

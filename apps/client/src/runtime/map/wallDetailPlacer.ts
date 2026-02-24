@@ -17,6 +17,10 @@ const DOOR_ANCHOR_TYPES = new Set([
 ]);
 
 const SIGN_ANCHOR_TYPE = "signage_anchor";
+const ENABLE_CABLE_RUNS = false;
+const ENABLE_SIGN_MOUNTS = false;
+const ENABLE_SIGN_BRACKETS = false;
+const ENABLE_AWNING_BRACKETS = false;
 const SEGMENT_EDGE_MARGIN_M = 0.35;
 const LAYER_EPSILON_M = 0.002;
 
@@ -495,6 +499,7 @@ function placeDoorFrames(ctx: SegmentDecorContext): void {
 }
 
 function placeSignageAndAwning(ctx: SegmentDecorContext): void {
+  if (!ENABLE_SIGN_MOUNTS && !ENABLE_AWNING_BRACKETS) return;
   const signageAnchors = collectAnchorsForSegment(
     ctx.segment,
     ctx.anchors,
@@ -505,6 +510,7 @@ function placeSignageAndAwning(ctx: SegmentDecorContext): void {
   const maxSignProtrusion = clamp(ctx.maxProtrusionM, 0.05, 0.15);
 
   for (const anchor of signageAnchors) {
+    if (!ENABLE_SIGN_MOUNTS) continue;
     if (ctx.rng.next() > hangingDensity) continue;
 
     const along = anchorAlongAxis(ctx.segment, anchor);
@@ -526,33 +532,36 @@ function placeSignageAndAwning(ctx: SegmentDecorContext): void {
       width,
     );
 
-    const bracketDepth = clamp(boardDepth + 0.04, 0.06, maxSignProtrusion);
-    const bracketY = y - boardHeight * 0.33;
-    const bracketOffset = width * 0.34;
-    pushBox(
-      ctx.instances,
-      "sign_bracket",
-      ctx.frame,
-      s - bracketOffset,
-      bracketY,
-      bracketDepth * 0.5,
-      bracketDepth,
-      0.18,
-      0.07,
-    );
-    pushBox(
-      ctx.instances,
-      "sign_bracket",
-      ctx.frame,
-      s + bracketOffset,
-      bracketY,
-      bracketDepth * 0.5,
-      bracketDepth,
-      0.18,
-      0.07,
-    );
+    if (ENABLE_SIGN_BRACKETS) {
+      const bracketDepth = clamp(boardDepth + 0.04, 0.06, maxSignProtrusion);
+      const bracketY = y - boardHeight * 0.33;
+      const bracketOffset = width * 0.34;
+      pushBox(
+        ctx.instances,
+        "sign_bracket",
+        ctx.frame,
+        s - bracketOffset,
+        bracketY,
+        bracketDepth * 0.5,
+        bracketDepth,
+        0.18,
+        0.07,
+      );
+      pushBox(
+        ctx.instances,
+        "sign_bracket",
+        ctx.frame,
+        s + bracketOffset,
+        bracketY,
+        bracketDepth * 0.5,
+        bracketDepth,
+        0.18,
+        0.07,
+      );
+    }
   }
 
+  if (!ENABLE_AWNING_BRACKETS) return;
   if (ctx.frame.lengthM < 3 || ctx.rng.next() > hangingDensity * 0.5) {
     return;
   }
@@ -593,6 +602,7 @@ function placeSignageAndAwning(ctx: SegmentDecorContext): void {
 }
 
 function placeCableRuns(ctx: SegmentDecorContext): void {
+  if (!ENABLE_CABLE_RUNS) return;
   if (ctx.frame.lengthM < 4) return;
   const hangingDensity = clamp(ctx.density * (ctx.isMainLane ? 0.45 : 0.75), 0, 0.75);
   if (ctx.rng.next() > hangingDensity) return;
