@@ -228,10 +228,10 @@ function overlapsOpening(openings: readonly OpeningSpan[], s: number, y: number)
 function placeCornerPiers(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 0.8) return;
 
-  const maxWidth = Math.max(0.32, Math.min(1.3, ctx.frame.lengthM * 0.45));
-  const pierWidth = clamp(ctx.rng.range(0.48, 0.92), 0.36, maxWidth);
-  const pierDepth = clamp(ctx.rng.range(0.1, 0.17), 0.08, ctx.maxProtrusionM);
-  const pierHeight = clamp(ctx.wallHeightM - ctx.rng.range(0.25, 0.6), 3, ctx.wallHeightM);
+  const maxWidth = Math.max(0.28, Math.min(1.05, ctx.frame.lengthM * 0.4));
+  const pierWidth = clamp(ctx.rng.range(0.42, 0.78), 0.3, maxWidth);
+  const pierDepth = clamp(ctx.rng.range(0.08, 0.14), 0.06, ctx.maxProtrusionM);
+  const pierHeight = clamp(ctx.wallHeightM - ctx.rng.range(0.35, 0.75), 3, ctx.wallHeightM);
   const halfLen = ctx.frame.lengthM * 0.5;
 
   for (const side of [-1, 1] as const) {
@@ -251,10 +251,10 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
       return;
     }
 
-    if (ctx.rng.next() < 0.6) {
+    if (ctx.rng.next() < 0.35) {
       const capDepth = clamp(pierDepth * 0.7, 0.05, ctx.maxProtrusionM);
-      const capHeight = clamp(ctx.rng.range(0.9, 1.5), 0.7, pierHeight * 0.5);
-      const capWidth = clamp(pierWidth * ctx.rng.range(0.45, 0.72), 0.22, pierWidth);
+      const capHeight = clamp(ctx.rng.range(0.55, 1.1), 0.45, pierHeight * 0.42);
+      const capWidth = clamp(pierWidth * ctx.rng.range(0.4, 0.62), 0.18, pierWidth);
       if (!pushBox(
         ctx.instances,
         ctx.maxInstances,
@@ -270,63 +270,6 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
         return;
       }
     }
-  }
-}
-
-function placePlinthSegments(ctx: SegmentDecorContext): void {
-  const halfLen = ctx.frame.lengthM * 0.5;
-  const end = halfLen - 0.04;
-  let cursor = -halfLen + 0.04;
-
-  while (cursor < end && ctx.instances.length < ctx.maxInstances) {
-    const pieceLenRaw = clamp(
-      ctx.rng.range(0.78, 1.95) * (0.86 + 0.28 * ctx.density),
-      0.55,
-      2.35,
-    );
-    const remaining = end - cursor;
-    const pieceLen = Math.min(pieceLenRaw, remaining);
-    if (pieceLen < 0.3) break;
-
-    const centerS = cursor + pieceLen * 0.5;
-    const plinthDepth = clamp(ctx.rng.range(0.08, 0.14), 0.06, ctx.maxProtrusionM);
-    const plinthHeight = clamp(ctx.rng.range(0.24, 0.48), 0.22, 0.56);
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "plinth_strip",
-      ctx.frame,
-      centerS,
-      plinthHeight * 0.5,
-      plinthDepth * 0.5,
-      plinthDepth,
-      plinthHeight,
-      pieceLen,
-    )) {
-      return;
-    }
-
-    if (ctx.rng.next() < 0.42 && centerS + pieceLen * 0.5 < end - 0.08) {
-      const jointWidth = clamp(ctx.rng.range(0.03, 0.055), 0.025, 0.06);
-      const jointDepth = clamp(ctx.rng.range(0.012, 0.024), 0.01, 0.03);
-      if (!pushBox(
-        ctx.instances,
-        ctx.maxInstances,
-        "masonry_joint",
-        ctx.frame,
-        centerS + pieceLen * 0.5,
-        plinthHeight * 0.5,
-        -(jointDepth * 0.5 + LAYER_EPSILON_M),
-        jointDepth,
-        plinthHeight,
-        jointWidth,
-      )) {
-        return;
-      }
-    }
-
-    cursor += pieceLen + ctx.rng.range(0.02, 0.2);
   }
 }
 
@@ -346,8 +289,6 @@ function placeRecessedOpenings(ctx: SegmentDecorContext): OpeningSpan[] {
   let lastPlacedS = Number.NEGATIVE_INFINITY;
 
   for (const anchor of anchors) {
-    if (ctx.instances.length >= ctx.maxInstances) break;
-
     const along = anchorAlongAxis(ctx.segment, anchor);
     const s = along - (ctx.segment.start + ctx.segment.end) * 0.5;
     if (Math.abs(s - lastPlacedS) < 1.35) continue;
@@ -360,135 +301,14 @@ function placeRecessedOpenings(ctx: SegmentDecorContext): OpeningSpan[] {
     const baseHeight = anchor.heightM ?? (type === "service_door_anchor" ? 2.4 : 3.1);
     const openingWidth = clamp(baseWidth, 1, widthLimit);
     const openingHeight = clamp(baseHeight, 2.1, Math.max(2.2, ctx.wallHeightM - 1.25));
-    const jambWidth = clamp(ctx.rng.range(0.2, 0.36), 0.16, 0.42);
-    const lintelHeight = clamp(ctx.rng.range(0.22, 0.36), 0.2, 0.42);
-    const frameDepth = clamp(ctx.rng.range(0.07, 0.12), 0.06, ctx.maxProtrusionM);
-    const revealDepth = clamp(
-      ctx.wallThicknessM * 0.65 + ctx.rng.range(-0.06, 0.1),
-      0.28,
-      Math.max(0.35, ctx.wallThicknessM * 0.95),
-    );
-    const sideOffset = openingWidth * 0.5 + jambWidth * 0.5;
+    const edgePad = clamp(ctx.rng.range(0.12, 0.24), 0.1, 0.28);
+    const topPad = clamp(ctx.rng.range(0.06, 0.14), 0.05, 0.18);
 
     spans.push({
-      sMin: s - (openingWidth * 0.55 + jambWidth * 0.7),
-      sMax: s + (openingWidth * 0.55 + jambWidth * 0.7),
-      topY: openingHeight + lintelHeight + 0.1,
+      sMin: s - (openingWidth * 0.5 + edgePad),
+      sMax: s + (openingWidth * 0.5 + edgePad),
+      topY: openingHeight + topPad,
     });
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "door_jamb",
-      ctx.frame,
-      s - sideOffset,
-      openingHeight * 0.5,
-      frameDepth * 0.5,
-      frameDepth,
-      openingHeight,
-      jambWidth,
-    )) {
-      break;
-    }
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "door_jamb",
-      ctx.frame,
-      s + sideOffset,
-      openingHeight * 0.5,
-      frameDepth * 0.5,
-      frameDepth,
-      openingHeight,
-      jambWidth,
-    )) {
-      break;
-    }
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "door_lintel",
-      ctx.frame,
-      s,
-      openingHeight + lintelHeight * 0.5,
-      frameDepth * 0.5,
-      frameDepth,
-      lintelHeight,
-      openingWidth + jambWidth * 2,
-    )) {
-      break;
-    }
-
-    const revealBand = clamp(ctx.rng.range(0.07, 0.11), 0.06, 0.14);
-    const revealThickness = clamp(ctx.rng.range(0.07, 0.12), 0.06, 0.13);
-    const revealInset = -(revealDepth * 0.5 + revealThickness * 0.5 + LAYER_EPSILON_M);
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "masonry_block",
-      ctx.frame,
-      s - (openingWidth * 0.5 - revealBand * 0.5),
-      openingHeight * 0.5,
-      revealInset,
-      revealThickness,
-      openingHeight,
-      revealBand,
-    )) {
-      break;
-    }
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "masonry_block",
-      ctx.frame,
-      s + (openingWidth * 0.5 - revealBand * 0.5),
-      openingHeight * 0.5,
-      revealInset,
-      revealThickness,
-      openingHeight,
-      revealBand,
-    )) {
-      break;
-    }
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "masonry_block",
-      ctx.frame,
-      s,
-      openingHeight - revealBand * 0.5,
-      revealInset,
-      revealThickness,
-      revealBand,
-      openingWidth,
-    )) {
-      break;
-    }
-
-    const backPlateDepth = 0.03;
-    const backInset = -(revealDepth + backPlateDepth * 0.5 + LAYER_EPSILON_M * 2);
-    const backWidth = Math.max(0.5, openingWidth - 0.2);
-    const backHeight = Math.max(1.55, openingHeight - 0.25);
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "recessed_panel_back",
-      ctx.frame,
-      s,
-      backHeight * 0.5,
-      backInset,
-      backPlateDepth,
-      backHeight,
-      backWidth,
-    )) {
-      break;
-    }
 
     lastPlacedS = s;
   }
@@ -507,10 +327,10 @@ function placeHorizontalJointSegments(
   let cursor = -halfLen + 0.05;
 
   while (cursor < end && ctx.instances.length < ctx.maxInstances) {
-    const segLen = Math.min(end - cursor, clamp(ctx.rng.range(0.95, 2.45), 0.7, 2.8));
+    const segLen = Math.min(end - cursor, clamp(ctx.rng.range(0.42, 1.35), 0.32, 1.65));
     const centerS = cursor + segLen * 0.5;
 
-    if (!overlapsOpening(openings, centerS, y)) {
+    if (ctx.rng.next() < 0.84 && !overlapsOpening(openings, centerS, y)) {
       if (!pushBox(
         ctx.instances,
         ctx.maxInstances,
@@ -527,61 +347,83 @@ function placeHorizontalJointSegments(
       }
     }
 
-    cursor += segLen + ctx.rng.range(0.03, 0.3);
+    cursor += segLen + ctx.rng.range(0.08, 0.42);
   }
 }
 
 function placeMasonryBlockwork(ctx: SegmentDecorContext, openings: readonly OpeningSpan[]): void {
-  const lowerY = 0.45;
-  const upperY = Math.max(1.4, ctx.wallHeightM - 0.62);
+  const lowerY = 0.38;
+  const upperY = Math.max(1.5, ctx.wallHeightM - 0.55);
   if (upperY <= lowerY) return;
 
+  const usableHeight = upperY - lowerY;
   let courseBaseY = lowerY;
   const halfLen = ctx.frame.lengthM * 0.5;
+  const targetCourseHeight = clamp(
+    0.72 + (1 - ctx.density) * 0.12 + ctx.rng.range(-0.06, 0.06),
+    0.62,
+    0.92,
+  );
+  let remainingCourses = clamp(Math.round(usableHeight / targetCourseHeight), 4, 12);
 
-  while (courseBaseY < upperY && ctx.instances.length < ctx.maxInstances) {
+  while (remainingCourses > 0 && courseBaseY < upperY && ctx.instances.length < ctx.maxInstances) {
+    const remainingHeight = upperY - courseBaseY;
+    const nominalCourseHeight = remainingHeight / remainingCourses;
     const courseHeight = clamp(
-      ctx.rng.range(0.46, 0.78) * (1.08 - ctx.density * 0.16),
-      0.38,
-      0.84,
+      nominalCourseHeight + ctx.rng.range(-0.08, 0.08),
+      0.52,
+      0.98,
     );
-    const blockHeight = Math.max(0.24, courseHeight - 0.05);
+    const blockHeight = Math.max(0.28, courseHeight - clamp(ctx.rng.range(0.04, 0.07), 0.03, 0.09));
     const blockY = courseBaseY + blockHeight * 0.5;
 
     if (blockY + blockHeight * 0.5 > upperY + 0.05) {
       break;
     }
 
-    const hJointDepth = clamp(ctx.rng.range(0.012, 0.022), 0.01, 0.03);
+    const hJointDepth = clamp(ctx.rng.range(0.009, 0.017), 0.008, 0.022);
     placeHorizontalJointSegments(ctx, openings, courseBaseY + courseHeight, hJointDepth);
 
-    let cursor = -halfLen + ctx.rng.range(0.04, 0.18);
+    let cursor = -halfLen + ctx.rng.range(0.03, 0.12);
     const end = halfLen - 0.06;
 
     while (cursor < end && ctx.instances.length < ctx.maxInstances) {
-      const blockLen = clamp(
-        ctx.rng.range(0.82, 1.95) * (1.02 - ctx.density * 0.08),
-        0.68,
-        2.2,
+      const baseBlockLen = clamp(
+        ctx.rng.range(0.88, 1.7) * (1.05 - ctx.density * 0.07),
+        0.72,
+        2.05,
       );
+      const isLargeStone = ctx.rng.next() < (0.08 + ctx.density * 0.06);
+      const blockLen = isLargeStone
+        ? clamp(baseBlockLen * ctx.rng.range(1.35, 1.9), 1.15, 2.75)
+        : baseBlockLen;
       const available = end - cursor;
       const span = Math.min(blockLen, available);
-      if (span < 0.42) break;
+      if (span < 0.38) break;
 
       const centerS = cursor + span * 0.5;
       if (overlapsOpening(openings, centerS, blockY)) {
-        cursor += span + ctx.rng.range(0.03, 0.18);
+        cursor += span + ctx.rng.range(0.06, 0.22);
         continue;
       }
 
-      const faceDepthBase = clamp(ctx.rng.range(0.03, 0.1), 0.02, ctx.maxProtrusionM);
-      const recessed = ctx.rng.next() < 0.22;
-      const faceDepth = recessed
-        ? clamp(faceDepthBase * ctx.rng.range(0.3, 0.55), 0.01, 0.055)
-        : faceDepthBase;
-      const inwardN = recessed
-        ? -(faceDepth * 0.5 + ctx.rng.range(0.003, 0.025))
-        : faceDepth * 0.5;
+      const reliefRoll = ctx.rng.next();
+      let faceDepth = 0;
+      let inwardN = 0;
+      if (reliefRoll < 0.56) {
+        // Recess target: ~1.5cm to 3.5cm into wall.
+        faceDepth = clamp(ctx.rng.range(0.012, 0.026), 0.01, 0.03);
+        const recessM = ctx.rng.range(0.015, 0.035);
+        inwardN = -(recessM + faceDepth * 0.5);
+      } else if (reliefRoll < 0.9) {
+        faceDepth = clamp(ctx.rng.range(0.009, 0.018), 0.008, 0.022);
+        inwardN = ctx.rng.range(-0.003, 0.004);
+      } else {
+        // Proud target: ~0.6cm to 1.8cm out from wall.
+        faceDepth = clamp(ctx.rng.range(0.006, 0.012), 0.005, 0.014);
+        const proudM = ctx.rng.range(0.006, 0.018);
+        inwardN = proudM - faceDepth * 0.5;
+      }
 
       if (!pushBox(
         ctx.instances,
@@ -598,9 +440,9 @@ function placeMasonryBlockwork(ctx: SegmentDecorContext, openings: readonly Open
         return;
       }
 
-      if (ctx.rng.next() < 0.74 && centerS + span * 0.5 < end - 0.08) {
-        const vJointWidth = clamp(ctx.rng.range(0.03, 0.055), 0.024, 0.06);
-        const vJointDepth = clamp(ctx.rng.range(0.012, 0.024), 0.01, 0.03);
+      if (ctx.rng.next() < 0.56 && centerS + span * 0.5 < end - 0.08) {
+        const vJointWidth = clamp(ctx.rng.range(0.018, 0.04), 0.016, 0.05);
+        const vJointDepth = clamp(ctx.rng.range(0.009, 0.018), 0.008, 0.022);
         if (!pushBox(
           ctx.instances,
           ctx.maxInstances,
@@ -617,8 +459,8 @@ function placeMasonryBlockwork(ctx: SegmentDecorContext, openings: readonly Open
         }
       }
 
-      if (ctx.rng.next() < 0.24) {
-        const chipDepth = clamp(ctx.rng.range(0.012, 0.03), 0.01, 0.035);
+      if (ctx.rng.next() < 0.14) {
+        const chipDepth = clamp(ctx.rng.range(0.009, 0.02), 0.008, 0.026);
         const chipY = blockY + ctx.rng.range(-blockHeight * 0.32, blockHeight * 0.32);
         const chipS = centerS + ctx.rng.range(-span * 0.35, span * 0.35);
         if (!pushBox(
@@ -630,117 +472,18 @@ function placeMasonryBlockwork(ctx: SegmentDecorContext, openings: readonly Open
           chipY,
           -(chipDepth * 0.5 + ctx.rng.range(0.004, 0.02)),
           chipDepth,
-          clamp(ctx.rng.range(0.05, 0.16), 0.04, 0.2),
-          clamp(ctx.rng.range(0.06, 0.2), 0.05, 0.24),
+          clamp(ctx.rng.range(0.04, 0.11), 0.03, 0.14),
+          clamp(ctx.rng.range(0.05, 0.14), 0.04, 0.18),
         )) {
           return;
         }
       }
 
-      cursor += span + ctx.rng.range(0.02, 0.14);
+      cursor += span + ctx.rng.range(0.05, 0.2);
     }
 
-    courseBaseY += courseHeight + ctx.rng.range(0.01, 0.06);
-  }
-}
-
-function placeStringCourseSegments(ctx: SegmentDecorContext, openings: readonly OpeningSpan[]): void {
-  if (!(ctx.isMainLane || ctx.isShopfrontZone)) return;
-  if (ctx.frame.lengthM < 1.8) return;
-
-  const baseY = clamp(2.98 + ctx.rng.range(-0.18, 0.22), 2.7, 3.35);
-  if (baseY >= ctx.wallHeightM - 0.45) return;
-
-  const halfLen = ctx.frame.lengthM * 0.5;
-  const end = halfLen - 0.06;
-  let cursor = -halfLen + 0.06;
-
-  while (cursor < end && ctx.instances.length < ctx.maxInstances) {
-    const runLenRaw = clamp(ctx.rng.range(1.05, 2.85), 0.8, 3.2);
-    const runLen = Math.min(runLenRaw, end - cursor);
-    if (runLen < 0.4) break;
-
-    const centerS = cursor + runLen * 0.5;
-    const keepChance = clamp(0.56 + ctx.density * 0.18, 0.48, 0.82);
-
-    if (ctx.rng.next() < keepChance && !overlapsOpening(openings, centerS, baseY)) {
-      const depth = clamp(ctx.rng.range(0.05, 0.1), 0.04, ctx.maxProtrusionM);
-      const height = clamp(ctx.rng.range(0.12, 0.23), 0.1, 0.26);
-      if (!pushBox(
-        ctx.instances,
-        ctx.maxInstances,
-        "string_course_strip",
-        ctx.frame,
-        centerS,
-        baseY,
-        depth * 0.5,
-        depth,
-        height,
-        runLen,
-      )) {
-        return;
-      }
-    }
-
-    cursor += runLen + ctx.rng.range(0.14, 0.68);
-  }
-}
-
-function placeRooflineTermination(ctx: SegmentDecorContext): void {
-  const halfLen = ctx.frame.lengthM * 0.5;
-  const end = halfLen - 0.05;
-  let cursor = -halfLen + 0.05;
-
-  while (cursor < end && ctx.instances.length < ctx.maxInstances) {
-    const runLenRaw = clamp(ctx.rng.range(0.85, 1.95), 0.6, 2.4);
-    const runLen = Math.min(runLenRaw, end - cursor);
-    if (runLen < 0.35) break;
-
-    const centerS = cursor + runLen * 0.5;
-    const depth = clamp(ctx.rng.range(0.07, 0.13), 0.05, ctx.maxProtrusionM);
-    const height = clamp(ctx.rng.range(0.16, 0.32), 0.14, 0.36);
-    const y = clamp(
-      ctx.wallHeightM - height * 0.5 - ctx.rng.range(0.01, 0.12),
-      height * 0.5,
-      ctx.wallHeightM - 0.04,
-    );
-
-    if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "cornice_strip",
-      ctx.frame,
-      centerS,
-      y,
-      depth * 0.5,
-      depth,
-      height,
-      runLen,
-    )) {
-      return;
-    }
-
-    if (ctx.rng.next() < 0.36) {
-      const stepLen = clamp(runLen * ctx.rng.range(0.45, 0.9), 0.25, runLen);
-      const stepHeight = clamp(height * ctx.rng.range(0.42, 0.75), 0.07, height);
-      const stepDepth = clamp(depth * ctx.rng.range(0.6, 0.92), 0.04, ctx.maxProtrusionM);
-      if (!pushBox(
-        ctx.instances,
-        ctx.maxInstances,
-        "cornice_strip",
-        ctx.frame,
-        centerS + ctx.rng.range(-0.12, 0.12),
-        y + stepHeight * 0.3,
-        stepDepth * 0.5,
-        stepDepth,
-        stepHeight,
-        stepLen,
-      )) {
-        return;
-      }
-    }
-
-    cursor += runLen + ctx.rng.range(0.04, 0.26);
+    courseBaseY += courseHeight + ctx.rng.range(0.015, 0.055);
+    remainingCourses -= 1;
   }
 }
 
@@ -748,15 +491,15 @@ function placeDamagePitsAndCracks(ctx: SegmentDecorContext, openings: readonly O
   const halfLen = ctx.frame.lengthM * 0.5;
   const sideInset = Math.max(0.14, halfLen - 0.12);
 
-  const pitCount = clamp(Math.floor(ctx.frame.lengthM * (0.38 + ctx.density * 1.02)), 1, 42);
+  const pitCount = clamp(Math.floor(ctx.frame.lengthM * (0.14 + ctx.density * 0.32)), 1, 18);
   for (let index = 0; index < pitCount && ctx.instances.length < ctx.maxInstances; index += 1) {
     const y = clamp(ctx.rng.range(0.28, ctx.wallHeightM - 0.35), 0.24, ctx.wallHeightM - 0.28);
     const s = ctx.rng.range(-halfLen + 0.08, halfLen - 0.08);
     if (overlapsOpening(openings, s, y)) continue;
 
-    const depth = clamp(ctx.rng.range(0.012, 0.04), 0.01, 0.05);
-    const pitHeight = clamp(ctx.rng.range(0.06, 0.25), 0.04, 0.32);
-    const pitLength = clamp(ctx.rng.range(0.07, 0.4), 0.06, 0.46);
+    const depth = clamp(ctx.rng.range(0.008, 0.024), 0.007, 0.03);
+    const pitHeight = clamp(ctx.rng.range(0.04, 0.14), 0.03, 0.18);
+    const pitLength = clamp(ctx.rng.range(0.05, 0.2), 0.04, 0.24);
 
     if (!pushBox(
       ctx.instances,
@@ -774,20 +517,20 @@ function placeDamagePitsAndCracks(ctx: SegmentDecorContext, openings: readonly O
     }
   }
 
-  const crackCount = clamp(Math.floor(ctx.frame.lengthM * (0.07 + ctx.density * 0.24)), 1, 16);
+  const crackCount = clamp(Math.floor(ctx.frame.lengthM * (0.035 + ctx.density * 0.1)), 1, 8);
   for (let index = 0; index < crackCount && ctx.instances.length < ctx.maxInstances; index += 1) {
     const vertical = ctx.rng.next() < 0.58;
     const crackY = clamp(ctx.rng.range(0.5, ctx.wallHeightM - 0.45), 0.4, ctx.wallHeightM - 0.4);
     const crackS = ctx.rng.range(-halfLen + 0.1, halfLen - 0.1);
     if (overlapsOpening(openings, crackS, crackY)) continue;
 
-    const depth = clamp(ctx.rng.range(0.014, 0.032), 0.01, 0.04);
+    const depth = clamp(ctx.rng.range(0.01, 0.022), 0.008, 0.028);
     const crackHeight = vertical
-      ? clamp(ctx.rng.range(0.55, 1.35), 0.42, 1.6)
-      : clamp(ctx.rng.range(0.05, 0.14), 0.04, 0.18);
+      ? clamp(ctx.rng.range(0.35, 0.95), 0.3, 1.2)
+      : clamp(ctx.rng.range(0.04, 0.1), 0.03, 0.14);
     const crackLength = vertical
-      ? clamp(ctx.rng.range(0.05, 0.14), 0.04, 0.2)
-      : clamp(ctx.rng.range(0.5, 1.5), 0.35, 1.8);
+      ? clamp(ctx.rng.range(0.04, 0.1), 0.03, 0.14)
+      : clamp(ctx.rng.range(0.35, 0.95), 0.24, 1.2);
 
     if (!pushBox(
       ctx.instances,
@@ -805,16 +548,16 @@ function placeDamagePitsAndCracks(ctx: SegmentDecorContext, openings: readonly O
     }
   }
 
-  const cornerChipCount = clamp(Math.floor(2 + ctx.density * 3), 2, 6);
+  const cornerChipCount = clamp(Math.floor(1 + ctx.density * 1.8), 1, 4);
   for (const side of [-1, 1] as const) {
     for (let index = 0; index < cornerChipCount && ctx.instances.length < ctx.maxInstances; index += 1) {
       const y = clamp(ctx.rng.range(0.2, ctx.wallHeightM - 0.2), 0.2, ctx.wallHeightM - 0.2);
       const s = side * (sideInset - ctx.rng.range(0, 0.35));
       if (overlapsOpening(openings, s, y)) continue;
 
-      const depth = clamp(ctx.rng.range(0.012, 0.035), 0.01, 0.045);
-      const pitHeight = clamp(ctx.rng.range(0.05, 0.22), 0.04, 0.26);
-      const pitLength = clamp(ctx.rng.range(0.05, 0.22), 0.04, 0.28);
+      const depth = clamp(ctx.rng.range(0.008, 0.02), 0.007, 0.026);
+      const pitHeight = clamp(ctx.rng.range(0.04, 0.13), 0.03, 0.16);
+      const pitLength = clamp(ctx.rng.range(0.04, 0.14), 0.03, 0.18);
 
       if (!pushBox(
         ctx.instances,
@@ -839,10 +582,7 @@ function decorateSegment(ctx: SegmentDecorContext): void {
 
   const openings = placeRecessedOpenings(ctx);
   placeCornerPiers(ctx);
-  placePlinthSegments(ctx);
   placeMasonryBlockwork(ctx, openings);
-  placeStringCourseSegments(ctx, openings);
-  placeRooflineTermination(ctx);
   placeDamagePitsAndCracks(ctx, openings);
 }
 
