@@ -4,6 +4,11 @@ import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 export type WallDetailMeshId =
   | "plinth_strip"
   | "cornice_strip"
+  | "masonry_block"
+  | "masonry_joint"
+  | "masonry_pit"
+  | "string_course_strip"
+  | "corner_pier"
   | "vertical_edge_trim"
   | "pilaster"
   | "recessed_panel_frame_h"
@@ -42,6 +47,11 @@ type DetailTemplate = {
 const DETAIL_IDS: WallDetailMeshId[] = [
   "plinth_strip",
   "cornice_strip",
+  "masonry_block",
+  "masonry_joint",
+  "masonry_pit",
+  "string_course_strip",
+  "corner_pier",
   "vertical_edge_trim",
   "pilaster",
   "recessed_panel_frame_h",
@@ -98,6 +108,26 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     cornice_strip: {
       geometry: new BoxGeometry(1, 1, 1),
       material: stoneTrim,
+    },
+    masonry_block: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stonePrimary,
+    },
+    masonry_joint: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stoneRecess,
+    },
+    masonry_pit: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stoneRecess,
+    },
+    string_course_strip: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stoneTrim,
+    },
+    corner_pier: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stonePrimary,
     },
     vertical_edge_trim: {
       geometry: new BoxGeometry(1, 1, 1),

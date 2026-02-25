@@ -1211,67 +1211,207 @@ export function buildProps(options: BuildPropsOptions): PropsBuildResult {
 
     if (type === "hero_landmark") {
       const rng = streamByType.hero.fork(anchor.id);
-      const structuralJitter = 0.06 + 0.1 * chaos.jitter;
-      const yaw = baseYaw + rng.range(-1, 1) * 2.2 * DEG_TO_RAD;
+      if (anchor.id === "LMK_HERO_ARCH_01") {
+        const yaw = baseYaw + rng.range(-1, 1) * 1.2 * DEG_TO_RAD;
+        const openingWidth = 9.0;
+        const openingHalf = openingWidth * 0.5;
+        const clearance = Math.max(6.0, anchor.heightM ?? 6.2);
+        const surroundDepth = clamp(1.2 + rng.range(-0.08, 0.08), 1.0, 1.5);
+        const jambThickness = clamp(1.08 + rng.range(-0.08, 0.1), 0.95, 1.3);
+        const pierHeight = clearance + 1.35;
+        const lateralOffset = openingHalf + jambThickness * 0.5;
+        const rightX = Math.cos(yaw);
+        const rightZ = -Math.sin(yaw);
+        const forwardX = -Math.sin(yaw);
+        const forwardZ = -Math.cos(yaw);
+        const buttressWidth = clamp(jambThickness * 1.55, 1.4, 1.95);
 
-      const pillarSize = {
-        x: 0.8 + rng.range(-0.03, 0.03) * chaos.jitter,
-        y: 4.8 + rng.range(-0.1, 0.12) * chaos.jitter,
-        z: 0.8 + rng.range(-0.03, 0.03) * chaos.jitter,
-      };
-      const lintelSize = {
-        x: 8,
-        y: 0.65,
-        z: 0.9,
-      };
-      const clearHalf = 3.0;
-      const lateralOffset = clearHalf + pillarSize.x * 0.5;
-      const rightX = Math.cos(yaw);
-      const rightZ = -Math.sin(yaw);
+        const leftPillarCenter = {
+          x: base.x - rightX * lateralOffset,
+          y: pierHeight * 0.5,
+          z: base.z - rightZ * lateralOffset,
+        };
+        const rightPillarCenter = {
+          x: base.x + rightX * lateralOffset,
+          y: pierHeight * 0.5,
+          z: base.z + rightZ * lateralOffset,
+        };
+        const pillarSize = {
+          x: jambThickness,
+          y: pierHeight,
+          z: surroundDepth,
+        };
 
-      const leftPillarCenter = {
-        x: base.x - rightX * lateralOffset + rng.range(-structuralJitter, structuralJitter),
-        y: pillarSize.y * 0.5,
-        z: base.z - rightZ * lateralOffset + rng.range(-structuralJitter, structuralJitter),
-      };
-      const rightPillarCenter = {
-        x: base.x + rightX * lateralOffset + rng.range(-structuralJitter, structuralJitter),
-        y: pillarSize.y * 0.5,
-        z: base.z + rightZ * lateralOffset + rng.range(-structuralJitter, structuralJitter),
-      };
+        // Keep hero-portal collision simple: only the two primary masonry jamb masses.
+        placeCollidingBox(anchor.id, "pillar-l", batches.heroPillar, leftPillarCenter, pillarSize, yaw);
+        placeCollidingBox(anchor.id, "pillar-r", batches.heroPillar, rightPillarCenter, pillarSize, yaw);
 
-      placeCollidingBox(anchor.id, "pillar-l", batches.heroPillar, leftPillarCenter, pillarSize, yaw);
-      placeCollidingBox(anchor.id, "pillar-r", batches.heroPillar, rightPillarCenter, pillarSize, yaw);
+        const buttressDepth = clamp(surroundDepth * 0.74, 0.72, 1.2);
+        const buttressHeight = pierHeight + 0.35;
+        const buttressOffset = openingHalf + buttressWidth * 0.5 + 0.15;
+        for (const side of [-1, 1] as const) {
+          const centerX = base.x + rightX * (side * buttressOffset) - forwardX * 0.16;
+          const centerZ = base.z + rightZ * (side * buttressOffset) - forwardZ * 0.16;
+          const placementId = `${anchor.id}-buttress-${side < 0 ? "l" : "r"}`;
+          pushInstance(
+            batches.heroPillar,
+            centerX,
+            buttressHeight * 0.5,
+            centerZ,
+            buttressWidth,
+            buttressHeight,
+            buttressDepth,
+            yaw,
+          );
+          recordPlacement(
+            anchor.id,
+            batches.heroPillar.kind,
+            {
+              x: centerX,
+              y: buttressHeight * 0.5,
+              z: centerZ,
+              sx: buttressWidth,
+              sy: buttressHeight,
+              sz: buttressDepth,
+              yawRad: yaw,
+            },
+            null,
+            placementId,
+          );
+        }
 
-      const lintelCenter = {
-        x: base.x,
-        y: pillarSize.y + lintelSize.y * 0.5,
-        z: base.z,
-      };
-      pushInstance(
-        batches.heroLintel,
-        lintelCenter.x,
-        lintelCenter.y,
-        lintelCenter.z,
-        lintelSize.x,
-        lintelSize.y,
-        lintelSize.z,
-        yaw,
-      );
-      recordPlacement(
-        anchor.id,
-        batches.heroLintel.kind,
-        {
-          x: lintelCenter.x,
-          y: lintelCenter.y,
-          z: lintelCenter.z,
-          sx: lintelSize.x,
-          sy: lintelSize.y,
-          sz: lintelSize.z,
-          yawRad: yaw,
-        },
-        null,
-      );
+        const ringBandHeight = clamp(0.34 + rng.range(-0.04, 0.06), 0.28, 0.44);
+        const ringDepth = clamp(0.82 + rng.range(-0.06, 0.08), 0.72, 1.02);
+        const tunnelDepth = clamp(surroundDepth * 0.92, 0.9, 1.35);
+        const archLevels = 10;
+
+        for (let level = 0; level < archLevels; level += 1) {
+          const t = level / (archLevels - 1);
+          const yOffset = openingHalf * t;
+          const span = 2 * Math.sqrt(Math.max(0, openingHalf * openingHalf - yOffset * yOffset));
+          if (span < 0.9) continue;
+
+          const y = clearance + yOffset + ringBandHeight * 0.5;
+          const levelWidth = span + jambThickness * 2 + ringDepth * 0.2;
+          const rearWidth = Math.max(0.8, levelWidth * 0.95);
+          const frontOffset = tunnelDepth * 0.5 - ringDepth * 0.5;
+          const rearOffset = -(tunnelDepth * 0.5 - ringDepth * 0.5);
+
+          pushInstance(
+            batches.heroLintel,
+            base.x + forwardX * frontOffset,
+            y,
+            base.z + forwardZ * frontOffset,
+            levelWidth,
+            ringBandHeight,
+            ringDepth,
+            yaw,
+          );
+          recordPlacement(
+            anchor.id,
+            batches.heroLintel.kind,
+            {
+              x: base.x + forwardX * frontOffset,
+              y,
+              z: base.z + forwardZ * frontOffset,
+              sx: levelWidth,
+              sy: ringBandHeight,
+              sz: ringDepth,
+              yawRad: yaw,
+            },
+            null,
+            `${anchor.id}-arch-front-${level}`,
+          );
+
+          pushInstance(
+            batches.heroLintel,
+            base.x + forwardX * rearOffset,
+            y,
+            base.z + forwardZ * rearOffset,
+            rearWidth,
+            ringBandHeight,
+            ringDepth,
+            yaw,
+          );
+          recordPlacement(
+            anchor.id,
+            batches.heroLintel.kind,
+            {
+              x: base.x + forwardX * rearOffset,
+              y,
+              z: base.z + forwardZ * rearOffset,
+              sx: rearWidth,
+              sy: ringBandHeight,
+              sz: ringDepth,
+              yawRad: yaw,
+            },
+            null,
+            `${anchor.id}-arch-rear-${level}`,
+          );
+        }
+      } else {
+        const structuralJitter = 0.06 + 0.1 * chaos.jitter;
+        const yaw = baseYaw + rng.range(-1, 1) * 2.2 * DEG_TO_RAD;
+
+        const pillarSize = {
+          x: 0.8 + rng.range(-0.03, 0.03) * chaos.jitter,
+          y: 4.8 + rng.range(-0.1, 0.12) * chaos.jitter,
+          z: 0.8 + rng.range(-0.03, 0.03) * chaos.jitter,
+        };
+        const lintelSize = {
+          x: 8,
+          y: 0.65,
+          z: 0.9,
+        };
+        const clearHalf = 3.0;
+        const lateralOffset = clearHalf + pillarSize.x * 0.5;
+        const rightX = Math.cos(yaw);
+        const rightZ = -Math.sin(yaw);
+
+        const leftPillarCenter = {
+          x: base.x - rightX * lateralOffset + rng.range(-structuralJitter, structuralJitter),
+          y: pillarSize.y * 0.5,
+          z: base.z - rightZ * lateralOffset + rng.range(-structuralJitter, structuralJitter),
+        };
+        const rightPillarCenter = {
+          x: base.x + rightX * lateralOffset + rng.range(-structuralJitter, structuralJitter),
+          y: pillarSize.y * 0.5,
+          z: base.z + rightZ * lateralOffset + rng.range(-structuralJitter, structuralJitter),
+        };
+
+        placeCollidingBox(anchor.id, "pillar-l", batches.heroPillar, leftPillarCenter, pillarSize, yaw);
+        placeCollidingBox(anchor.id, "pillar-r", batches.heroPillar, rightPillarCenter, pillarSize, yaw);
+
+        const lintelCenter = {
+          x: base.x,
+          y: pillarSize.y + lintelSize.y * 0.5,
+          z: base.z,
+        };
+        pushInstance(
+          batches.heroLintel,
+          lintelCenter.x,
+          lintelCenter.y,
+          lintelCenter.z,
+          lintelSize.x,
+          lintelSize.y,
+          lintelSize.z,
+          yaw,
+        );
+        recordPlacement(
+          anchor.id,
+          batches.heroLintel.kind,
+          {
+            x: lintelCenter.x,
+            y: lintelCenter.y,
+            z: lintelCenter.z,
+            sx: lintelSize.x,
+            sy: lintelSize.y,
+            sz: lintelSize.z,
+            yawRad: yaw,
+          },
+          null,
+        );
+      }
       continue;
     }
 
