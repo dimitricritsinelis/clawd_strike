@@ -12,6 +12,7 @@ function getCriticalAssetUrls(variant: DeviceVariant): string[] {
     return [
       "/loading-screen/assets/loading-bg-mobile.webp",
       "/loading-screen/assets/loading-logo-mobile.webp",
+      "/loading-screen/assets/info_screen.png",
       "/loading-screen/assets/loading-button-human-mobile.webp",
       "/loading-screen/assets/loading-button-agent-mobile.webp",
       "/loading-screen/assets/loading-button-skill-md-mobile.webp",
@@ -24,6 +25,7 @@ function getCriticalAssetUrls(variant: DeviceVariant): string[] {
   return [
     "/loading-screen/assets/loading-bg-desktop.webp",
     "/loading-screen/assets/loading-logo-desktop.webp",
+    "/loading-screen/assets/info_screen.png",
     "/loading-screen/assets/loading-button-human-desktop.webp",
     "/loading-screen/assets/loading-button-agent-desktop.webp",
     "/loading-screen/assets/loading-button-skill-md-desktop.webp",
