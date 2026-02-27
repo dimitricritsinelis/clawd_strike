@@ -92,6 +92,7 @@ type GameOptions = {
     anchorTypes: readonly string[];
   };
   onWeaponShot?: (shot: WeaponShotPayload) => void;
+  unlimitedHealth?: boolean;
 };
 
 type SpawnPose = {
@@ -131,7 +132,7 @@ export class Game {
   private wallMode: RuntimeWallMode = "blockout";
   private wallDetailsEnabled = true;
   private wallDetailDensity: number | null = null;
-  private floorQuality: RuntimeFloorQuality = "2k";
+  private floorQuality: RuntimeFloorQuality = "4k";
   private floorMaterials: FloorMaterialLibrary | null = null;
   private wallMaterials: WallMaterialLibrary | null = null;
   private propVisuals: RuntimePropVisualMode = "blockout";
@@ -183,6 +184,7 @@ export class Game {
   private debugHotkeysEnabled = false;
   private onTogglePerfHud: (() => void) | null = null;
   private onWeaponShot: ((shot: WeaponShotPayload) => void) | null = null;
+  private unlimitedHealth = false;
   private weaponLoaded = false;
   private weaponAlignDot = -1;
   private weaponAlignAngleDeg = 180;
@@ -290,6 +292,7 @@ export class Game {
     this.debugHotkeysEnabled = options.debug ?? false;
     this.onTogglePerfHud = options.onTogglePerfHud ?? null;
     this.onWeaponShot = options.onWeaponShot ?? null;
+    this.unlimitedHealth = options.unlimitedHealth ?? false;
 
     this.setupLighting();
     this.setupInitialView();
@@ -447,7 +450,11 @@ export class Game {
           this.worldColliders,
         );
         const delta = this.enemyManager.getPlayerHealthDelta();
-        this.playerHealth = Math.max(0, this.playerHealth - delta);
+        if (this.unlimitedHealth) {
+          this.playerHealth = 100;
+        } else {
+          this.playerHealth = Math.max(0, this.playerHealth - delta);
+        }
         // ── Damage shake: proportional to damage taken ──────────────────────
         if (delta > 0) {
           const damageNorm = Math.min(1, delta / 25); // 25 = one shot
@@ -455,7 +462,7 @@ export class Game {
           this.shakeXVel += (Math.random() * 2 - 1) * impulse;
           this.shakeYVel -= Math.abs(impulse) * 0.6; // bias upward jolt on damage
         }
-        if (this.playerHealth <= 0 && !this.isDead) {
+        if (!this.unlimitedHealth && this.playerHealth <= 0 && !this.isDead) {
           this.isDead = true;
           this.setFreezeInput(true);
         }

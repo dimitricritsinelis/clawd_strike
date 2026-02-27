@@ -39,7 +39,9 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
   let disposed = false;
   let bannerTimer: number | null = null;
+  let pendingMode: LoadingScreenMode | null = null;
   start.dataset.agentSubmenu = "false";
+  start.dataset.nameEntryVisible = "false";
 
   function clearBannerTimer() {
     if (bannerTimer === null) return;
@@ -57,14 +59,54 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     callbacks.onMuteToggle();
   }
 
+  function resetToPrimaryButtons() {
+    pendingMode = null;
+    playerNameInput.placeholder = "ENTER NAME";
+    start.dataset.nameEntryVisible = "false";
+    start.dataset.agentSubmenu = "false";
+  }
+
+  function revealNameEntry(mode: LoadingScreenMode) {
+    pendingMode = mode;
+    playerNameInput.placeholder = mode === "agent" ? "AGENT NAME" : "HUMAN NAME";
+    start.dataset.agentSubmenu = "false";
+    start.dataset.nameEntryVisible = "true";
+    window.requestAnimationFrame(() => {
+      playerNameInput.focus();
+      const caretPos = playerNameInput.value.length;
+      playerNameInput.setSelectionRange(caretPos, caretPos);
+    });
+  }
+
+  function hideNameEntry() {
+    resetToPrimaryButtons();
+    window.requestAnimationFrame(() => {
+      singlePlayerBtn.focus();
+    });
+  }
+
   function onSelectHuman() {
     if (disposed) return;
-    callbacks.onSelectMode("human", playerNameInput.value.trim());
+    revealNameEntry("human");
   }
 
   function onSelectAgent() {
     if (disposed) return;
+    pendingMode = null;
+    playerNameInput.placeholder = "ENTER NAME";
+    start.dataset.nameEntryVisible = "false";
     start.dataset.agentSubmenu = "true";
+  }
+
+  function onNameInputKeyDown(event: KeyboardEvent) {
+    if (disposed) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      hideNameEntry();
+      return;
+    }
+    if (event.key !== "Enter" || !pendingMode) return;
+    callbacks.onSelectMode(pendingMode, playerNameInput.value.trim());
   }
 
   function showTransientBanner(message: string) {
@@ -89,16 +131,26 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
   function onEnterAgentMode() {
     if (disposed) return;
-    callbacks.onSelectMode("agent", playerNameInput.value.trim());
+    revealNameEntry("agent");
+  }
+
+  function onGlobalKeyDown(event: KeyboardEvent) {
+    if (disposed || event.key !== "Escape") return;
+    resetToPrimaryButtons();
+    window.requestAnimationFrame(() => {
+      singlePlayerBtn.focus();
+    });
   }
 
   start.addEventListener("pointerdown", onWarmupAudio, { passive: true });
   window.addEventListener("keydown", onWarmupAudio);
+  window.addEventListener("keydown", onGlobalKeyDown);
   muteToggleBtn.addEventListener("click", onMuteToggleClick);
   singlePlayerBtn.addEventListener("click", onSelectHuman);
   multiPlayerBtn.addEventListener("click", onSelectAgent);
   skillsMdBtn.addEventListener("click", onOpenSkillsMd);
   enterAgentModeBtn.addEventListener("click", onEnterAgentMode);
+  playerNameInput.addEventListener("keydown", onNameInputKeyDown);
 
   return {
     show() {
@@ -116,11 +168,13 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
       start.removeEventListener("pointerdown", onWarmupAudio);
       window.removeEventListener("keydown", onWarmupAudio);
+      window.removeEventListener("keydown", onGlobalKeyDown);
       muteToggleBtn.removeEventListener("click", onMuteToggleClick);
       singlePlayerBtn.removeEventListener("click", onSelectHuman);
       multiPlayerBtn.removeEventListener("click", onSelectAgent);
       skillsMdBtn.removeEventListener("click", onOpenSkillsMd);
       enterAgentModeBtn.removeEventListener("click", onEnterAgentMode);
+      playerNameInput.removeEventListener("keydown", onNameInputKeyDown);
     },
     setMuteState(muted) {
       muteToggleBtn.classList.toggle("is-muted", muted);

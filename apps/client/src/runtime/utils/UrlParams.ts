@@ -1,12 +1,12 @@
 const DEFAULT_MAP_ID = "bazaar-map";
 const DEFAULT_PROP_PROFILE = "subtle";
-const DEFAULT_FLOOR_QUALITY = "2k";
+const DEFAULT_FLOOR_QUALITY = "4k";
 
 export type RuntimeSpawnId = "A" | "B";
 export type RuntimePropProfile = "subtle" | "medium" | "high";
 export type RuntimeFloorMode = "blockout" | "pbr";
 export type RuntimeWallMode = "blockout" | "pbr";
-export type RuntimeFloorQuality = "1k" | "2k";
+export type RuntimeFloorQuality = "1k" | "2k" | "4k";
 export type RuntimeLightingPreset = "golden" | "flat";
 export type RuntimePropVisualMode = "blockout" | "bazaar";
 export type RuntimePropChaosOptions = {
@@ -38,6 +38,7 @@ export type RuntimeUrlParams = {
   lightingPreset: RuntimeLightingPreset;
   propVisuals: RuntimePropVisualMode;
   propChaos: RuntimePropChaosOptions;
+  unlimitedHealth: boolean;
 };
 
 function parseBooleanFlag(value: string | null): boolean {
@@ -101,12 +102,12 @@ function parseFloorMode(value: string | null): RuntimeFloorMode {
 }
 
 function parseWallMode(value: string | null): RuntimeWallMode {
-  return value?.trim().toLowerCase() === "pbr" ? "pbr" : "blockout";
+  return value?.trim().toLowerCase() === "blockout" ? "blockout" : "pbr";
 }
 
 function parseFloorQuality(value: string | null): RuntimeFloorQuality {
   const normalized = value?.trim().toLowerCase();
-  if (normalized === "1k" || normalized === "2k") {
+  if (normalized === "1k" || normalized === "2k" || normalized === "4k") {
     return normalized;
   }
   return DEFAULT_FLOOR_QUALITY;
@@ -161,6 +162,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawPropJitter = getParam(params, "prop-jitter", "propJitter");
   const rawPropCluster = getParam(params, "prop-cluster", "propCluster");
   const rawPropDensity = getParam(params, "prop-density", "propDensity");
+  const rawUnlimitedHealth = getParam(params, "unlimitedHealth", "god", "godMode");
 
   const mapId = rawMapId && rawMapId.trim().length > 0 ? rawMapId.trim() : DEFAULT_MAP_ID;
   const playerName = parsePlayerName(rawPlayerName);
@@ -188,6 +190,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     cluster: parseUnitFloat(rawPropCluster),
     density: parseUnitFloat(rawPropDensity),
   };
+  const unlimitedHealth = parseBooleanFlag(rawUnlimitedHealth);
 
   return {
     mapId,
@@ -211,5 +214,6 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     lightingPreset,
     propVisuals,
     propChaos,
+    unlimitedHealth,
   };
 }

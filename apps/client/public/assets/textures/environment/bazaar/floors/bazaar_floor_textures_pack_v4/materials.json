@@ -1,74 +1,105 @@
 {
   "packId": "bazaar_floor_textures_pack_v4",
-  "version": 4,
-  "notes": "Runtime floor PBR set sourced from Poly Haven CC0 assets (mapped to bazaar material ids).",
+  "version": 6,
+  "notes": "Runtime floor PBR set sourced from Poly Haven CC0 assets (main lane, side halls, cuts, connectors, spawns). Tuned for a dusty, sandy middle-eastern bazaar look and includes 4K cobblestone_color.",
   "materials": [
     {
-      "id": "pavement_01",
-      "tileSizeM": 2.0,
-      "textures": {
-        "1k": {
-          "albedo": "textures/pavement_01/1k/pavement_01_albedo_1k.jpg",
-          "normal": "textures/pavement_01/1k/pavement_01_normal_gl_1k.jpg",
-          "arm": "textures/pavement_01/1k/pavement_01_arm_1k.jpg"
-        },
-        "2k": {
-          "albedo": "textures/pavement_01/2k/pavement_01_albedo_2k.jpg",
-          "normal": "textures/pavement_01/2k/pavement_01_normal_gl_2k.jpg",
-          "arm": "textures/pavement_01/2k/pavement_01_arm_2k.jpg"
-        }
-      }
-    },
-    {
-      "id": "red_sandstone_pavement",
-      "tileSizeM": 3.25,
-      "tintHex": "#FFF8EE",
-      "albedoBoost": 1.55,
-      "roughness": 0.9,
-      "normalScale": 0.2,
-      "aoIntensity": 0.14,
-      "textures": {
-        "1k": {
-          "albedo": "textures/red_sandstone_pavement/1k/red_sandstone_pavement_albedo_1k.jpg",
-          "normal": "textures/red_sandstone_pavement/1k/red_sandstone_pavement_normal_gl_1k.jpg",
-          "arm": "textures/red_sandstone_pavement/1k/red_sandstone_pavement_arm_1k.jpg"
-        },
-        "2k": {
-          "albedo": "textures/red_sandstone_pavement/2k/red_sandstone_pavement_albedo_2k.jpg",
-          "normal": "textures/red_sandstone_pavement/2k/red_sandstone_pavement_normal_gl_2k.jpg",
-          "arm": "textures/red_sandstone_pavement/2k/red_sandstone_pavement_arm_2k.jpg"
-        }
-      }
-    },
-    {
-      "id": "cobblestone_floor_02",
+      "id": "large_sandstone_blocks_01",
       "tileSizeM": 3.0,
-      "tintHex": "#FFFCF4",
-      "albedoBoost": 1.8,
-      "roughness": 0.9,
-      "normalScale": 0.16,
+      "tintHex": "#FFF8EE",
+      "albedoBoost": 1.35,
+      "albedoGamma": 0.82,
+      "dustStrength": 0.38,
+      "roughness": 0.95,
+      "normalScale": 0.14,
       "aoIntensity": 0.1,
       "textures": {
         "1k": {
-          "albedo": "textures/cobblestone_floor_02/1k/cobblestone_floor_02_albedo_1k.jpg",
-          "normal": "textures/cobblestone_floor_02/1k/cobblestone_floor_02_normal_gl_1k.jpg",
-          "arm": "textures/cobblestone_floor_02/1k/cobblestone_floor_02_arm_1k.jpg"
+          "albedo": "textures/large_sandstone_blocks_01/1k/large_sandstone_blocks_01_albedo_1k.jpg",
+          "normal": "textures/large_sandstone_blocks_01/1k/large_sandstone_blocks_01_normal_gl_1k.jpg",
+          "arm": "textures/large_sandstone_blocks_01/1k/large_sandstone_blocks_01_arm_1k.jpg"
         },
         "2k": {
-          "albedo": "textures/cobblestone_floor_02/2k/cobblestone_floor_02_albedo_2k.jpg",
-          "normal": "textures/cobblestone_floor_02/2k/cobblestone_floor_02_normal_gl_2k.jpg",
-          "arm": "textures/cobblestone_floor_02/2k/cobblestone_floor_02_arm_2k.jpg"
+          "albedo": "textures/large_sandstone_blocks_01/2k/large_sandstone_blocks_01_albedo_2k.jpg",
+          "normal": "textures/large_sandstone_blocks_01/2k/large_sandstone_blocks_01_normal_gl_2k.jpg",
+          "arm": "textures/large_sandstone_blocks_01/2k/large_sandstone_blocks_01_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "grey_tiles",
+      "tileSizeM": 2.2,
+      "tintHex": "#FFF8EE",
+      "albedoBoost": 1.25,
+      "albedoGamma": 0.86,
+      "dustStrength": 0.46,
+      "roughness": 0.95,
+      "normalScale": 0.14,
+      "aoIntensity": 0.1,
+      "textures": {
+        "1k": {
+          "albedo": "textures/grey_tiles/1k/grey_tiles_albedo_1k.jpg",
+          "normal": "textures/grey_tiles/1k/grey_tiles_normal_gl_1k.jpg",
+          "arm": "textures/grey_tiles/1k/grey_tiles_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/grey_tiles/2k/grey_tiles_albedo_2k.jpg",
+          "normal": "textures/grey_tiles/2k/grey_tiles_normal_gl_2k.jpg",
+          "arm": "textures/grey_tiles/2k/grey_tiles_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "cobblestone_pavement",
+      "tileSizeM": 2.5,
+      "tintHex": "#FFF8EE",
+      "albedoBoost": 1.2,
+      "albedoGamma": 0.84,
+      "dustStrength": 0.5,
+      "roughness": 0.95,
+      "normalScale": 0.14,
+      "aoIntensity": 0.1,
+      "textures": {
+        "1k": {
+          "albedo": "textures/cobblestone_pavement/1k/cobblestone_pavement_albedo_1k.jpg",
+          "normal": "textures/cobblestone_pavement/1k/cobblestone_pavement_normal_gl_1k.jpg",
+          "arm": "textures/cobblestone_pavement/1k/cobblestone_pavement_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/cobblestone_pavement/2k/cobblestone_pavement_albedo_2k.jpg",
+          "normal": "textures/cobblestone_pavement/2k/cobblestone_pavement_normal_gl_2k.jpg",
+          "arm": "textures/cobblestone_pavement/2k/cobblestone_pavement_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "cobblestone_color",
+      "tileSizeM": 2.5,
+      "tintHex": "#F0DEC1",
+      "albedoBoost": 1.0,
+      "albedoGamma": 0.78,
+      "dustStrength": 1,
+      "roughness": 1,
+      "normalScale": 0.1,
+      "aoIntensity": 0.45,
+      "textures": {
+        "4k": {
+          "albedo": "textures/cobblestone_color/4k/cobblestone_color_diff_4k.png",
+          "normal": "textures/cobblestone_color/4k/cobblestone_color_nor_gl_4k.png",
+          "arm": "textures/cobblestone_color/4k/cobblestone_color_arm_4k.png"
         }
       }
     },
     {
       "id": "sand_01",
       "tileSizeM": 2.25,
-      "tintHex": "#FFEBC8",
-      "albedoBoost": 1.22,
-      "roughness": 1.0,
-      "normalScale": 0.22,
-      "aoIntensity": 0.22,
+      "tintHex": "#E6CE9F",
+      "albedoBoost": 1.02,
+      "albedoGamma": 0.75,
+      "dustStrength": 1,
+      "roughness": 1,
+      "normalScale": 0.2,
+      "aoIntensity": 0.45,
       "textures": {
         "1k": {
           "albedo": "textures/sand_01/1k/sand_01_albedo_1k.jpg",
@@ -79,6 +110,48 @@
           "albedo": "textures/sand_01/2k/sand_01_albedo_2k.jpg",
           "normal": "textures/sand_01/2k/sand_01_normal_gl_2k.jpg",
           "arm": "textures/sand_01/2k/sand_01_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "rock_embedded_concrete",
+      "tileSizeM": 2.0,
+      "tintHex": "#FFF2E6",
+      "albedoBoost": 1.05,
+      "roughness": 0.96,
+      "normalScale": 0.18,
+      "aoIntensity": 0.18,
+      "textures": {
+        "1k": {
+          "albedo": "textures/rock_embedded_concrete/1k/rock_embedded_concrete_albedo_1k.jpg",
+          "normal": "textures/rock_embedded_concrete/1k/rock_embedded_concrete_normal_gl_1k.jpg",
+          "arm": "textures/rock_embedded_concrete/1k/rock_embedded_concrete_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/rock_embedded_concrete/2k/rock_embedded_concrete_albedo_2k.jpg",
+          "normal": "textures/rock_embedded_concrete/2k/rock_embedded_concrete_normal_gl_2k.jpg",
+          "arm": "textures/rock_embedded_concrete/2k/rock_embedded_concrete_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "cobblestone_floor_09",
+      "tileSizeM": 2.2,
+      "tintHex": "#FFF4EA",
+      "albedoBoost": 1.1,
+      "roughness": 0.93,
+      "normalScale": 0.2,
+      "aoIntensity": 0.2,
+      "textures": {
+        "1k": {
+          "albedo": "textures/cobblestone_floor_09/1k/cobblestone_floor_09_albedo_1k.jpg",
+          "normal": "textures/cobblestone_floor_09/1k/cobblestone_floor_09_normal_gl_1k.jpg",
+          "arm": "textures/cobblestone_floor_09/1k/cobblestone_floor_09_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "textures/cobblestone_floor_09/2k/cobblestone_floor_09_albedo_2k.jpg",
+          "normal": "textures/cobblestone_floor_09/2k/cobblestone_floor_09_normal_gl_2k.jpg",
+          "arm": "textures/cobblestone_floor_09/2k/cobblestone_floor_09_arm_2k.jpg"
         }
       }
     }

@@ -1,12 +1,13 @@
 import { BoxGeometry, CylinderGeometry, Group, InstancedMesh, MeshStandardMaterial, Object3D } from "three";
+import { applyWallShaderTweaks } from "../render/materials/applyWallShaderTweaks";
+import type { WallMaterialLibrary, WallTextureQuality } from "../render/materials/WallMaterialLibrary";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
+import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
+import type { RuntimeWallMode } from "../utils/UrlParams";
 
 export type WallDetailMeshId =
   | "plinth_strip"
   | "cornice_strip"
-  | "masonry_block"
-  | "masonry_joint"
-  | "masonry_pit"
   | "string_course_strip"
   | "corner_pier"
   | "vertical_edge_trim"
@@ -37,6 +38,15 @@ export type WallDetailInstance = {
   yawRad: number;
   pitchRad?: number;
   rollRad?: number;
+  wallMaterialId: string | null;
+};
+
+export type BuildWallDetailMeshesOptions = {
+  highVis: boolean;
+  wallMode: RuntimeWallMode;
+  wallMaterials: WallMaterialLibrary | null;
+  quality: WallTextureQuality;
+  seed: number;
 };
 
 type DetailTemplate = {
@@ -44,12 +54,15 @@ type DetailTemplate = {
   material: MeshStandardMaterial;
 };
 
+type DetailBucket = {
+  meshId: WallDetailMeshId;
+  wallMaterialId: string | null;
+  instances: WallDetailInstance[];
+};
+
 const DETAIL_IDS: WallDetailMeshId[] = [
   "plinth_strip",
   "cornice_strip",
-  "masonry_block",
-  "masonry_joint",
-  "masonry_pit",
   "string_course_strip",
   "corner_pier",
   "vertical_edge_trim",
@@ -108,18 +121,6 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     cornice_strip: {
       geometry: new BoxGeometry(1, 1, 1),
       material: stoneTrim,
-    },
-    masonry_block: {
-      geometry: new BoxGeometry(1, 1, 1),
-      material: stonePrimary,
-    },
-    masonry_joint: {
-      geometry: new BoxGeometry(1, 1, 1),
-      material: stoneRecess,
-    },
-    masonry_pit: {
-      geometry: new BoxGeometry(1, 1, 1),
-      material: stoneRecess,
     },
     string_course_strip: {
       geometry: new BoxGeometry(1, 1, 1),
@@ -180,14 +181,20 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
   };
 }
 
-export function buildWallDetailMeshes(instances: readonly WallDetailInstance[], highVis: boolean): Group {
-  const root = new Group();
-  root.name = "map-wall-details";
-  if (instances.length === 0) {
-    return root;
-  }
+function resolveMaterialUvOffset(seed: number, materialId: string): { x: number; y: number } {
+  const offsetSeed = deriveSubSeed(seed, `wall-uvoffset:${materialId}`);
+  const offsetRng = new DeterministicRng(offsetSeed);
+  return {
+    x: offsetRng.int(0, 4),
+    y: offsetRng.int(0, 4),
+  };
+}
 
-  const templates = createTemplates(highVis);
+function buildBlockoutDetailMeshes(
+  instances: readonly WallDetailInstance[],
+  templates: Record<WallDetailMeshId, DetailTemplate>,
+  root: Group,
+): void {
   const grouped = new Map<WallDetailMeshId, WallDetailInstance[]>();
   for (const meshId of DETAIL_IDS) {
     grouped.set(meshId, []);
@@ -199,9 +206,7 @@ export function buildWallDetailMeshes(instances: readonly WallDetailInstance[], 
   const dummy = new Object3D();
   for (const meshId of DETAIL_IDS) {
     const bucket = grouped.get(meshId);
-    if (!bucket || bucket.length === 0) {
-      continue;
-    }
+    if (!bucket || bucket.length === 0) continue;
 
     const template = templates[meshId];
     const mesh = new InstancedMesh(template.geometry, template.material, bucket.length);
@@ -222,6 +227,106 @@ export function buildWallDetailMeshes(instances: readonly WallDetailInstance[], 
     mesh.instanceMatrix.needsUpdate = true;
     root.add(mesh);
   }
+}
 
+function buildPbrDetailMeshes(
+  instances: readonly WallDetailInstance[],
+  templates: Record<WallDetailMeshId, DetailTemplate>,
+  root: Group,
+  options: BuildWallDetailMeshesOptions,
+): void {
+  const wallMaterials = options.wallMaterials;
+  if (!wallMaterials) return;
+
+  const materialIds = wallMaterials.getMaterialIds();
+  if (materialIds.length === 0) return;
+  const fallbackMaterialId = materialIds[0]!;
+  const availableMaterialIds = new Set(materialIds);
+
+  const grouped = new Map<string, DetailBucket>();
+  for (const instance of instances) {
+    const wallMaterialId =
+      instance.wallMaterialId && availableMaterialIds.has(instance.wallMaterialId)
+        ? instance.wallMaterialId
+        : fallbackMaterialId;
+    const key = `${instance.meshId}|${wallMaterialId}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.instances.push(instance);
+      continue;
+    }
+    grouped.set(key, {
+      meshId: instance.meshId,
+      wallMaterialId,
+      instances: [instance],
+    });
+  }
+
+  const surfaceMaterialCache = new Map<string, MeshStandardMaterial>();
+  const getSurfaceMaterial = (materialId: string): MeshStandardMaterial => {
+    const cached = surfaceMaterialCache.get(materialId);
+    if (cached) return cached;
+
+    const material = wallMaterials.createStandardMaterial(materialId, options.quality);
+    const albedoBoost =
+      typeof material.userData.wallAlbedoBoost === "number" && Number.isFinite(material.userData.wallAlbedoBoost)
+        ? material.userData.wallAlbedoBoost
+        : 1;
+    const tileSizeM = wallMaterials.getTileSizeM(materialId);
+    const uvOffset = resolveMaterialUvOffset(options.seed, materialId);
+    applyWallShaderTweaks(material, {
+      albedoBoost,
+      macroColorAmplitude: 0.02,
+      macroRoughnessAmplitude: 0.015,
+      macroFrequency: 0.06,
+      macroSeed: deriveSubSeed(options.seed, `wall-macro:${materialId}`),
+      tileSizeM,
+      uvOffset,
+    });
+    surfaceMaterialCache.set(materialId, material);
+    return material;
+  };
+
+  const dummy = new Object3D();
+  for (const bucket of grouped.values()) {
+    const template = templates[bucket.meshId];
+    const material = getSurfaceMaterial(bucket.wallMaterialId ?? fallbackMaterialId);
+    const mesh = new InstancedMesh(template.geometry, material, bucket.instances.length);
+    mesh.name = `wall-detail-${bucket.meshId}-${bucket.wallMaterialId ?? fallbackMaterialId}`;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+
+    for (let index = 0; index < bucket.instances.length; index += 1) {
+      const instance = bucket.instances[index]!;
+      dummy.position.set(instance.position.x, instance.position.y, instance.position.z);
+      dummy.rotation.set(instance.pitchRad ?? 0, instance.yawRad, instance.rollRad ?? 0);
+      dummy.scale.set(instance.scale.x, instance.scale.y, instance.scale.z);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    root.add(mesh);
+  }
+}
+
+export function buildWallDetailMeshes(
+  instances: readonly WallDetailInstance[],
+  options: BuildWallDetailMeshesOptions,
+): Group {
+  const root = new Group();
+  root.name = "map-wall-details";
+  if (instances.length === 0) {
+    return root;
+  }
+
+  const templates = createTemplates(options.highVis);
+  if (options.wallMode !== "pbr" || !options.wallMaterials) {
+    buildBlockoutDetailMeshes(instances, templates, root);
+    return root;
+  }
+
+  buildPbrDetailMeshes(instances, templates, root, options);
   return root;
 }

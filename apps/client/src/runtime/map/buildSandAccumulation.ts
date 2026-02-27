@@ -316,7 +316,15 @@ export function buildSandAccumulation(options: BuildSandAccumulationOptions): Me
     typeof material.userData.floorAlbedoBoost === "number" && Number.isFinite(material.userData.floorAlbedoBoost)
       ? material.userData.floorAlbedoBoost
       : 1;
-  applyFloorShaderTweaks(material, { albedoBoost });
+  const albedoGamma =
+    typeof material.userData.floorAlbedoGamma === "number" && Number.isFinite(material.userData.floorAlbedoGamma)
+      ? material.userData.floorAlbedoGamma
+      : 1;
+  const dustStrength =
+    typeof material.userData.floorDustStrength === "number" && Number.isFinite(material.userData.floorDustStrength)
+      ? material.userData.floorDustStrength
+      : 0;
+  applyFloorShaderTweaks(material, { albedoBoost, albedoGamma, dustStrength });
   material.roughness = Math.max(material.roughness, 0.98);
   material.normalScale.set(0.22, 0.22);
   material.aoMapIntensity = Math.min(material.aoMapIntensity, 0.32);

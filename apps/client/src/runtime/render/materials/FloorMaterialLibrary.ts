@@ -8,7 +8,7 @@ import {
   Vector2,
 } from "three";
 
-export type FloorTextureQuality = "1k" | "2k";
+export type FloorTextureQuality = "1k" | "2k" | "4k";
 
 type FloorTextureSet = {
   albedo: string;
@@ -21,10 +21,12 @@ type FloorMaterialEntry = {
   tileSizeM: number;
   tintHex?: string;
   albedoBoost?: number;
+  albedoGamma?: number;
+  dustStrength?: number;
   roughness?: number;
   normalScale?: number;
   aoIntensity?: number;
-  textures: Record<FloorTextureQuality, FloorTextureSet>;
+  textures: Partial<Record<FloorTextureQuality, FloorTextureSet>>;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -68,31 +70,63 @@ function parseTextureSet(value: unknown, context: string): FloorTextureSet {
   return { albedo, normal, arm };
 }
 
+function parseOptionalTextureSet(value: unknown, context: string): FloorTextureSet | undefined {
+  if (value === undefined) return undefined;
+  return parseTextureSet(value, context);
+}
+
+function resolveTextureSetForQuality(
+  textures: Partial<Record<FloorTextureQuality, FloorTextureSet>>,
+  quality: FloorTextureQuality,
+): FloorTextureSet {
+  return (
+    textures[quality] ??
+    textures["4k"] ??
+    textures["2k"] ??
+    textures["1k"] ??
+    (() => {
+      throw new Error("Material is missing all supported texture variants");
+    })()
+  );
+}
+
 function parseEntry(value: unknown, index: number): FloorMaterialEntry {
   const context = `materials[${index}]`;
   const record = asRecord(value, context);
   const texturesRaw = asRecord(record.textures, `${context}.textures`);
   const tintHexRaw = asOptionalString(record.tintHex, `${context}.tintHex`);
   const albedoBoostRaw = asOptionalNumber(record.albedoBoost, `${context}.albedoBoost`);
+  const albedoGammaRaw = asOptionalNumber(record.albedoGamma, `${context}.albedoGamma`);
+  const dustStrengthRaw = asOptionalNumber(record.dustStrength, `${context}.dustStrength`);
   const roughnessRaw = asOptionalNumber(record.roughness, `${context}.roughness`);
   const normalScaleRaw = asOptionalNumber(record.normalScale, `${context}.normalScale`);
   const aoIntensityRaw = asOptionalNumber(record.aoIntensity, `${context}.aoIntensity`);
   if (tintHexRaw !== undefined && !/^#[0-9a-fA-F]{6}$/.test(tintHexRaw)) {
     throw new Error(`${context}.tintHex: expected #RRGGBB hex color`);
   }
+
   const entry: FloorMaterialEntry = {
     id: asString(record.id, `${context}.id`),
     tileSizeM: Math.max(0.05, asNumber(record.tileSizeM, `${context}.tileSizeM`)),
     textures: {
-      "1k": parseTextureSet(texturesRaw["1k"], `${context}.textures.1k`),
-      "2k": parseTextureSet(texturesRaw["2k"], `${context}.textures.2k`),
+      "1k": parseOptionalTextureSet(texturesRaw["1k"], `${context}.textures.1k`),
+      "2k": parseOptionalTextureSet(texturesRaw["2k"], `${context}.textures.2k`),
+      "4k": parseOptionalTextureSet(texturesRaw["4k"], `${context}.textures.4k`),
     },
   };
-  if (tintHexRaw !== undefined) entry.tintHex = tintHexRaw;
+
+  if (!entry.textures["1k"] && !entry.textures["2k"] && !entry.textures["4k"]) {
+    throw new Error(`${context}.textures: expected at least one of 1k, 2k, or 4k`);
+  }
+
   if (albedoBoostRaw !== undefined) entry.albedoBoost = Math.max(0, Math.min(2, albedoBoostRaw));
+  if (albedoGammaRaw !== undefined) entry.albedoGamma = Math.max(0.65, Math.min(1.25, albedoGammaRaw));
+  if (dustStrengthRaw !== undefined) entry.dustStrength = Math.max(0, Math.min(0.8, dustStrengthRaw));
   if (roughnessRaw !== undefined) entry.roughness = Math.max(0, Math.min(1, roughnessRaw));
   if (normalScaleRaw !== undefined) entry.normalScale = Math.max(0, Math.min(1, normalScaleRaw));
   if (aoIntensityRaw !== undefined) entry.aoIntensity = Math.max(0, Math.min(1, aoIntensityRaw));
+  if (tintHexRaw !== undefined) entry.tintHex = tintHexRaw;
+
   return entry;
 }
 
@@ -144,10 +178,12 @@ export class FloorMaterialLibrary {
 
   createStandardMaterial(materialId: string, quality: FloorTextureQuality): MeshStandardMaterial {
     const entry = this.requireMaterial(materialId);
-    const maps = entry.textures[quality];
+    const maps = resolveTextureSetForQuality(entry.textures, quality);
     const roughness = entry.roughness ?? 0.96;
     const normalScale = entry.normalScale ?? 0.7;
     const albedoBoost = entry.albedoBoost ?? 1;
+    const albedoGamma = entry.albedoGamma ?? 1;
+    const dustStrength = entry.dustStrength ?? 0;
 
     const material = new MeshStandardMaterial({
       color: entry.tintHex ?? 0xffffff,
@@ -156,6 +192,8 @@ export class FloorMaterialLibrary {
       normalScale: new Vector2(normalScale, normalScale),
     });
     material.userData.floorAlbedoBoost = albedoBoost;
+    material.userData.floorAlbedoGamma = albedoGamma;
+    material.userData.floorDustStrength = dustStrength;
 
     void this.applyMaps(material, entry, maps);
     return material;

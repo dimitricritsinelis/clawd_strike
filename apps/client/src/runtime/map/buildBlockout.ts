@@ -309,7 +309,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       seed: options.seed,
       quality: options.floorQuality,
       manifest: options.floorMaterials,
-      patchSizeM: 4,
+      patchSizeM: 2,
       floorTopY,
     });
     root.add(pbrFloors);
@@ -358,12 +358,12 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
   if (options.wallMode === "pbr" && options.wallMaterials) {
     const pbrWalls = buildPbrWalls({
       segments: wallSegments,
+      zones: spec.zones,
       seed: options.seed,
       quality: options.floorQuality,
       manifest: options.wallMaterials,
       wallHeightM: spec.defaults.wall_height,
       floorTopY,
-      wallThicknessM,
     });
     root.add(pbrWalls);
   } else {
@@ -392,12 +392,19 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     wallHeightM: spec.defaults.wall_height,
     wallThicknessM,
     enabled: spec.wall_details.enabled && options.wallDetails.enabled,
+    profile: options.wallMode === "pbr" ? "pbr" : "blockout",
     detailSeed: typeof spec.wall_details.seed === "number" ? spec.wall_details.seed : null,
     density: clamp(spec.wall_details.density * wallDetailDensityScale, 0, 1.25),
     maxProtrusionM: spec.wall_details.maxProtrusion,
   });
   if (wallDetailPlacements.instances.length > 0) {
-    const detailRoot = buildWallDetailMeshes(wallDetailPlacements.instances, options.highVis);
+    const detailRoot = buildWallDetailMeshes(wallDetailPlacements.instances, {
+      highVis: options.highVis,
+      wallMode: options.wallMode,
+      wallMaterials: options.wallMaterials,
+      quality: options.floorQuality,
+      seed: options.seed,
+    });
     root.add(detailRoot);
   }
 

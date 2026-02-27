@@ -3,6 +3,16 @@ import type { WallMaterialLibrary, WallTextureQuality } from "../render/material
 import { applyWallShaderTweaks } from "../render/materials/applyWallShaderTweaks";
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type { BoundarySegment } from "./buildBlockout";
+import type { RuntimeBlockoutZone } from "./types";
+import { resolveWallMaterialIdForZone } from "./wallMaterialAssignment";
+
+const WALL_ZONE_TYPES = new Set([
+  "spawn_plaza",
+  "main_lane_segment",
+  "side_hall",
+  "cut",
+  "connector",
+]);
 
 type MaterialBatch = {
   positions: number[];
@@ -14,12 +24,12 @@ type MaterialBatch = {
 
 type BuildPbrWallsOptions = {
   segments: readonly BoundarySegment[];
+  zones: readonly RuntimeBlockoutZone[];
   seed: number;
   quality: WallTextureQuality;
   manifest: WallMaterialLibrary;
   wallHeightM: number;
   floorTopY: number;
-  wallThicknessM: number;
 };
 
 function getBatch(map: Map<string, MaterialBatch>, materialId: string): MaterialBatch {
@@ -57,7 +67,6 @@ function appendSegmentFace(
   segment: BoundarySegment,
   floorTopY: number,
   wallHeightM: number,
-  wallThicknessM: number,
   tileSizeM: number,
   uvOffsetU: number,
   uvOffsetV: number,
@@ -71,14 +80,14 @@ function appendSegmentFace(
   const v1 = y1 / tileSizeM + uvOffsetV;
 
   if (segment.orientation === "vertical") {
-    const x = segment.coord + segment.outward * (wallThicknessM * 0.5);
+    const x = segment.coord;
     const normalX = -segment.outward;
     appendVertex(batch, x, y0, segment.start, normalX, 0, 0, u0, v0);
     appendVertex(batch, x, y0, segment.end, normalX, 0, 0, u1, v0);
     appendVertex(batch, x, y1, segment.end, normalX, 0, 0, u1, v1);
     appendVertex(batch, x, y1, segment.start, normalX, 0, 0, u0, v1);
   } else {
-    const z = segment.coord + segment.outward * (wallThicknessM * 0.5);
+    const z = segment.coord;
     const normalZ = -segment.outward;
     appendVertex(batch, segment.start, y0, z, 0, 0, normalZ, u0, v0);
     appendVertex(batch, segment.end, y0, z, 0, 0, normalZ, u1, v0);
@@ -95,6 +104,77 @@ function appendSegmentFace(
     baseIndex + 2,
   );
   batch.vertexCount += 4;
+}
+
+type SegmentFrame = {
+  centerX: number;
+  centerZ: number;
+  inwardX: number;
+  inwardZ: number;
+};
+
+function pointInRect2D(zone: RuntimeBlockoutZone, x: number, z: number): boolean {
+  const rect = zone.rect;
+  return x >= rect.x && x <= rect.x + rect.w && z >= rect.y && z <= rect.y + rect.h;
+}
+
+function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
+  if (segment.orientation === "vertical") {
+    return {
+      centerX: segment.coord,
+      centerZ: (segment.start + segment.end) * 0.5,
+      inwardX: -segment.outward,
+      inwardZ: 0,
+    };
+  }
+
+  return {
+    centerX: (segment.start + segment.end) * 0.5,
+    centerZ: segment.coord,
+    inwardX: 0,
+    inwardZ: -segment.outward,
+  };
+}
+
+function resolveSegmentZone(frame: SegmentFrame, zones: readonly RuntimeBlockoutZone[]): RuntimeBlockoutZone | null {
+  const probeX = frame.centerX + frame.inwardX * 0.1;
+  const probeZ = frame.centerZ + frame.inwardZ * 0.1;
+  let winner: RuntimeBlockoutZone | null = null;
+  let winnerArea = Number.POSITIVE_INFINITY;
+
+  for (const zone of zones) {
+    if (!WALL_ZONE_TYPES.has(zone.type)) continue;
+    if (!pointInRect2D(zone, probeX, probeZ)) continue;
+    const area = zone.rect.w * zone.rect.h;
+    if (area < winnerArea) {
+      winnerArea = area;
+      winner = zone;
+    }
+  }
+
+  return winner;
+}
+
+function resolveZoneMaterialId(zone: RuntimeBlockoutZone | null): string {
+  return resolveWallMaterialIdForZone(zone?.id ?? null);
+}
+
+function resolveManifestMaterialId(
+  materialIds: readonly string[],
+  availableMaterialIds: ReadonlySet<string>,
+  zoneMaterialId: string,
+): string {
+  if (availableMaterialIds.has(zoneMaterialId)) return zoneMaterialId;
+  return materialIds[0]!;
+}
+
+function resolveMaterialUvOffset(seed: number, materialId: string): { x: number; y: number } {
+  const offsetSeed = deriveSubSeed(seed, `wall-uvoffset:${materialId}`);
+  const offsetRng = new DeterministicRng(offsetSeed);
+  return {
+    x: offsetRng.int(0, 4),
+    y: offsetRng.int(0, 4),
+  };
 }
 
 function finalizeGeometry(batch: MaterialBatch): BufferGeometry {
@@ -120,11 +200,17 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
   }
 
   const batches = new Map<string, MaterialBatch>();
-  const assignRng = new DeterministicRng(deriveSubSeed(options.seed, "wall-material-assignment"));
+  const availableMaterialIds = new Set(materialIds);
 
   for (let index = 0; index < options.segments.length; index += 1) {
     const segment = options.segments[index]!;
-    const materialId = materialIds[assignRng.int(0, materialIds.length)]!;
+    const frame = toSegmentFrame(segment);
+    const zone = resolveSegmentZone(frame, options.zones);
+    const materialId = resolveManifestMaterialId(
+      materialIds,
+      availableMaterialIds,
+      resolveZoneMaterialId(zone),
+    );
     const uvSeed = deriveSubSeed(options.seed, `wall-uv:${index}:${materialId}`);
     const uvRng = new DeterministicRng(uvSeed);
     const tileSizeM = options.manifest.getTileSizeM(materialId);
@@ -134,7 +220,6 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
       segment,
       options.floorTopY,
       options.wallHeightM,
-      options.wallThicknessM,
       tileSizeM,
       uvRng.int(0, 4),
       uvRng.int(0, 4),
@@ -151,12 +236,16 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
       typeof material.userData.wallAlbedoBoost === "number" && Number.isFinite(material.userData.wallAlbedoBoost)
         ? material.userData.wallAlbedoBoost
         : 1;
+    const tileSizeM = options.manifest.getTileSizeM(materialId);
+    const uvOffset = resolveMaterialUvOffset(options.seed, materialId);
     applyWallShaderTweaks(material, {
       albedoBoost,
-      macroColorAmplitude: 0.045,
-      macroRoughnessAmplitude: 0.035,
-      macroFrequency: 0.085,
+      macroColorAmplitude: 0.02,
+      macroRoughnessAmplitude: 0.015,
+      macroFrequency: 0.06,
       macroSeed: deriveSubSeed(options.seed, `wall-macro:${materialId}`),
+      tileSizeM,
+      uvOffset,
     });
 
     const mesh = new Mesh(geometry, material);

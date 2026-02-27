@@ -30,7 +30,7 @@ const OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M = 10;
 const PERF_SCENE_SAMPLE_INTERVAL_MS = 300;
 const POINTER_LOCK_BANNER_GRACE_MS = 2600;
 const FLOOR_MANIFEST_URL = "/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json";
-const WALL_MANIFEST_URL = "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v4/materials.json";
+const WALL_MANIFEST_URL = "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v5/materials.json";
 const PROP_MANIFEST_URL = "/assets/models/environment/bazaar/props/bazaar_prop_models_pack_v1/models.json";
 const MAP_PROPS_ENABLED = false;
 
@@ -471,6 +471,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
         }
       }
     },
+    unlimitedHealth: urlParams.unlimitedHealth,
     ...(urlParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
   });
 
