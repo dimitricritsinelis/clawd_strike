@@ -1,6 +1,6 @@
 import { BoxGeometry, Group, InstancedMesh, MeshLambertMaterial, Object3D } from "three";
 import type { FloorMaterialLibrary } from "../render/materials/FloorMaterialLibrary";
-import type { WallMaterialLibrary } from "../render/materials/WallMaterialLibrary";
+import type { WallMaterialLibrary, WallTextureQuality } from "../render/materials/WallMaterialLibrary";
 import type { RuntimeAnchorsSpec, RuntimeBlockoutSpec, RuntimeRect } from "./types";
 import type { RuntimeColliderAabb } from "../sim/collision/WorldColliders";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
@@ -27,6 +27,11 @@ const OVERLAY_FLOOR_THICKNESS_M = 0.02;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function resolveWallTextureQuality(floorQuality: RuntimeFloorQuality): WallTextureQuality {
+  if (floorQuality === "1k") return "1k";
+  return "2k";
 }
 
 export type BoundarySegment = {
@@ -288,6 +293,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
   const root = new Group();
   root.name = "map-blockout";
   const palette = resolveBlockoutPalette(options.highVis);
+  const wallTextureQuality = resolveWallTextureQuality(options.floorQuality);
 
   const walkableRects = spec.zones
     .filter((zone) => WALKABLE_ZONE_TYPES.has(zone.type))
@@ -360,7 +366,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       segments: wallSegments,
       zones: spec.zones,
       seed: options.seed,
-      quality: options.floorQuality,
+      quality: wallTextureQuality,
       manifest: options.wallMaterials,
       wallHeightM: spec.defaults.wall_height,
       floorTopY,
@@ -402,7 +408,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       highVis: options.highVis,
       wallMode: options.wallMode,
       wallMaterials: options.wallMaterials,
-      quality: options.floorQuality,
+      quality: wallTextureQuality,
       seed: options.seed,
     });
     root.add(detailRoot);

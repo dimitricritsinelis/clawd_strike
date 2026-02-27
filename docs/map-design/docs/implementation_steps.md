@@ -1,4 +1,4 @@
-# Implementation Steps (Blockout → Final) — Bazaar Slice v2.2
+# Implementation Steps (Blockout → Final) — Bazaar Slice v2.3
 
 This is written as a **build checklist** for Codex or a level designer.
 
@@ -64,4 +64,3 @@ Run internal tests with 10 players:
 - Verify spawns are not trapped by a single sightline
 
 Acceptance criteria: `docs/acceptance_criteria.md`
-

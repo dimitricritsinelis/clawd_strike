@@ -2,14 +2,10 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Loading screen uses separate containers: `.actions-buttons` (buttons) and `.actions-nameplate` (nameplate).
-- Button row anchor: `top: 525px`, `left: calc(50% - 16px)`.
-- Nameplate anchor: `top: 435px`, `left: calc(50% - 11px)`.
-- Agent flow: click `Agent` -> agent submenu (`skills.md` + `enter agent mode`) -> `Enter agent mode` shows nameplate.
-- Global `Escape` always resets to primary Human/Agent buttons.
-- Placeholder text is mode-specific (`HUMAN NAME` / `AGENT NAME`), alpha `0.80`.
-- White text regression fixed: no auto-select on reveal; caret moved to end and selection text color forced dark.
-- Temporary tweak mode active: skipping validation/build/screenshots while iterating loading-screen UI.
+- `docs/map-design` remains the source-of-truth input (spec + refs) and is only used by `gen:maps` to emit runtime copies under `apps/client/public/maps/bazaar-map/`.
+- No evidence the design packet is slowing iteration (folder is ~7MB, mostly refs, and not shipped in the client build output).
+- Validation passed: `pnpm typecheck` and `pnpm build`.
+- Latest compare-shot screenshot pair captured under `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P122_map_design_folder_review/`.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
@@ -25,21 +21,24 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P118_placeholder_white_regression_fix_tweak_only`
+- Prompt ID: `P122_map_design_folder_review`
 - What changed:
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/loading-screen/ui.ts`
-- `/Users/dimitri/Desktop/clawd-strike/apps/client/src/styles.css`
-- `/Users/dimitri/Desktop/clawd-strike/progress.md`
+  - Reviewed whether `docs/map-design/` is still needed; confirmed it is part of the current runtime generation pipeline (design spec -> `gen:maps` -> runtime copies).
+  - Updated `/Users/dimitri/Desktop/clawd-strike/progress.md` with the decision and notes.
+- Validation:
+  - `pnpm typecheck`
+  - `pnpm build`
+- Screenshots:
+  - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P122_map_design_folder_review/before.png`
+  - `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P122_map_design_folder_review/after.png`
 - Quick test steps:
-- Tweak-only pass (no validation run).
-- `pnpm dev` then open:
-- `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
+  - `pnpm dev` then open: `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
 
 ## Next 3 Tasks
-1. Finalize horizontal/vertical placement of button row and nameplate.
-2. Finalize placeholder darkness and text styling over the nameplate.
-3. Once UI is approved, run full validation loop (`pnpm typecheck` + `pnpm build` + restart + screenshots).
+1. Define and apply a retention policy for `artifacts/screenshots/` (e.g., keep last N prompt folders, archive older folders outside repo).
+2. Run a human traversal pass for map-approval evidence (pointer lock, full-route collision/snag notes, no out-of-bounds escape).
+3. Continue blockout readability tuning (landmark/blocker color rhythm and deterministic prop density) toward map approval criteria.
 
 ## Known Issues / Risks
-- Tweak mode currently skips typecheck/build/screenshot validation per user request.
-- Runtime map generator still reports known anchor warnings unrelated to loading-screen UI.
+- `gen:maps` still emits known clear-zone anchor warnings for designated landmark/open-node anchors.
+- Automated browser smoke may miss pointer-lock behavior; final pointer-lock sign-off should remain interactive.

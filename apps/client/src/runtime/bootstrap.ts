@@ -32,6 +32,7 @@ const POINTER_LOCK_BANNER_GRACE_MS = 2600;
 const FLOOR_MANIFEST_URL = "/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json";
 const WALL_MANIFEST_URL = "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v5/materials.json";
 const PROP_MANIFEST_URL = "/assets/models/environment/bazaar/props/bazaar_prop_models_pack_v1/models.json";
+const PBR_SURFACES_ENABLED = false;
 const MAP_PROPS_ENABLED = false;
 
 type ScenePerfSnapshot = {
@@ -330,9 +331,9 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     warningOverlay.style.display = "block";
   };
 
-  let resolvedFloorMode = urlParams.floorMode;
+  let resolvedFloorMode = PBR_SURFACES_ENABLED ? urlParams.floorMode : "blockout";
   let floorMaterials: FloorMaterialLibrary | null = null;
-  if (resolvedFloorMode === "pbr") {
+  if (PBR_SURFACES_ENABLED && resolvedFloorMode === "pbr") {
     try {
       floorMaterials = await FloorMaterialLibrary.load(FLOOR_MANIFEST_URL);
     } catch (error) {
@@ -343,9 +344,9 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     }
   }
 
-  let resolvedWallMode = urlParams.wallMode;
+  let resolvedWallMode = PBR_SURFACES_ENABLED ? urlParams.wallMode : "blockout";
   let wallMaterials: WallMaterialLibrary | null = null;
-  if (resolvedWallMode === "pbr") {
+  if (PBR_SURFACES_ENABLED && resolvedWallMode === "pbr") {
     try {
       wallMaterials = await WallMaterialLibrary.load(WALL_MANIFEST_URL);
     } catch (error) {

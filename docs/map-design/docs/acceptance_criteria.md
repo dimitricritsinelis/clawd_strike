@@ -1,4 +1,4 @@
-# Acceptance Criteria — Bazaar Slice v2.2 (Engineering Sign-off)
+# Acceptance Criteria — Bazaar Slice v2.3 (Engineering Sign-off)
 
 These criteria define “done” for the initial map build before moving into polish.
 
@@ -38,4 +38,3 @@ These criteria define “done” for the initial map build before moving into po
 - Built map matches the signed birds-eye reference:
   - `refs/bazaar_slice_v2_2_detailed_birdseye.png`
 - Build artifacts include updated topdown screenshot for review.
-

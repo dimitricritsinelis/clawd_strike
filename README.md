@@ -13,6 +13,9 @@ pnpm dev
 
 Open the URL, then click `Human` on the loading screen to enter the gameplay runtime.
 
+## Authority Order
+- If docs conflict, follow this order: `AGENTS.md` -> `progress.md` -> `docs/map-design/specs/map_spec.json` (with `docs/map-design/shots.json` as runtime shot input).
+
 ## MVP Scope (Current)
 - Pointer lock + full-screen canvas runtime
 - WASD + mouse-look, Shift walk, Space jump

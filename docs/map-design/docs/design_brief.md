@@ -1,4 +1,4 @@
-# Design Brief — Bazaar Slice v2.2 (10 Players FPS)
+# Design Brief — Bazaar Slice v2.3 (10 Players FPS)
 
 ## High-Level Intent
 A compact **3-lane multiplayer map** set in a **warm stone bazaar district**:
@@ -49,4 +49,3 @@ Source of truth:
 - `refs/bazaar_slice_v2_2_detailed_birdseye.png`
 - `specs/map_spec.json`
 - `specs/dimension_schedule.csv`
-

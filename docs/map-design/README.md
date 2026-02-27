@@ -1,6 +1,6 @@
-# Bazaar Slice v2.2 — Map Design Package (10P FPS)
+# Bazaar Slice v2.3 — Map Design Package (10P FPS)
 
-This package contains the **engineering-grade** map layout + specifications for **Bazaar Slice v2.2** (3-lane marketplace).
+This package contains the **engineering-grade** map layout + specifications for **Bazaar Slice v2.3** (3-lane marketplace).
 It is intended to be consumed by **Codex** (or a level designer) to produce a blockout + final dressing pass.
 
 ## Quick Start (for Codex)
@@ -15,7 +15,6 @@ It is intended to be consumed by **Codex** (or a level designer) to produce a bl
 - `bazaar_slice_v2_2_detailed_birdseye.png` — **signed-off** detailed birds-eye (dimensions + legend + callouts).
 - `bazaar_slice_v2_2_map_only.png` — map-only zoom.
 - `bazaar_main_hall_reference.png` — reference look for the main bazaar hallway.
-- `birdseye_example_v1.png` — prior example style reference (legacy).
 
 ### Specifications (`/specs`)
 - `map_spec.json` — **single source of truth** (zones, dimensions, anchors, constraints).
@@ -24,10 +23,9 @@ It is intended to be consumed by **Codex** (or a level designer) to produce a bl
 - `object_catalog.csv` — recommended prop types and placement rules.
 - `callouts.csv` — suggested comms callouts.
 
-### Legacy snapshots (read-only; not source-of-truth)
-- `blockout_spec.json` — historical derived runtime snapshot kept for reference only.
-- `anchors.json` — historical derived runtime snapshot kept for reference only.
-- Runtime generation uses `specs/map_spec.json` and `shots.json`; do not edit legacy snapshots for gameplay changes.
+### Archived legacy files
+- Legacy snapshots and older references were moved to `archive/docs/map-design/` to avoid source-of-truth drift.
+- Runtime generation uses `specs/map_spec.json` and `shots.json`; do not use archived files for gameplay changes.
 
 ### Blockout assets (`/blockout`)
 - `topdown_layout.svg` — scaled topdown layout (10px/m).

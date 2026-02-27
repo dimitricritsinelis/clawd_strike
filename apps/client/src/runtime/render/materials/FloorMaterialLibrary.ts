@@ -105,14 +105,18 @@ function parseEntry(value: unknown, index: number): FloorMaterialEntry {
     throw new Error(`${context}.tintHex: expected #RRGGBB hex color`);
   }
 
+  const textures: Partial<Record<FloorTextureQuality, FloorTextureSet>> = {};
+  const oneK = parseOptionalTextureSet(texturesRaw["1k"], `${context}.textures.1k`);
+  const twoK = parseOptionalTextureSet(texturesRaw["2k"], `${context}.textures.2k`);
+  const fourK = parseOptionalTextureSet(texturesRaw["4k"], `${context}.textures.4k`);
+  if (oneK) textures["1k"] = oneK;
+  if (twoK) textures["2k"] = twoK;
+  if (fourK) textures["4k"] = fourK;
+
   const entry: FloorMaterialEntry = {
     id: asString(record.id, `${context}.id`),
     tileSizeM: Math.max(0.05, asNumber(record.tileSizeM, `${context}.tileSizeM`)),
-    textures: {
-      "1k": parseOptionalTextureSet(texturesRaw["1k"], `${context}.textures.1k`),
-      "2k": parseOptionalTextureSet(texturesRaw["2k"], `${context}.textures.2k`),
-      "4k": parseOptionalTextureSet(texturesRaw["4k"], `${context}.textures.4k`),
-    },
+    textures,
   };
 
   if (!entry.textures["1k"] && !entry.textures["2k"] && !entry.textures["4k"]) {

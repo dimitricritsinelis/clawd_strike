@@ -2,7 +2,7 @@
   "metadata": {
     "mapId": "bazaar-map",
     "name": "bazaar-map",
-    "version": "2.2",
+    "version": "2.3",
     "units": "meters",
     "coordinateSystem": {
       "origin": "southwest_corner_of_playable_boundary",

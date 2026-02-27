@@ -18,3 +18,5 @@ artifacts/screenshots/**/smoke/
 artifacts/screenshots/**/errors-*.json
 artifacts/screenshots/**/state-*.json
 artifacts/screenshots/**/shot-*.png
+artifacts/tmp/
+artifacts/tmp/**

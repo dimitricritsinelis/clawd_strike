@@ -78,7 +78,6 @@ This package includes:
 - `refs/bazaar_slice_v2_2_detailed_birdseye.png`
 - `refs/bazaar_slice_v2_2_map_only.png`
 - `refs/bazaar_main_hall_reference.png`
-- `refs/birdseye_example_v1.png`
 - `refs/user_review_screenshot.png`
 
 **specs/** (Codex-friendly source-of-truth)
@@ -99,7 +98,6 @@ This package includes:
 - `docs/implementation_steps.md`
 - `docs/acceptance_criteria.md`
 - `docs/codex_instructions.md`
-- `docs/codex_prompt.md`
 - `docs/modular_kit_spec.md`
 - `docs/art_dressing_notes.md`
 - `docs/gameplay_balance_notes.md`
@@ -111,6 +109,7 @@ Codex must treat these as source of truth in this order:
 3) `blockout/topdown_layout.svg` (quick geometry confirmation)
 
 Codex must not invent layout. If implementation-ready data is missing, update the spec (or add a small derived runtime spec) rather than guessing.
+Coordinate note: design packet axes are `x/y` ground + `z` up; runtime axes are `x/z` ground + `y` up.
 
 ### 2.3 Path verification (mandatory once per new thread/branch)
 If Codex cannot find the above files at the expected paths:
@@ -170,7 +169,7 @@ Codex should assume a typical web client stack but must confirm reality:
 - package manager: pnpm
 - language: TypeScript
 - rendering: three.js (WebGL)
-- dev server: typically Vite-style (often localhost:5173)
+- dev server: typically Vite-style (often localhost:5174 in this repo)
 
 If any of these are false in the repo, Codex must:
 - adapt to the repo conventions
@@ -211,7 +210,7 @@ If the repo uses a different static path, Codex must adapt and document it in `p
 
 ## 7) Canonical playtest URL + toggles
 progress.md must define ONE canonical URL. Common shape:
-- `http://127.0.0.1:5173/?map=<mapId>`
+- `http://127.0.0.1:5174/?map=<mapId>`
 
 Recommended toggles:
 - `&blockout=1` force solid colors by tag
