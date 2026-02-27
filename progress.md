@@ -3,7 +3,7 @@
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
 - `docs/map-design` remains the source-of-truth input (spec + refs) and is only used by `gen:maps` to emit runtime copies under `apps/client/public/maps/bazaar-map/`.
-- Large legacy artifact + texture payload cleanup moved historical handoff/docs/screenshots data into `archive/`, and generated `AUDIT_LEDGER.md`.
+- Large legacy artifact + texture payload cleanup moved historical handoff/docs/screenshots data into `archive/`.
 - Latest status is a cleanup commit on branch `codex/code-audit` with runtime/code updates plus large-asset dedupe.
 - Validation not rerun in this push-only turn.
 - Latest compare-shot screenshot pair captured under `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P122_map_design_folder_review/`.
@@ -29,7 +29,7 @@ pnpm build
     - blockout tuning and map shot updates under `apps/client/public/maps/bazaar-map`
     - archiving/cleanup of legacy design handoff payloads to `archive/*`
     - removal of unused heavy texture/model packs and redundant screenshot/temp capture files
-    - added `AUDIT_LEDGER.md`.
+    - generated `AUDIT_LEDGER.md` was later removed.
 - Validation:
   - Not rerun this turn (push-only request).
 - Quick test steps:
@@ -42,4 +42,4 @@ pnpm build
 
 ## Known Issues / Risks
 - `gen:maps` still emits known clear-zone anchor warnings for designated landmark/open-node anchors.
-- Cleanup removed many historical artifacts; downstream scripts should ignore `archive/` paths explicitly.
+- `AUDIT_LEDGER.md` was removed as requested; no runtime code depends on it.
