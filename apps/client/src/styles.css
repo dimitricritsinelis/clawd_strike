@@ -296,8 +296,14 @@ body {
   width: auto;
   height: auto;
   object-fit: contain;
+  transform: translateY(clamp(24px, 5vh, 72px));
 }
-#start[data-info-visible="true"] .logo-wrap,
+#start[data-info-visible="true"] .logo-wrap {
+  top: 29%;
+}
+#start[data-info-visible="true"] .logo-img {
+  transform: scale(0.8);
+}
 #start[data-info-visible="true"] .actions {
   opacity: 0;
   visibility: hidden;
