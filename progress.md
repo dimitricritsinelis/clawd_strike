@@ -1,15 +1,18 @@
 # progress.md — MVP Blockout Branch
+Original prompt: help me fix the loading screen. i have an image that load when i click the info button, however the textbox needs fixing. i want the text in the text box to have the same behavior and font and settings as the nameplate. this is a hidden text box and the text should show ontop of the image
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
 - `docs/map-design` remains the source-of-truth input (spec + refs) and is only used by `gen:maps` to emit runtime copies under `apps/client/public/maps/bazaar-map/`.
 - Working on `codex/loading-screen` in the loading UI loop.
-- Added loading info overlay asset wiring (`info_screen.png`) and `#info-btn` toggle behavior; logo now shifts/scale transitions instead of fully hiding on info open.
-- Validation rerun succeeded (`pnpm typecheck`, `pnpm build`).
+- Info overlay textbox was moved up by the same amount again; lift is now `-90px`.
+- Vertical position is now controlled by CSS reference variables: `--info-textbox-top-desktop`, `--info-textbox-top-mobile`, `--info-textbox-y-lift`.
+- Current lift is `--info-textbox-y-lift: -90px` (negative values move text up).
+- Screenshot/validation loop skipped for this prompt per direct user request.
 - `gen:maps` still emits anchor clearance warnings during build.
 
 ## Canonical Playtest URL
-- `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
+- `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
 
 ## Map Approval Status
 - `NOT APPROVED`
@@ -22,23 +25,24 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P127_loading_screen_info_layout`
+- Prompt ID: `P141_loading_screen_textbox_move_up_same_amount_no_screenshots`
 - What changed:
-  - Kept the clawstrike logo visible on info-screen toggle by scaling it down and moving it up (`apps/client/src/styles.css`).
-  - Kept human/agent action buttons hidden while info overlay opens.
-  - Nudged the `info_screen.png` render down via CSS transform so it no longer overlaps the logo (`apps/client/src/styles.css`).
+  - Updated `/Users/dimitri/Desktop/clawd-strike/apps/client/src/styles.css`:
+    - Set `--info-textbox-y-lift` from `-66px` to `-90px` per request to move up by the same amount again.
 - Validation:
-  - `pnpm typecheck`
-  - `pnpm build`
+  - Skipped for this prompt per user request ("skip the screenshots for now, just move it").
 - Quick test steps:
-  - `pnpm dev` then open: `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
-  - Captured before/after screenshot pair at `artifacts/screenshots/P127_loading_screen_info_layout/before.png` and `after.png`.
+  - `pnpm dev` then open: `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
+  - Click Info button and verify text sits higher than `-30px` while remaining over the image.
+  - Tune vertical offset by editing `--info-textbox-y-lift` in `apps/client/src/styles.css` (negative = up, positive = down).
+  - Runtime sanity pass: `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
+  - Screenshot outputs: skipped for this prompt per request.
 
 ## Next 3 Tasks
-1. Validate on-device/manual pointer behavior for logo + info-screen transition with repeated toggles.
-2. Confirm Escape closes the info overlay and returns to base state across desktop + mobile breakpoints.
-3. Capture a second pass of screenshots if QA calls out additional spacing adjustments.
+1. Confirm whether `--info-textbox-y-lift: -90px` is final or if another fine nudge is desired.
+2. Run screenshot pair + validation loop once user wants the next checkpoint.
+3. Re-run info open/close spam test (info button + Escape) with final position locked.
 
 ## Known Issues / Risks
 - `gen:maps` still emits clear-zone anchor warnings for several landmarks/open-node anchors.
-- Info-screen overlay state is entirely UI-scoped; additional touch/click-state logic for mobile overlays may need validation.
+- Automated pointer-lock verification is flaky in Playwright (`WrongDocumentError`) and still needs manual browser confirmation.
