@@ -448,24 +448,10 @@ function placeArchedDoor(
     ctx.frame, centerS, spec.doorH * 0.5, 0.003,
     0.006, spec.doorH, spec.doorW);
 
-  // 2–3. Frame jambs — protruding forward, creating depth contrast with void
-  for (const side of [-1, 1] as const) {
-    pushBox(ctx.instances, ctx.maxInstances, "door_jamb", ctx.wallMaterialId,
-      ctx.frame, centerS + side * (spec.doorW + spec.frameThickness) * 0.5, spec.doorH * 0.5, spec.jambDepth * 0.5,
-      spec.jambDepth, spec.doorH, spec.frameThickness);
-  }
-
-  // 4. Arch lintel (half-cylinder oriented as arch)
-  const archRadius = spec.doorW * 0.5;
-  pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", ctx.wallMaterialId,
-    ctx.frame, centerS, spec.doorH + archRadius * 0.5, spec.jambDepth * 0.5,
-    spec.jambDepth, archRadius, spec.doorW,
-    Math.PI * 0.5);
-
-  // 5. Threshold step at ground level
-  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
-    ctx.frame, centerS, 0.03, spec.jambDepth * 0.6,
-    spec.jambDepth * 1.2, 0.06, spec.doorW + spec.frameThickness * 2);
+  // 2. Lintel bar — marks the top edge of the opening
+  pushBox(ctx.instances, ctx.maxInstances, "door_lintel", null,
+    ctx.frame, centerS, spec.doorH + spec.frameThickness * 0.5, spec.frameDepth * 0.5,
+    spec.frameDepth, spec.frameThickness, spec.doorW + spec.frameThickness * 2);
 }
 
 // ── Recessed panel (uses window width from spec for alignment) ─────────────
