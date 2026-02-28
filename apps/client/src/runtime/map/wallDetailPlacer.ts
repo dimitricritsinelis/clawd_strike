@@ -365,11 +365,11 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
   for (let i = 0; i < bayCount; i += 1) {
     const roll = ctx.rng.next();
     if (ctx.isMainLane || ctx.isShopfrontZone) {
-      columnRoles.push(roll < 0.28 ? "door" : roll < 0.72 ? "window" : "blank");
+      columnRoles.push(roll < 0.20 ? "door" : roll < 0.46 ? "window" : "blank");
     } else if (ctx.isSideHall) {
-      columnRoles.push(roll < 0.10 ? "door" : roll < 0.45 ? "window" : "blank");
+      columnRoles.push(roll < 0.06 ? "door" : roll < 0.22 ? "window" : "blank");
     } else {
-      columnRoles.push(roll < 0.16 ? "door" : roll < 0.52 ? "window" : "blank");
+      columnRoles.push(roll < 0.10 ? "door" : roll < 0.30 ? "window" : "blank");
     }
   }
 
@@ -543,8 +543,10 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       if (story === 0 && role === "door") {
         // Ground floor door column → arched door
         placeArchedDoor(ctx, centerS, spec);
-      } else if (role === "window" || (role === "door" && story > 0)) {
-        // Window column at any story, OR door column on upper stories
+      } else if (role === "window") {
+        placeWindowOpening(ctx, centerS, storyBaseY, spec);
+      } else if (role === "door" && story > 0 && ctx.rng.next() < 0.50) {
+        // Above a door, 50% chance of window (rest is blank wall)
         placeWindowOpening(ctx, centerS, storyBaseY, spec);
       } else if (role === "blank" && ctx.rng.next() < 0.25) {
         // Blank column — occasional subtle recess for texture
