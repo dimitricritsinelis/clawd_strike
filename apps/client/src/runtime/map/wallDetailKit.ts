@@ -1,5 +1,14 @@
-import { BoxGeometry, CylinderGeometry, Group, InstancedMesh, MeshStandardMaterial, Object3D } from "three";
+import {
+  BoxGeometry,
+  CylinderGeometry,
+  Group,
+  InstancedMesh,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  Object3D,
+} from "three";
 import { applyWallShaderTweaks } from "../render/materials/applyWallShaderTweaks";
+import { applyWindowGlassShaderTweaks } from "../render/materials/applyWindowGlassShaderTweaks";
 import type { WallMaterialLibrary, WallTextureQuality } from "../render/materials/WallMaterialLibrary";
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
@@ -18,11 +27,13 @@ export type WallDetailMeshId =
   | "door_jamb"
   | "door_lintel"
   | "door_arch_lintel"
+  | "door_void"
   | "sign_board"
   | "sign_bracket"
   | "awning_bracket"
   | "cable_segment"
   | "window_shutter"
+  | "window_glass"
   | "balcony_slab"
   | "balcony_railing";
 
@@ -54,7 +65,7 @@ export type BuildWallDetailMeshesOptions = {
 
 type DetailTemplate = {
   geometry: BoxGeometry | CylinderGeometry;
-  material: MeshStandardMaterial;
+  material: MeshStandardMaterial | MeshPhysicalMaterial;
 };
 
 type DetailBucket = {
@@ -76,14 +87,36 @@ const DETAIL_IDS: WallDetailMeshId[] = [
   "door_jamb",
   "door_lintel",
   "door_arch_lintel",
+  "door_void",
   "sign_board",
   "sign_bracket",
   "awning_bracket",
   "cable_segment",
   "window_shutter",
+  "window_glass",
   "balcony_slab",
   "balcony_railing",
 ];
+
+const WALL_SURFACE_INHERIT_MESH_IDS = new Set<WallDetailMeshId>([
+  "plinth_strip",
+  "cornice_strip",
+  "string_course_strip",
+  "corner_pier",
+  "vertical_edge_trim",
+  "pilaster",
+  "recessed_panel_frame_h",
+  "recessed_panel_frame_v",
+  "recessed_panel_back",
+  "door_jamb",
+  "door_lintel",
+  "door_arch_lintel",
+  "balcony_slab",
+]);
+
+function inheritsWallSurface(meshId: WallDetailMeshId): boolean {
+  return WALL_SURFACE_INHERIT_MESH_IDS.has(meshId);
+}
 
 function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTemplate> {
   const palette = resolveBlockoutPalette(highVis);
@@ -118,6 +151,17 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     roughness: 0.64,
     metalness: 0.34,
   });
+  const windowGlass = new MeshPhysicalMaterial({
+    color: highVis ? 0x2a4a62 : 0x18293a,
+    roughness: 0.18,
+    metalness: 0,
+    clearcoat: 1,
+    clearcoatRoughness: 0.12,
+    ior: 1.5,
+    specularIntensity: 0.55,
+    specularColor: 0xbfd8ff,
+  });
+  applyWindowGlassShaderTweaks(windowGlass, { highVis });
 
   return {
     plinth_strip: {
@@ -168,6 +212,10 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
       geometry: new CylinderGeometry(0.5, 0.5, 1, 14, 1, false, 0, Math.PI),
       material: stoneTrim,
     },
+    door_void: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: new MeshStandardMaterial({ color: 0x060809, roughness: 0.98, metalness: 0.0 }),
+    },
     sign_board: {
       geometry: new BoxGeometry(1, 1, 1),
       material: accent,
@@ -187,6 +235,10 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     window_shutter: {
       geometry: new BoxGeometry(1, 1, 1),
       material: stonePrimary,
+    },
+    window_glass: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: windowGlass,
     },
     balcony_slab: {
       geometry: new BoxGeometry(1, 1, 1),
@@ -263,11 +315,13 @@ function buildPbrDetailMeshes(
 
   const grouped = new Map<string, DetailBucket>();
   for (const instance of instances) {
-    const wallMaterialId =
-      instance.wallMaterialId && availableMaterialIds.has(instance.wallMaterialId)
+    const shouldInheritWallSurface = inheritsWallSurface(instance.meshId);
+    const wallMaterialId = shouldInheritWallSurface
+      ? instance.wallMaterialId && availableMaterialIds.has(instance.wallMaterialId)
         ? instance.wallMaterialId
-        : fallbackMaterialId;
-    const key = `${instance.meshId}|${wallMaterialId}`;
+        : fallbackMaterialId
+      : null;
+    const key = shouldInheritWallSurface ? `${instance.meshId}|${wallMaterialId}` : `${instance.meshId}|template`;
     const existing = grouped.get(key);
     if (existing) {
       existing.instances.push(instance);
@@ -308,9 +362,11 @@ function buildPbrDetailMeshes(
   const dummy = new Object3D();
   for (const bucket of grouped.values()) {
     const template = templates[bucket.meshId];
-    const material = getSurfaceMaterial(bucket.wallMaterialId ?? fallbackMaterialId);
+    const material = bucket.wallMaterialId ? getSurfaceMaterial(bucket.wallMaterialId) : template.material;
     const mesh = new InstancedMesh(template.geometry, material, bucket.instances.length);
-    mesh.name = `wall-detail-${bucket.meshId}-${bucket.wallMaterialId ?? fallbackMaterialId}`;
+    mesh.name = bucket.wallMaterialId
+      ? `wall-detail-${bucket.meshId}-${bucket.wallMaterialId}`
+      : `wall-detail-${bucket.meshId}-template`;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;

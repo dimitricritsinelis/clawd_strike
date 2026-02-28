@@ -15,6 +15,8 @@ const DETAIL_ZONE_TYPES = new Set([
 const SEGMENT_EDGE_MARGIN_M = 0.35;
 const INSTANCE_BUDGET = 9800;
 const STORY_HEIGHT_M = 3.0;
+const WINDOW_GLASS_THICKNESS_M = 0.02;
+const WINDOW_GLASS_INSET_M = 0.012;
 
 type SegmentFrame = {
   lengthM: number;
@@ -251,7 +253,7 @@ function placeParapetCap(ctx: SegmentDecorContext): void {
 function placePlinthStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const plinthHeight = ctx.rng.range(0.28, 0.48);
-  const plinthDepth = clamp(ctx.rng.range(0.04, 0.09), 0.03, ctx.maxProtrusionM + 0.04);
+  const plinthDepth = clamp(ctx.rng.range(0.06, 0.13), 0.04, ctx.maxProtrusionM + 0.06);
   const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
   if (usableLength < 0.3) return;
   pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
@@ -261,8 +263,8 @@ function placePlinthStrip(ctx: SegmentDecorContext): void {
 
 function placeStringCourses(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.5) return;
-  const courseHeight = ctx.rng.range(0.08, 0.16);
-  const courseDepth = clamp(ctx.rng.range(0.03, 0.07), 0.02, ctx.maxProtrusionM + 0.02);
+  const courseHeight = ctx.rng.range(0.10, 0.18);
+  const courseDepth = clamp(ctx.rng.range(0.06, 0.11), 0.04, ctx.maxProtrusionM + 0.04);
   const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
   if (usableLength < 0.5) return;
 
@@ -277,8 +279,8 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
 
 function placeCorniceStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
-  const corniceHeight = ctx.rng.range(0.14, 0.24);
-  const corniceDepth = clamp(ctx.rng.range(0.06, 0.14), 0.04, ctx.maxProtrusionM + 0.05);
+  const corniceHeight = ctx.rng.range(0.18, 0.30);
+  const corniceDepth = clamp(ctx.rng.range(0.10, 0.19), 0.06, ctx.maxProtrusionM + 0.08);
   const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
   if (usableLength < 0.5) return;
   const y = ctx.wallHeightM - corniceHeight * 0.5;
@@ -396,10 +398,10 @@ function placeWindowOpening(
   const sillY = storyBaseY + spec.sillOffset;
   const centerY = sillY + spec.windowH * 0.5;
 
-  // Back panel (recessed into wall)
-  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-    ctx.frame, centerS, centerY, -spec.recessDepth * 0.5,
-    spec.recessDepth, spec.windowH, spec.windowW);
+  // Opaque reflective glass plane, slightly offset from the wall to avoid z-fighting.
+  pushBox(ctx.instances, ctx.maxInstances, "window_glass", null,
+    ctx.frame, centerS, centerY, WINDOW_GLASS_INSET_M,
+    WINDOW_GLASS_THICKNESS_M, spec.windowH, spec.windowW);
 
   // Left jamb
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
@@ -441,8 +443,8 @@ function placeArchedDoor(
   centerS: number,
   spec: FacadeSpec,
 ): void {
-  // Dark recessed opening
-  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
+  // Near-black void behind the door opening
+  pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
     ctx.frame, centerS, spec.doorH * 0.5, -spec.recessDepth * 0.5,
     spec.recessDepth, spec.doorH, spec.doorW);
 
@@ -525,46 +527,6 @@ function placeBalcony(ctx: SegmentDecorContext, centerS: number, storyBaseY: num
     0.06, railingH, slabWidth);
 }
 
-// ── Awning brackets ────────────────────────────────────────────────────────
-
-function placeAwningBrackets(ctx: SegmentDecorContext, centerS: number, spec: FacadeSpec): void {
-  if (!ctx.isShopfrontZone) return;
-  if (ctx.rng.next() > 0.45) return;
-
-  const bracketH = ctx.rng.range(0.15, 0.3);
-  const bracketDepth = clamp(ctx.rng.range(0.3, 0.55), 0.2, 0.6);
-  const y = ctx.rng.range(2.8, 3.3);
-
-  for (const side of [-1, 1] as const) {
-    const s = centerS + side * spec.bayWidth * 0.32;
-    if (!pushBox(ctx.instances, ctx.maxInstances, "awning_bracket", null,
-      ctx.frame, s, y, bracketDepth * 0.5,
-      bracketDepth, bracketH, 0.06)) {
-      return;
-    }
-  }
-}
-
-// ── Sign boards ────────────────────────────────────────────────────────────
-
-function placeSignBoard(ctx: SegmentDecorContext, centerS: number): void {
-  if (!ctx.isMainLane) return;
-  if (ctx.rng.next() > 0.18) return;
-
-  const signW = ctx.rng.range(0.4, 0.75);
-  const signH = ctx.rng.range(0.3, 0.55);
-  const y = ctx.rng.range(2.9, 3.5);
-  const protrusion = ctx.rng.range(0.35, 0.65);
-
-  pushBox(ctx.instances, ctx.maxInstances, "sign_bracket", null,
-    ctx.frame, centerS, y, protrusion * 0.5,
-    protrusion, 0.04, 0.04);
-
-  pushBox(ctx.instances, ctx.maxInstances, "sign_board", null,
-    ctx.frame, centerS, y - signH * 0.5 - 0.06, protrusion,
-    0.04, signH, signW);
-}
-
 // ── Cable segments ─────────────────────────────────────────────────────────
 
 function placeCableSegments(ctx: SegmentDecorContext): void {
@@ -623,10 +585,6 @@ function decorateSegment(ctx: SegmentDecorContext): void {
         placeRecessedPanel(ctx, centerS, storyBaseY, spec);
       }
     }
-
-    // Ground-floor embellishments on this column
-    placeAwningBrackets(ctx, centerS, spec);
-    placeSignBoard(ctx, centerS);
 
     // Balconies on upper-floor window/door columns (sparse)
     if ((role === "window" || role === "door") && spec.stories > 1) {
