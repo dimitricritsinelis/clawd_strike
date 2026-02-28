@@ -49,15 +49,15 @@ export function applyWindowGlassShaderTweaks(
   const lineFeather = 0.018;
   const borderFadeInner = 0.04;
   const borderFadeOuter = 0.13;
-  const gridRoughnessBoost = 0.065;
+  const gridRoughnessBoost = 0.08;
   const smudgeRoughnessBoost = highVis ? 0.045 : 0.055;
-  const smudgeStrength = highVis ? 0.58 : 0.72;
-  const fresnelPower = highVis ? 4.4 : 5.1;
-  const reflectStrength = highVis ? 0.39 : 0.45;
-  const paneDarkening = highVis ? 0.11 : 0.15;
-  const grimeDarkening = highVis ? 0.04 : 0.06;
-  const groundColor: readonly [number, number, number] = highVis ? [0.76, 0.69, 0.57] : [0.72, 0.64, 0.52];
-  const skyColor: readonly [number, number, number] = highVis ? [0.76, 0.86, 0.96] : [0.67, 0.79, 0.95];
+  const smudgeStrength = highVis ? 0.48 : 0.58;
+  const fresnelPower = highVis ? 3.5 : 4.0;
+  const reflectStrength = highVis ? 0.52 : 0.58;
+  const paneDarkening = highVis ? 0.08 : 0.10;
+  const grimeDarkening = highVis ? 0.03 : 0.04;
+  const groundColor: readonly [number, number, number] = highVis ? [0.82, 0.75, 0.63] : [0.78, 0.70, 0.58];
+  const skyColor: readonly [number, number, number] = highVis ? [0.82, 0.90, 0.98] : [0.74, 0.85, 0.97];
 
   const previousOnBeforeCompile = material.onBeforeCompile;
   material.onBeforeCompile = (shader: MaterialShader, renderer: WebGLRenderer): void => {

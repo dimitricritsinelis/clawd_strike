@@ -152,14 +152,14 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     metalness: 0.34,
   });
   const windowGlass = new MeshPhysicalMaterial({
-    color: highVis ? 0x2a4a62 : 0x18293a,
-    roughness: 0.18,
+    color: highVis ? 0x4a7a9a : 0x2e5472,
+    roughness: 0.12,
     metalness: 0,
     clearcoat: 1,
-    clearcoatRoughness: 0.12,
+    clearcoatRoughness: 0.08,
     ior: 1.5,
-    specularIntensity: 0.55,
-    specularColor: 0xbfd8ff,
+    specularIntensity: 0.7,
+    specularColor: 0xc8e4ff,
   });
   applyWindowGlassShaderTweaks(windowGlass, { highVis });
 
@@ -214,7 +214,7 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     },
     door_void: {
       geometry: new BoxGeometry(1, 1, 1),
-      material: new MeshStandardMaterial({ color: 0x060809, roughness: 0.98, metalness: 0.0 }),
+      material: new MeshStandardMaterial({ color: 0x0c1218, roughness: 0.95, metalness: 0.0 }),
     },
     sign_board: {
       geometry: new BoxGeometry(1, 1, 1),
