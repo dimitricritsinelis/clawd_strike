@@ -16,8 +16,6 @@ const SEGMENT_EDGE_MARGIN_M = 0.35;
 const INSTANCE_BUDGET = 9800;
 const STORY_HEIGHT_M = 3.0;
 const WINDOW_GLASS_THICKNESS_M = 0.02;
-const WINDOW_EMBRASURE_DEPTH_M = 0.18;
-const DOOR_EMBRASURE_DEPTH_M = 0.28;
 
 type SegmentFrame = {
   lengthM: number;
@@ -359,8 +357,8 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
   const doorH = ctx.rng.range(2.35, 2.65);
   const recessDepth = ctx.rng.range(0.07, 0.12);
   const frameThickness = ctx.rng.range(0.09, 0.14);
-  const frameDepth = clamp(ctx.rng.range(0.03, 0.06), 0.02, ctx.maxProtrusionM + 0.02);
-  const jambDepth = clamp(ctx.rng.range(0.06, 0.12), 0.04, ctx.maxProtrusionM + 0.04);
+  const frameDepth = clamp(ctx.rng.range(0.06, 0.10), 0.04, ctx.maxProtrusionM + 0.06);
+  const jambDepth = clamp(ctx.rng.range(0.10, 0.16), 0.06, ctx.maxProtrusionM + 0.10);
 
   // Assign a role to each column (vertical coherence)
   const columnRoles: ColumnRole[] = [];
@@ -398,48 +396,30 @@ function placeWindowOpening(
 ): void {
   const sillY = storyBaseY + spec.sillOffset;
   const centerY = sillY + spec.windowH * 0.5;
-  const emb = WINDOW_EMBRASURE_DEPTH_M;
 
-  // 1. Dark void behind glass — the dark interior background
+  // 1. Dark void — flush with wall surface (tiny offset prevents z-fighting)
   pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
-    ctx.frame, centerS, centerY, -emb * 0.5,
-    emb, spec.windowH, spec.windowW);
+    ctx.frame, centerS, centerY, 0.003,
+    0.006, spec.windowH, spec.windowW);
 
-  // 2. Glass pane — recessed into the embrasure (not flush with wall)
+  // 2. Glass pane — in front of void, behind frames
   pushBox(ctx.instances, ctx.maxInstances, "window_glass", null,
-    ctx.frame, centerS, centerY, -emb * 0.35,
-    WINDOW_GLASS_THICKNESS_M, spec.windowH - 0.01, spec.windowW - 0.01);
+    ctx.frame, centerS, centerY, 0.015,
+    WINDOW_GLASS_THICKNESS_M, spec.windowH, spec.windowW);
 
-  // 3–4. Left/right reveal panels — wall-textured sides showing embrasure depth
-  for (const side of [-1, 1] as const) {
-    pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-      ctx.frame, centerS + side * spec.windowW * 0.5, centerY, -emb * 0.5,
-      emb, spec.windowH, 0.004);
-  }
-
-  // 5. Top reveal — ceiling of embrasure
-  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-    ctx.frame, centerS, sillY + spec.windowH, -emb * 0.5,
-    emb, 0.004, spec.windowW);
-
-  // 6. Bottom reveal — floor of embrasure (behind sill shelf)
-  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-    ctx.frame, centerS, sillY, -emb * 0.5,
-    emb, 0.004, spec.windowW);
-
-  // 7–8. Outer frame jambs — protruding forward from wall surface
+  // 3–4. Frame jambs — protruding forward, creating depth contrast with void
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
       ctx.frame, centerS + side * (spec.windowW + spec.frameThickness) * 0.5, centerY, spec.frameDepth * 0.5,
       spec.frameDepth, spec.windowH + spec.frameThickness, spec.frameThickness);
   }
 
-  // 9. Sill shelf — protruding ledge (wider + deeper than lintel)
+  // 5. Sill shelf — protruding ledge (wider + deeper than lintel)
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, sillY - spec.frameThickness * 0.5, spec.frameDepth * 0.65,
-    spec.frameDepth * 1.3, spec.frameThickness, spec.windowW + spec.frameThickness * 2);
+    spec.frameDepth * 1.4, spec.frameThickness, spec.windowW + spec.frameThickness * 2);
 
-  // 10. Lintel — slightly thicker for visual weight
+  // 6. Lintel — slightly thicker for visual weight
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, sillY + spec.windowH + spec.frameThickness * 0.5, spec.frameDepth * 0.5,
     spec.frameDepth, spec.frameThickness * 1.2, spec.windowW + spec.frameThickness * 2);
@@ -464,45 +444,31 @@ function placeArchedDoor(
   centerS: number,
   spec: FacadeSpec,
 ): void {
-  const emb = DOOR_EMBRASURE_DEPTH_M;
-
-  // 1. Deep dark void — near-black interior (28cm deep)
+  // 1. Dark void — flush with wall surface (tiny offset prevents z-fighting)
   pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
-    ctx.frame, centerS, spec.doorH * 0.5, -emb * 0.5,
-    emb, spec.doorH, spec.doorW);
+    ctx.frame, centerS, spec.doorH * 0.5, 0.003,
+    0.006, spec.doorH, spec.doorW);
 
-  // 2–3. Left/right reveal panels — wall-textured sides of doorway
-  for (const side of [-1, 1] as const) {
-    pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-      ctx.frame, centerS + side * spec.doorW * 0.5, spec.doorH * 0.5, -emb * 0.5,
-      emb, spec.doorH, 0.004);
-  }
-
-  // 4. Top reveal — soffit (ceiling of doorway)
-  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-    ctx.frame, centerS, spec.doorH, -emb * 0.5,
-    emb, 0.004, spec.doorW);
-
-  // 5–6. Outer frame jambs — protruding stone surround
+  // 2–3. Frame jambs — protruding forward, creating depth contrast with void
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "door_jamb", ctx.wallMaterialId,
       ctx.frame, centerS + side * (spec.doorW + spec.frameThickness) * 0.5, spec.doorH * 0.5, spec.jambDepth * 0.5,
       spec.jambDepth, spec.doorH, spec.frameThickness);
   }
 
-  // 7. Arch lintel (half-cylinder oriented as arch)
+  // 4. Arch lintel (half-cylinder oriented as arch)
   const archRadius = spec.doorW * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", ctx.wallMaterialId,
     ctx.frame, centerS, spec.doorH + archRadius * 0.5, spec.jambDepth * 0.5,
     spec.jambDepth, archRadius, spec.doorW,
     Math.PI * 0.5);
 
-  // 8. Flat lintel bar above the arch
+  // 5. Flat lintel bar above the arch
   pushBox(ctx.instances, ctx.maxInstances, "door_lintel", ctx.wallMaterialId,
     ctx.frame, centerS, spec.doorH + archRadius + spec.frameThickness * 0.5, spec.jambDepth * 0.5,
     spec.jambDepth, spec.frameThickness * 1.5, spec.doorW + spec.frameThickness * 2);
 
-  // 9. Threshold step at ground level
+  // 6. Threshold step at ground level
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, 0.03, spec.jambDepth * 0.6,
     spec.jambDepth * 1.2, 0.06, spec.doorW + spec.frameThickness * 2);

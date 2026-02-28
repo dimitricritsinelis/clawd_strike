@@ -49,7 +49,7 @@ export function applyWindowGlassShaderTweaks(
   const lineFeather = 0.018;
   const borderFadeInner = 0.04;
   const borderFadeOuter = 0.13;
-  const gridRoughnessBoost = 0.08;
+  const gridRoughnessBoost = 0.05;
   const smudgeRoughnessBoost = highVis ? 0.045 : 0.055;
   const smudgeStrength = highVis ? 0.48 : 0.58;
   const fresnelPower = highVis ? 3.5 : 4.0;
