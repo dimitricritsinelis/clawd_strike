@@ -17,6 +17,21 @@ const INSTANCE_BUDGET = 9800;
 const STORY_HEIGHT_M = 3.0;
 const WINDOW_GLASS_THICKNESS_M = 0.02;
 
+// Roof cap constants
+const ROOF_DEPTH_M = 10.0;
+const ROOF_THICKNESS_M = 0.20;
+const ROOF_OVERHANG_M = 0.15;
+
+// Balcony constants
+const BALCONY_DEPTH_M = 1.1;
+const BALCONY_SLAB_THICKNESS_M = 0.12;
+const BALCONY_WALL_H = 0.95;
+const BALCONY_WALL_THICKNESS_M = 0.15;
+const BALCONY_DOOR_H = 2.2;
+const BALCONY_DOOR_SILL_OFFSET = 0.08;
+const BALCONY_CHANCE = 0.20;
+const BALCONY_ELIGIBLE_ZONES = new Set(["main_lane_segment", "spawn_plaza"]);
+
 type SegmentFrame = {
   lengthM: number;
   centerX: number;
@@ -245,6 +260,29 @@ function placeParapetCap(ctx: SegmentDecorContext): void {
   const y = ctx.wallHeightM + capHeight * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
     ctx.frame, 0, y, capDepth * 0.5, capDepth, capHeight, usableLength);
+}
+
+// ── Roof cap ───────────────────────────────────────────────────────────────
+
+function placeRoofCap(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+
+  const roofY = ctx.wallHeightM + ROOF_THICKNESS_M * 0.5;
+  const roofLength = ctx.frame.lengthM;
+  // Positive inwardN = toward walkable zone, negative = into building mass
+  const centerInwardN = (ROOF_OVERHANG_M - ROOF_DEPTH_M) * 0.5;
+
+  pushBox(
+    ctx.instances, ctx.maxInstances,
+    "balcony_slab", ctx.wallMaterialId,
+    ctx.frame,
+    0,
+    roofY,
+    centerInwardN,
+    ROOF_DEPTH_M + ROOF_OVERHANG_M,
+    ROOF_THICKNESS_M,
+    roofLength,
+  );
 }
 
 // ── Horizontal banding ─────────────────────────────────────────────────────
@@ -481,6 +519,77 @@ function placeRecessedPanel(
     depth, panelH, panelW);
 }
 
+// ── Balcony placement (stone balustrade style) ─────────────────────────────
+
+function placeBalcony(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  storyBaseY: number,
+  spec: FacadeSpec,
+): void {
+  const balconyW = Math.min(spec.bayWidth * 1.8, spec.usableLength * 0.45);
+  const slabY = storyBaseY + BALCONY_SLAB_THICKNESS_M * 0.5;
+
+  // 1. Slab — extends outward toward walkable zone (positive inwardN)
+  pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+    ctx.frame, centerS, slabY, BALCONY_DEPTH_M * 0.5,
+    BALCONY_DEPTH_M, BALCONY_SLAB_THICKNESS_M, balconyW);
+
+  // 2. French door opening — taller & wider than regular window, starts near floor
+  const doorW = Math.min(spec.windowW * 1.8, balconyW * 0.55);
+  const doorCenterY = storyBaseY + BALCONY_DOOR_SILL_OFFSET + BALCONY_DOOR_H * 0.5;
+
+  // 2a. Dark void
+  pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
+    ctx.frame, centerS, doorCenterY, 0.003,
+    0.006, BALCONY_DOOR_H, doorW);
+
+  // 2b. Glass pane
+  pushBox(ctx.instances, ctx.maxInstances, "window_glass", null,
+    ctx.frame, centerS, doorCenterY, 0.015,
+    WINDOW_GLASS_THICKNESS_M, BALCONY_DOOR_H, doorW);
+
+  // 2c. Frame jambs
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
+      ctx.frame, centerS + side * (doorW + spec.frameThickness) * 0.5, doorCenterY, spec.frameDepth * 0.5,
+      spec.frameDepth, BALCONY_DOOR_H + spec.frameThickness, spec.frameThickness);
+  }
+
+  // 2d. Lintel
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, storyBaseY + BALCONY_DOOR_SILL_OFFSET + BALCONY_DOOR_H + spec.frameThickness * 0.5,
+    spec.frameDepth * 0.5,
+    spec.frameDepth, spec.frameThickness * 1.2, doorW + spec.frameThickness * 2);
+
+  // 2e. Horizontal crossbar
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", null,
+    ctx.frame, centerS, doorCenterY, 0.018,
+    0.035, 0.04, doorW * 0.92);
+
+  // 3. Stone balustrade — front wall at outer edge of slab
+  const wallY = storyBaseY + BALCONY_SLAB_THICKNESS_M + BALCONY_WALL_H * 0.5;
+  pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+    ctx.frame, centerS, wallY, BALCONY_DEPTH_M,
+    BALCONY_WALL_THICKNESS_M, BALCONY_WALL_H, balconyW);
+
+  // 4. Stone balustrade — side walls
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+      ctx.frame, centerS + side * balconyW * 0.5, wallY, BALCONY_DEPTH_M * 0.5,
+      BALCONY_DEPTH_M, BALCONY_WALL_H, BALCONY_WALL_THICKNESS_M);
+  }
+
+  // 5. Support brackets — small stone corbels under slab
+  const bracketH = 0.25;
+  const bracketD = 0.3;
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+      ctx.frame, centerS + side * (balconyW * 0.35), storyBaseY - bracketH * 0.5, bracketD * 0.5,
+      bracketD, bracketH, 0.12);
+  }
+}
+
 // ── Pilasters aligned to bay grid ──────────────────────────────────────────
 
 function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
@@ -525,6 +634,7 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   // Structural framing
   placeCornerPiers(ctx);
   placeParapetCap(ctx);
+  placeRoofCap(ctx);
 
   // Horizontal banding
   placePlinthStrip(ctx);
@@ -541,6 +651,31 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   // Pilasters aligned to the bay grid
   placePilasters(ctx, spec);
 
+  // Pre-compute balcony placements — architect logic:
+  // Decision is per COLUMN (not per bay×story) → vertical stacks.
+  // If a column gets a balcony, ALL upper floors on that column get one.
+  // Minimum 2-bay spacing between balcony columns for visual rhythm.
+  const balconyColumns = new Set<number>();
+  if (BALCONY_ELIGIBLE_ZONES.has(ctx.zone?.type ?? "") && spec.stories >= 2) {
+    const balconyRng = ctx.rng.fork("balconies");
+    let lastBalconyCol = -3;
+    for (let col = 0; col < spec.bayCount; col += 1) {
+      if (spec.columnRoles[col] !== "window") continue;
+      if (col - lastBalconyCol < 2) continue;
+      if (balconyRng.next() < BALCONY_CHANCE) {
+        balconyColumns.add(col);
+        lastBalconyCol = col;
+      }
+    }
+  }
+
+  const balconySet = new Set<string>();
+  for (const col of balconyColumns) {
+    for (let story = 1; story < spec.stories; story += 1) {
+      balconySet.add(`${col}:${story}`);
+    }
+  }
+
   // Walk columns × stories with vertical coherence
   for (let col = 0; col < spec.bayCount; col += 1) {
     const role = spec.columnRoles[col]!;
@@ -553,7 +688,11 @@ function decorateSegment(ctx: SegmentDecorContext): void {
         // Ground floor door column → arched door
         placeArchedDoor(ctx, centerS, spec);
       } else if (role === "window") {
-        placeWindowOpening(ctx, centerS, storyBaseY, spec);
+        if (balconySet.has(`${col}:${story}`)) {
+          placeBalcony(ctx, centerS, storyBaseY, spec);
+        } else {
+          placeWindowOpening(ctx, centerS, storyBaseY, spec);
+        }
       } else if (role === "door" && story > 0 && ctx.rng.next() < 0.50) {
         // Above a door, 50% chance of window (rest is blank wall)
         placeWindowOpening(ctx, centerS, storyBaseY, spec);
