@@ -434,17 +434,6 @@ function placeWindowOpening(
     ctx.frame, centerS, centerY, 0.018,
     0.035, spec.windowH * 0.92, 0.055);
 
-  // Shutters (consistent size, random per-window chance)
-  if (ctx.rng.next() < 0.58) {
-    const shutterW = spec.windowW * 0.38;
-    const shutterDepth = 0.04;
-    for (const side of [-1, 1] as const) {
-      const s = centerS + side * (spec.windowW * 0.5 + shutterW * 0.5 + 0.02);
-      pushBox(ctx.instances, ctx.maxInstances, "window_shutter", null,
-        ctx.frame, s, centerY, shutterDepth * 0.5,
-        shutterDepth, spec.windowH, shutterW);
-    }
-  }
 }
 
 // ── Arched door placement (uniform dimensions from spec) ───────────────────
@@ -473,44 +462,10 @@ function placeArchedDoor(
     spec.jambDepth, archRadius, spec.doorW,
     Math.PI * 0.5);
 
-  // 5. Flat lintel bar above the arch
-  pushBox(ctx.instances, ctx.maxInstances, "door_lintel", ctx.wallMaterialId,
-    ctx.frame, centerS, spec.doorH + archRadius + spec.frameThickness * 0.5, spec.jambDepth * 0.5,
-    spec.jambDepth, spec.frameThickness * 1.5, spec.doorW + spec.frameThickness * 2);
-
-  // 6. Threshold step at ground level
+  // 5. Threshold step at ground level
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, 0.03, spec.jambDepth * 0.6,
     spec.jambDepth * 1.2, 0.06, spec.doorW + spec.frameThickness * 2);
-}
-
-// ── Sign board above door ──────────────────────────────────────────────────
-
-function placeSignBoard(
-  ctx: SegmentDecorContext,
-  centerS: number,
-  spec: FacadeSpec,
-): void {
-  if (!ctx.isMainLane && !ctx.isShopfrontZone) return;
-  if (ctx.rng.next() > 0.40) return;
-
-  const archRadius = spec.doorW * 0.5;
-  const signY = spec.doorH + archRadius + spec.frameThickness * 1.5 + 0.15;
-  const signW = spec.doorW * ctx.rng.range(0.6, 0.8);
-  const signH = ctx.rng.range(0.18, 0.28);
-
-  // Sign board
-  pushBox(ctx.instances, ctx.maxInstances, "sign_board", null,
-    ctx.frame, centerS, signY + signH * 0.5, 0.04,
-    0.03, signH, signW);
-
-  // Bracket on each side
-  const bracketOffset = signW * 0.5 + 0.04;
-  for (const side of [-1, 1] as const) {
-    pushBox(ctx.instances, ctx.maxInstances, "sign_bracket", null,
-      ctx.frame, centerS + side * bracketOffset, signY + signH * 0.5, 0.03,
-      0.03, 0.04, 0.04);
-  }
 }
 
 // ── Recessed panel (uses window width from spec for alignment) ─────────────
@@ -550,23 +505,6 @@ function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
       return;
     }
   }
-}
-
-// ── Balconies ──────────────────────────────────────────────────────────────
-
-function placeBalcony(ctx: SegmentDecorContext, centerS: number, storyBaseY: number, spec: FacadeSpec): void {
-  const slabDepth = ctx.rng.range(0.5, 0.85);
-  const slabThickness = ctx.rng.range(0.12, 0.2);
-  const slabWidth = clamp(spec.bayWidth * 0.65, 0.8, spec.bayWidth * 0.8);
-
-  pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
-    ctx.frame, centerS, storyBaseY + slabThickness * 0.5, slabDepth * 0.5,
-    slabDepth, slabThickness, slabWidth);
-
-  const railingH = ctx.rng.range(0.55, 0.85);
-  pushBox(ctx.instances, ctx.maxInstances, "balcony_railing", ctx.wallMaterialId,
-    ctx.frame, centerS, storyBaseY + slabThickness + railingH * 0.5, slabDepth - 0.03,
-    0.06, railingH, slabWidth);
 }
 
 // ── Cable segments ─────────────────────────────────────────────────────────
@@ -617,9 +555,8 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       const storyBaseY = story * STORY_HEIGHT_M;
 
       if (story === 0 && role === "door") {
-        // Ground floor door column → arched door + optional sign
+        // Ground floor door column → arched door
         placeArchedDoor(ctx, centerS, spec);
-        placeSignBoard(ctx, centerS, spec);
       } else if (role === "window" || (role === "door" && story > 0)) {
         // Window column at any story, OR door column on upper stories
         placeWindowOpening(ctx, centerS, storyBaseY, spec);
@@ -629,14 +566,6 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       }
     }
 
-    // Balconies on upper-floor window/door columns (sparse)
-    if ((role === "window" || role === "door") && spec.stories > 1) {
-      for (let story = 1; story < spec.stories; story += 1) {
-        if (ctx.rng.next() < (ctx.isMainLane ? 0.15 : 0.06)) {
-          placeBalcony(ctx, centerS, story * STORY_HEIGHT_M, spec);
-        }
-      }
-    }
   }
 
   // Cables on side halls/cuts
