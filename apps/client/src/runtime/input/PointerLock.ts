@@ -79,6 +79,15 @@ export class PointerLockController {
 
   private requestPointerLock(): void {
     if (document.pointerLockElement === this.options.lockEl) return;
-    void this.options.lockEl.requestPointerLock();
+    try {
+      const result = this.options.lockEl.requestPointerLock();
+      if (result && typeof (result as Promise<void>).catch === "function") {
+        void (result as Promise<void>).catch(() => {
+          this.onPointerLockError();
+        });
+      }
+    } catch {
+      this.onPointerLockError();
+    }
   }
 }
