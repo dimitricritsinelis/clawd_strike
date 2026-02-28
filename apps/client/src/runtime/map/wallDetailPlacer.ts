@@ -427,15 +427,15 @@ function placeWindowOpening(
   // 7. Horizontal crossbar across glass center
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", null,
     ctx.frame, centerS, centerY, 0.018,
-    0.025, 0.035, spec.windowW * 0.92);
+    0.035, 0.055, spec.windowW * 0.92);
 
   // 8. Vertical crossbar
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", null,
     ctx.frame, centerS, centerY, 0.018,
-    0.025, spec.windowH * 0.92, 0.035);
+    0.035, spec.windowH * 0.92, 0.055);
 
   // Shutters (consistent size, random per-window chance)
-  if (ctx.rng.next() < 0.35) {
+  if (ctx.rng.next() < 0.58) {
     const shutterW = spec.windowW * 0.38;
     const shutterDepth = 0.04;
     for (const side of [-1, 1] as const) {
@@ -482,6 +482,35 @@ function placeArchedDoor(
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, 0.03, spec.jambDepth * 0.6,
     spec.jambDepth * 1.2, 0.06, spec.doorW + spec.frameThickness * 2);
+}
+
+// ── Sign board above door ──────────────────────────────────────────────────
+
+function placeSignBoard(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  spec: FacadeSpec,
+): void {
+  if (!ctx.isMainLane && !ctx.isShopfrontZone) return;
+  if (ctx.rng.next() > 0.40) return;
+
+  const archRadius = spec.doorW * 0.5;
+  const signY = spec.doorH + archRadius + spec.frameThickness * 1.5 + 0.15;
+  const signW = spec.doorW * ctx.rng.range(0.6, 0.8);
+  const signH = ctx.rng.range(0.18, 0.28);
+
+  // Sign board
+  pushBox(ctx.instances, ctx.maxInstances, "sign_board", null,
+    ctx.frame, centerS, signY + signH * 0.5, 0.04,
+    0.03, signH, signW);
+
+  // Bracket on each side
+  const bracketOffset = signW * 0.5 + 0.04;
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "sign_bracket", null,
+      ctx.frame, centerS + side * bracketOffset, signY + signH * 0.5, 0.03,
+      0.03, 0.04, 0.04);
+  }
 }
 
 // ── Recessed panel (uses window width from spec for alignment) ─────────────
@@ -588,8 +617,9 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       const storyBaseY = story * STORY_HEIGHT_M;
 
       if (story === 0 && role === "door") {
-        // Ground floor door column → arched door
+        // Ground floor door column → arched door + optional sign
         placeArchedDoor(ctx, centerS, spec);
+        placeSignBoard(ctx, centerS, spec);
       } else if (role === "window" || (role === "door" && story > 0)) {
         // Window column at any story, OR door column on upper stories
         placeWindowOpening(ctx, centerS, storyBaseY, spec);

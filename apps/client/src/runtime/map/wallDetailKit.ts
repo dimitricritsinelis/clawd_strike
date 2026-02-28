@@ -147,13 +147,13 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     metalness: 0.34,
   });
   const frameTrim = new MeshStandardMaterial({
-    color: highVis ? 0x8a7d6d : 0x7a6b55,
+    color: highVis ? 0x9a8068 : 0x8a7058,
     roughness: 0.78,
     metalness: 0.04,
   });
   const woodShutter = new MeshStandardMaterial({
-    color: highVis ? 0x7a5c42 : 0x6b4c38,
-    roughness: 0.82,
+    color: highVis ? 0x5a8a62 : 0x4a6e52,
+    roughness: 0.75,
     metalness: 0.02,
   });
   const windowGlass = new MeshPhysicalMaterial({
