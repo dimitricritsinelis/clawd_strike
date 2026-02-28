@@ -14,6 +14,7 @@ const DETAIL_ZONE_TYPES = new Set([
 
 const SEGMENT_EDGE_MARGIN_M = 0.35;
 const INSTANCE_BUDGET = 9800;
+const STORY_HEIGHT_M = 3.0;
 
 type SegmentFrame = {
   lengthM: number;
@@ -26,12 +27,33 @@ type SegmentFrame = {
   yawRad: number;
 };
 
+type ColumnRole = "door" | "window" | "blank";
+
+type FacadeSpec = {
+  bayCount: number;
+  bayWidth: number;
+  usableLength: number;
+  stories: number;
+  columnRoles: ColumnRole[];
+  windowW: number;
+  windowH: number;
+  sillOffset: number;
+  doorW: number;
+  doorH: number;
+  recessDepth: number;
+  frameThickness: number;
+  frameDepth: number;
+  jambDepth: number;
+};
+
 type SegmentDecorContext = {
   frame: SegmentFrame;
   zone: RuntimeBlockoutZone | null;
   isMainLane: boolean;
   isShopfrontZone: boolean;
   isSideHall: boolean;
+  isConnector: boolean;
+  isCut: boolean;
   profile: BuildWallDetailProfile;
   wallMaterialId: string;
   wallHeightM: number;
@@ -69,6 +91,7 @@ export type WallDetailPlacementStats = {
 
 export type WallDetailPlacementResult = {
   instances: WallDetailInstance[];
+  segmentHeights: number[];
   stats: WallDetailPlacementStats;
 };
 
@@ -158,13 +181,15 @@ function pushBox(
   depth: number,
   height: number,
   length: number,
+  pitchRad?: number,
+  rollRad?: number,
 ): boolean {
   if (instances.length >= maxInstances) {
     return false;
   }
 
   const world = toWorld(frame, alongS, y, inwardN);
-  instances.push({
+  const instance: WallDetailInstance = {
     meshId,
     position: world,
     scale: {
@@ -174,10 +199,95 @@ function pushBox(
     },
     yawRad: frame.yawRad,
     wallMaterialId,
-  });
+  };
+  if (pitchRad !== undefined) instance.pitchRad = pitchRad;
+  if (rollRad !== undefined) instance.rollRad = rollRad;
+  instances.push(instance);
 
   return true;
 }
+
+// ── Per-segment height variation ───────────────────────────────────────────
+
+function resolveSegmentWallHeight(
+  baseHeight: number,
+  zone: RuntimeBlockoutZone | null,
+  rng: DeterministicRng,
+): number {
+  const zoneType = zone?.type ?? "main_lane_segment";
+  let minStories: number;
+  let maxStories: number;
+
+  if (zoneType === "main_lane_segment" || zoneType === "spawn_plaza") {
+    minStories = 2;
+    maxStories = 3;
+  } else if (zoneType === "side_hall") {
+    minStories = 1;
+    maxStories = 2;
+  } else {
+    minStories = 2;
+    maxStories = 2;
+  }
+
+  const stories = minStories + Math.floor(rng.next() * (maxStories - minStories + 1));
+  const jitter = rng.range(-0.3, 0.4);
+  return clamp(stories * STORY_HEIGHT_M + jitter, baseHeight * 0.5, baseHeight * 1.6);
+}
+
+// ── Parapet cap ────────────────────────────────────────────────────────────
+
+function placeParapetCap(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+  const capHeight = ctx.rng.range(0.18, 0.35);
+  const capDepth = clamp(ctx.rng.range(0.06, 0.14), 0.04, ctx.maxProtrusionM + 0.06);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 0.5;
+  const y = ctx.wallHeightM + capHeight * 0.5;
+  pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
+    ctx.frame, 0, y, capDepth * 0.5, capDepth, capHeight, usableLength);
+}
+
+// ── Horizontal banding ─────────────────────────────────────────────────────
+
+function placePlinthStrip(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+  const plinthHeight = ctx.rng.range(0.28, 0.48);
+  const plinthDepth = clamp(ctx.rng.range(0.04, 0.09), 0.03, ctx.maxProtrusionM + 0.04);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 0.3) return;
+  pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
+    ctx.frame, 0, plinthHeight * 0.5, plinthDepth * 0.5,
+    plinthDepth, plinthHeight, usableLength);
+}
+
+function placeStringCourses(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.5) return;
+  const courseHeight = ctx.rng.range(0.08, 0.16);
+  const courseDepth = clamp(ctx.rng.range(0.03, 0.07), 0.02, ctx.maxProtrusionM + 0.02);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 0.5) return;
+
+  for (let storyY = STORY_HEIGHT_M; storyY < ctx.wallHeightM - 0.5; storyY += STORY_HEIGHT_M) {
+    if (!pushBox(ctx.instances, ctx.maxInstances, "string_course_strip", ctx.wallMaterialId,
+      ctx.frame, 0, storyY, courseDepth * 0.5,
+      courseDepth, courseHeight, usableLength)) {
+      return;
+    }
+  }
+}
+
+function placeCorniceStrip(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+  const corniceHeight = ctx.rng.range(0.14, 0.24);
+  const corniceDepth = clamp(ctx.rng.range(0.06, 0.14), 0.04, ctx.maxProtrusionM + 0.05);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 0.5) return;
+  const y = ctx.wallHeightM - corniceHeight * 0.5;
+  pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
+    ctx.frame, 0, y, corniceDepth * 0.5,
+    corniceDepth, corniceHeight, usableLength);
+}
+
+// ── Corner piers ───────────────────────────────────────────────────────────
 
 function placeCornerPiers(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 0.8) return;
@@ -199,42 +309,25 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
   for (const side of [-1, 1] as const) {
     const s = side * Math.max(0.02, halfLen - pierWidth * 0.5 - marginM);
     if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "corner_pier",
-      ctx.wallMaterialId,
-      ctx.frame,
-      s,
-      pierHeight * 0.5,
-      pierDepth * 0.5,
-      pierDepth,
-      pierHeight,
-      pierWidth,
+      ctx.instances, ctx.maxInstances, "corner_pier", ctx.wallMaterialId,
+      ctx.frame, s, pierHeight * 0.5, pierDepth * 0.5,
+      pierDepth, pierHeight, pierWidth,
     )) {
       return;
     }
 
     const capChance = clamp(
       0.22 + (ctx.isShopfrontZone ? 0.08 : 0) - (ctx.isSideHall ? 0.08 : 0) + ctx.density * 0.04,
-      0.08,
-      0.45,
+      0.08, 0.45,
     );
     if (ctx.rng.next() < capChance) {
       const capDepth = clamp(pierDepth * 0.7, 0.04, ctx.maxProtrusionM);
       const capHeight = clamp(ctx.rng.range(0.55, 1.05), 0.45, pierHeight * 0.42);
       const capWidth = clamp(pierWidth * ctx.rng.range(0.4, 0.62), 0.18, pierWidth);
       if (!pushBox(
-        ctx.instances,
-        ctx.maxInstances,
-        "corner_pier",
-        ctx.wallMaterialId,
-        ctx.frame,
-        s,
-        pierHeight - capHeight * 0.5,
-        capDepth * 0.5,
-        capDepth,
-        capHeight,
-        capWidth,
+        ctx.instances, ctx.maxInstances, "corner_pier", ctx.wallMaterialId,
+        ctx.frame, s, pierHeight - capHeight * 0.5, capDepth * 0.5,
+        capDepth, capHeight, capWidth,
       )) {
         return;
       }
@@ -242,10 +335,314 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
   }
 }
 
+// ── Facade spec: decide all proportions ONCE per segment ───────────────────
+
+function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 1.4) return null;
+
+  const stories = Math.max(1, Math.floor(ctx.wallHeightM / STORY_HEIGHT_M));
+
+  // Uniform bay width — pick a target, then round to get an integer count
+  const targetBayW = ctx.rng.range(1.8, 2.6);
+  const bayCount = Math.max(1, Math.round(usableLength / targetBayW));
+  const bayWidth = usableLength / bayCount;
+
+  // Uniform opening dimensions for the entire facade
+  const windowW = clamp(bayWidth * ctx.rng.range(0.35, 0.50), 0.55, bayWidth * 0.62);
+  const windowH = ctx.rng.range(1.05, 1.35);
+  const sillOffset = ctx.rng.range(0.85, 1.05);
+  const doorW = clamp(bayWidth * ctx.rng.range(0.45, 0.60), 0.75, bayWidth * 0.72);
+  const doorH = ctx.rng.range(2.35, 2.65);
+  const recessDepth = ctx.rng.range(0.07, 0.12);
+  const frameThickness = ctx.rng.range(0.09, 0.14);
+  const frameDepth = clamp(ctx.rng.range(0.03, 0.06), 0.02, ctx.maxProtrusionM + 0.02);
+  const jambDepth = clamp(ctx.rng.range(0.06, 0.12), 0.04, ctx.maxProtrusionM + 0.04);
+
+  // Assign a role to each column (vertical coherence)
+  const columnRoles: ColumnRole[] = [];
+  for (let i = 0; i < bayCount; i += 1) {
+    const roll = ctx.rng.next();
+    if (ctx.isMainLane || ctx.isShopfrontZone) {
+      columnRoles.push(roll < 0.28 ? "door" : roll < 0.72 ? "window" : "blank");
+    } else if (ctx.isSideHall) {
+      columnRoles.push(roll < 0.10 ? "door" : roll < 0.45 ? "window" : "blank");
+    } else {
+      columnRoles.push(roll < 0.16 ? "door" : roll < 0.52 ? "window" : "blank");
+    }
+  }
+
+  return {
+    bayCount, bayWidth, usableLength, stories, columnRoles,
+    windowW, windowH, sillOffset, doorW, doorH,
+    recessDepth, frameThickness, frameDepth, jambDepth,
+  };
+}
+
+// ── Column center position from uniform grid ───────────────────────────────
+
+function columnCenterS(spec: FacadeSpec, columnIndex: number): number {
+  return -spec.usableLength * 0.5 + spec.bayWidth * (columnIndex + 0.5);
+}
+
+// ── Window placement (uniform dimensions from spec) ────────────────────────
+
+function placeWindowOpening(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  storyBaseY: number,
+  spec: FacadeSpec,
+): void {
+  const sillY = storyBaseY + spec.sillOffset;
+  const centerY = sillY + spec.windowH * 0.5;
+
+  // Back panel (recessed into wall)
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
+    ctx.frame, centerS, centerY, -spec.recessDepth * 0.5,
+    spec.recessDepth, spec.windowH, spec.windowW);
+
+  // Left jamb
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
+    ctx.frame, centerS - (spec.windowW + spec.frameThickness) * 0.5, centerY, spec.frameDepth * 0.5,
+    spec.frameDepth, spec.windowH + spec.frameThickness, spec.frameThickness);
+
+  // Right jamb
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
+    ctx.frame, centerS + (spec.windowW + spec.frameThickness) * 0.5, centerY, spec.frameDepth * 0.5,
+    spec.frameDepth, spec.windowH + spec.frameThickness, spec.frameThickness);
+
+  // Sill
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, sillY - spec.frameThickness * 0.5, spec.frameDepth * 0.5,
+    spec.frameDepth, spec.frameThickness, spec.windowW + spec.frameThickness * 2);
+
+  // Lintel
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, sillY + spec.windowH + spec.frameThickness * 0.5, spec.frameDepth * 0.5,
+    spec.frameDepth, spec.frameThickness, spec.windowW + spec.frameThickness * 2);
+
+  // Shutters (consistent size, random per-window chance)
+  if (ctx.rng.next() < 0.35) {
+    const shutterW = spec.windowW * 0.38;
+    const shutterDepth = 0.04;
+    for (const side of [-1, 1] as const) {
+      const s = centerS + side * (spec.windowW * 0.5 + shutterW * 0.5 + 0.02);
+      pushBox(ctx.instances, ctx.maxInstances, "window_shutter", ctx.wallMaterialId,
+        ctx.frame, s, centerY, shutterDepth * 0.5,
+        shutterDepth, spec.windowH, shutterW);
+    }
+  }
+}
+
+// ── Arched door placement (uniform dimensions from spec) ───────────────────
+
+function placeArchedDoor(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  spec: FacadeSpec,
+): void {
+  // Dark recessed opening
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
+    ctx.frame, centerS, spec.doorH * 0.5, -spec.recessDepth * 0.5,
+    spec.recessDepth, spec.doorH, spec.doorW);
+
+  // Left jamb
+  pushBox(ctx.instances, ctx.maxInstances, "door_jamb", ctx.wallMaterialId,
+    ctx.frame, centerS - (spec.doorW + spec.frameThickness) * 0.5, spec.doorH * 0.5, spec.jambDepth * 0.5,
+    spec.jambDepth, spec.doorH, spec.frameThickness);
+
+  // Right jamb
+  pushBox(ctx.instances, ctx.maxInstances, "door_jamb", ctx.wallMaterialId,
+    ctx.frame, centerS + (spec.doorW + spec.frameThickness) * 0.5, spec.doorH * 0.5, spec.jambDepth * 0.5,
+    spec.jambDepth, spec.doorH, spec.frameThickness);
+
+  // Arch lintel (half-cylinder oriented as arch)
+  const archRadius = spec.doorW * 0.5;
+  pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", ctx.wallMaterialId,
+    ctx.frame, centerS, spec.doorH + archRadius * 0.5, spec.jambDepth * 0.5,
+    spec.jambDepth, archRadius, spec.doorW,
+    Math.PI * 0.5);
+
+  // Flat lintel bar above the arch
+  pushBox(ctx.instances, ctx.maxInstances, "door_lintel", ctx.wallMaterialId,
+    ctx.frame, centerS, spec.doorH + archRadius + spec.frameThickness * 0.5, spec.jambDepth * 0.5,
+    spec.jambDepth, spec.frameThickness * 1.5, spec.doorW + spec.frameThickness * 2);
+}
+
+// ── Recessed panel (uses window width from spec for alignment) ─────────────
+
+function placeRecessedPanel(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  storyBaseY: number,
+  spec: FacadeSpec,
+): void {
+  const panelW = spec.windowW * 0.85;
+  const panelH = spec.windowH * 0.7;
+  const centerY = storyBaseY + spec.sillOffset + panelH * 0.5;
+  const depth = spec.recessDepth * 0.7;
+
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
+    ctx.frame, centerS, centerY, -depth * 0.5,
+    depth, panelH, panelW);
+}
+
+// ── Pilasters aligned to bay grid ──────────────────────────────────────────
+
+function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
+  if (spec.bayCount < 2) return;
+  if (ctx.frame.lengthM < 3.0) return;
+
+  const pilasterDepth = clamp(ctx.rng.range(0.04, 0.09), 0.03, ctx.maxProtrusionM + 0.02);
+  const pilasterWidth = ctx.rng.range(0.14, 0.24);
+  const pilasterHeight = ctx.wallHeightM;
+
+  // Place between bay columns — aligned to the same grid as openings
+  for (let i = 1; i < spec.bayCount; i += 1) {
+    const s = -spec.usableLength * 0.5 + spec.bayWidth * i;
+    if (!pushBox(ctx.instances, ctx.maxInstances, "pilaster", ctx.wallMaterialId,
+      ctx.frame, s, pilasterHeight * 0.5, pilasterDepth * 0.5,
+      pilasterDepth, pilasterHeight, pilasterWidth)) {
+      return;
+    }
+  }
+}
+
+// ── Balconies ──────────────────────────────────────────────────────────────
+
+function placeBalcony(ctx: SegmentDecorContext, centerS: number, storyBaseY: number, spec: FacadeSpec): void {
+  const slabDepth = ctx.rng.range(0.5, 0.85);
+  const slabThickness = ctx.rng.range(0.12, 0.2);
+  const slabWidth = clamp(spec.bayWidth * 0.65, 0.8, spec.bayWidth * 0.8);
+
+  pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+    ctx.frame, centerS, storyBaseY + slabThickness * 0.5, slabDepth * 0.5,
+    slabDepth, slabThickness, slabWidth);
+
+  const railingH = ctx.rng.range(0.55, 0.85);
+  pushBox(ctx.instances, ctx.maxInstances, "balcony_railing", ctx.wallMaterialId,
+    ctx.frame, centerS, storyBaseY + slabThickness + railingH * 0.5, slabDepth - 0.03,
+    0.06, railingH, slabWidth);
+}
+
+// ── Awning brackets ────────────────────────────────────────────────────────
+
+function placeAwningBrackets(ctx: SegmentDecorContext, centerS: number, spec: FacadeSpec): void {
+  if (!ctx.isShopfrontZone) return;
+  if (ctx.rng.next() > 0.45) return;
+
+  const bracketH = ctx.rng.range(0.15, 0.3);
+  const bracketDepth = clamp(ctx.rng.range(0.3, 0.55), 0.2, 0.6);
+  const y = ctx.rng.range(2.8, 3.3);
+
+  for (const side of [-1, 1] as const) {
+    const s = centerS + side * spec.bayWidth * 0.32;
+    if (!pushBox(ctx.instances, ctx.maxInstances, "awning_bracket", null,
+      ctx.frame, s, y, bracketDepth * 0.5,
+      bracketDepth, bracketH, 0.06)) {
+      return;
+    }
+  }
+}
+
+// ── Sign boards ────────────────────────────────────────────────────────────
+
+function placeSignBoard(ctx: SegmentDecorContext, centerS: number): void {
+  if (!ctx.isMainLane) return;
+  if (ctx.rng.next() > 0.18) return;
+
+  const signW = ctx.rng.range(0.4, 0.75);
+  const signH = ctx.rng.range(0.3, 0.55);
+  const y = ctx.rng.range(2.9, 3.5);
+  const protrusion = ctx.rng.range(0.35, 0.65);
+
+  pushBox(ctx.instances, ctx.maxInstances, "sign_bracket", null,
+    ctx.frame, centerS, y, protrusion * 0.5,
+    protrusion, 0.04, 0.04);
+
+  pushBox(ctx.instances, ctx.maxInstances, "sign_board", null,
+    ctx.frame, centerS, y - signH * 0.5 - 0.06, protrusion,
+    0.04, signH, signW);
+}
+
+// ── Cable segments ─────────────────────────────────────────────────────────
+
+function placeCableSegments(ctx: SegmentDecorContext): void {
+  if (!ctx.isSideHall && !ctx.isCut) return;
+  if (ctx.rng.next() > 0.28) return;
+  if (ctx.frame.lengthM < 2.0) return;
+
+  const cableY = ctx.rng.range(ctx.wallHeightM * 0.55, ctx.wallHeightM * 0.82);
+  const cableLength = ctx.frame.lengthM * ctx.rng.range(0.3, 0.6);
+
+  pushBox(ctx.instances, ctx.maxInstances, "cable_segment", null,
+    ctx.frame, 0, cableY, ctx.rng.range(0.02, 0.05),
+    0.02, 0.02, cableLength);
+}
+
+// ── Main decoration orchestrator ───────────────────────────────────────────
+
 function decorateSegment(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < SEGMENT_EDGE_MARGIN_M * 2) return;
+
+  // Structural framing
   placeCornerPiers(ctx);
+  placeParapetCap(ctx);
+
+  // Horizontal banding
+  placePlinthStrip(ctx);
+  placeStringCourses(ctx);
+  placeCorniceStrip(ctx);
+
+  // Compute facade spec — all proportions decided once
+  const spec = computeFacadeSpec(ctx);
+  if (!spec) {
+    placeCableSegments(ctx);
+    return;
+  }
+
+  // Pilasters aligned to the bay grid
+  placePilasters(ctx, spec);
+
+  // Walk columns × stories with vertical coherence
+  for (let col = 0; col < spec.bayCount; col += 1) {
+    const role = spec.columnRoles[col]!;
+    const centerS = columnCenterS(spec, col);
+
+    for (let story = 0; story < spec.stories; story += 1) {
+      const storyBaseY = story * STORY_HEIGHT_M;
+
+      if (story === 0 && role === "door") {
+        // Ground floor door column → arched door
+        placeArchedDoor(ctx, centerS, spec);
+      } else if (role === "window" || (role === "door" && story > 0)) {
+        // Window column at any story, OR door column on upper stories
+        placeWindowOpening(ctx, centerS, storyBaseY, spec);
+      } else if (role === "blank" && ctx.rng.next() < 0.25) {
+        // Blank column — occasional subtle recess for texture
+        placeRecessedPanel(ctx, centerS, storyBaseY, spec);
+      }
+    }
+
+    // Ground-floor embellishments on this column
+    placeAwningBrackets(ctx, centerS, spec);
+    placeSignBoard(ctx, centerS);
+
+    // Balconies on upper-floor window/door columns (sparse)
+    if ((role === "window" || role === "door") && spec.stories > 1) {
+      for (let story = 1; story < spec.stories; story += 1) {
+        if (ctx.rng.next() < (ctx.isMainLane ? 0.15 : 0.06)) {
+          placeBalcony(ctx, centerS, story * STORY_HEIGHT_M, spec);
+        }
+      }
+    }
+  }
+
+  // Cables on side halls/cuts
+  placeCableSegments(ctx);
 }
+
+// ── Public entry point ─────────────────────────────────────────────────────
 
 export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOptions): WallDetailPlacementResult {
   const seed = typeof options.detailSeed === "number"
@@ -255,10 +652,12 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   const maxProtrusionM = clamp(options.maxProtrusionM, 0.03, 0.2);
   const maxInstances = Math.max(1, INSTANCE_BUDGET);
   const instances: WallDetailInstance[] = [];
+  const segmentHeights: number[] = [];
 
   if (!options.enabled || options.segments.length === 0) {
     return {
       instances,
+      segmentHeights,
       stats: {
         enabled: false,
         seed,
@@ -274,23 +673,31 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   let segmentsDecorated = 0;
 
   for (let index = 0; index < options.segments.length; index += 1) {
-    if (instances.length >= maxInstances) {
-      break;
-    }
-
     const segment = options.segments[index]!;
     const frame = toSegmentFrame(segment);
     const zone = resolveSegmentZone(frame, options.zones);
     const isMainLane = isMainLaneZone(zone);
     const isShopfront = isShopfrontZone(zone);
     const isSideHall = zone?.type === "side_hall";
+    const isConnector = zone?.type === "connector";
+    const isCut = zone?.type === "cut";
     const wallMaterialId = resolveWallMaterialIdForZone(zone?.id ?? null);
+
+    // Compute per-segment height
+    const heightSeed = deriveSubSeed(seed, `height:${index}:${zone?.id ?? "none"}`);
+    const heightRng = new DeterministicRng(heightSeed);
+    const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng);
+    segmentHeights.push(segHeight);
+
+    if (instances.length >= maxInstances) {
+      continue;
+    }
 
     const segmentDensityRaw = density
       * (isMainLane ? 1.04 : 1)
       * (isShopfront ? 1.08 : 1)
       * (isSideHall ? 0.84 : 1)
-      * (zone?.type === "connector" ? 0.78 : 1);
+      * (isConnector ? 0.78 : 1);
     const segmentDensity = clamp(segmentDensityRaw, 0.06, 1.2);
     const segmentMaxProtrusion = clamp(
       isMainLane ? Math.min(maxProtrusionM, 0.14) : maxProtrusionM,
@@ -307,9 +714,11 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       isMainLane,
       isShopfrontZone: isShopfront,
       isSideHall,
+      isConnector,
+      isCut,
       profile: options.profile,
       wallMaterialId,
-      wallHeightM: options.wallHeightM,
+      wallHeightM: segHeight,
       maxProtrusionM: segmentMaxProtrusion,
       density: segmentDensity,
       rng: segRng,
@@ -323,6 +732,7 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
 
   return {
     instances,
+    segmentHeights,
     stats: {
       enabled: true,
       seed,

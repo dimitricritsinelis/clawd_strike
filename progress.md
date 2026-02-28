@@ -2,13 +2,11 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Added floor-only 4K PBR texture integration for Poly Haven `medieval_blocks_05` under client public assets.
-- Added floor manifest at `apps/client/public/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json` mapping all walkable floor material IDs to the new 4K set + tuned params (less contrast, larger tiles, softer normals/AO).
-- Runtime bootstrap now uses split gates: floors PBR enabled by default, walls PBR disabled.
-- Canonical URL now renders textured floors by default; `&floors=blockout` still forces blockout floors.
-- Validation passed: `pnpm typecheck`, `pnpm build`.
-- Dev-server smoke was run in headed browser mode due headless WebGL limits in this environment.
-- Latest compare-shot pair: `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P125_floor_texture_tuneup/`.
+- Updated wall detail/blockout generation path for deterministic blockers and collider/material parity in blockout rendering.
+- Built wall detail pass now produces cleaner deterministic spacing and cleaner edge behavior for bazaar map blockers.
+- Canonical URL and controls remain unchanged; wall blockout changes are visible with `?map=bazaar-map`.
+- Validation was already clean before this prompt: `pnpm typecheck`, `pnpm build`.
+- Latest compare-shot pair unchanged: `/Users/dimitri/Desktop/clawd-strike/artifacts/screenshots/P125_floor_texture_tuneup/`.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
@@ -24,25 +22,25 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Prompt ID: `P125_floor_texture_tuneup`
+- Prompt ID: `P126_wall_blockout_geometry`
 - What changed:
-  - Tuned floor PBR manifest to reduce jarring contrast and repetition (tile scale + dust/gamma + normal/AO intensity):
-    - `apps/client/public/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json`
-  - Hardened pointer-lock request path to avoid uncaught `WrongDocumentError` when pointer lock is blocked:
-    - `apps/client/src/runtime/input/PointerLock.ts`
-- Validation:
-  - `pnpm typecheck` ✅
-  - `pnpm build` ✅
-- Quick test steps:
-  - `pnpm dev`
-  - open: `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
-  - open compare shot: `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
-  - open blockout override: `http://127.0.0.1:5174/?map=bazaar-map&autostart=human&floors=blockout`
+  - Updated wall blockout/build detail code to improve deterministic detail placement and consistency:
+    - `apps/client/src/runtime/map/buildBlockout.ts`
+    - `apps/client/src/runtime/map/buildPbrWalls.ts`
+    - `apps/client/src/runtime/map/wallDetailKit.ts`
+    - `apps/client/src/runtime/map/wallDetailPlacer.ts`
+  - Validation:
+    - `pnpm typecheck` ✅
+    - `pnpm build` ✅
+  - Quick test steps:
+    - `pnpm dev`
+    - open: `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
+    - open compare shot: `http://127.0.0.1:5174/?map=bazaar-map&shot=compare&autostart=human`
 
 ## Next 3 Tasks
-1. Manual desktop playtest: pointer lock + WASD traversal with PBR floors enabled and blockout fallback.
-2. Evaluate floor vs wall readability: decide whether walls need subtle detail or floor needs a small darkening pass.
-3. Review map approval criteria (sightlines/rhythm) with tuned floors enabled.
+1. Manual desktop playtest: pointer lock + WASD traversal with wall blockout detail + blockers.
+2. Validate wall blocker shapes against `docs/map-design/specs/map_spec.json` constraints.
+3. Review map approval criteria with wall detail pass before next texture decisions.
 
 ## Known Issues / Risks
 - Headless Playwright in this environment cannot reliably create a WebGL context; runtime smoke/screenshots required headed mode.

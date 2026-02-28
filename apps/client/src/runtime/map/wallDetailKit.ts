@@ -21,7 +21,10 @@ export type WallDetailMeshId =
   | "sign_board"
   | "sign_bracket"
   | "awning_bracket"
-  | "cable_segment";
+  | "cable_segment"
+  | "window_shutter"
+  | "balcony_slab"
+  | "balcony_railing";
 
 export type WallDetailInstance = {
   meshId: WallDetailMeshId;
@@ -77,6 +80,9 @@ const DETAIL_IDS: WallDetailMeshId[] = [
   "sign_bracket",
   "awning_bracket",
   "cable_segment",
+  "window_shutter",
+  "balcony_slab",
+  "balcony_railing",
 ];
 
 function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTemplate> {
@@ -177,6 +183,18 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     cable_segment: {
       geometry: new CylinderGeometry(0.5, 0.5, 1, 10, 1, true),
       material: cableMetal,
+    },
+    window_shutter: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stonePrimary,
+    },
+    balcony_slab: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stoneTrim,
+    },
+    balcony_railing: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: bracketMetal,
     },
   };
 }

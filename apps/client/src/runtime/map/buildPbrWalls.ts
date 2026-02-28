@@ -30,6 +30,7 @@ type BuildPbrWallsOptions = {
   manifest: WallMaterialLibrary;
   wallHeightM: number;
   floorTopY: number;
+  segmentHeights?: readonly number[];
 };
 
 function getBatch(map: Map<string, MaterialBatch>, materialId: string): MaterialBatch {
@@ -215,11 +216,12 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
     const uvRng = new DeterministicRng(uvSeed);
     const tileSizeM = options.manifest.getTileSizeM(materialId);
     const batch = getBatch(batches, materialId);
+    const segHeight = options.segmentHeights?.[index] ?? options.wallHeightM;
     appendSegmentFace(
       batch,
       segment,
       options.floorTopY,
-      options.wallHeightM,
+      segHeight,
       tileSizeM,
       uvRng.int(0, 4),
       uvRng.int(0, 4),
