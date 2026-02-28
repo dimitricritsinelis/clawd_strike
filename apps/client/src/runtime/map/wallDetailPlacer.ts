@@ -360,16 +360,25 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
   const frameDepth = clamp(ctx.rng.range(0.06, 0.10), 0.04, ctx.maxProtrusionM + 0.06);
   const jambDepth = clamp(ctx.rng.range(0.10, 0.16), 0.06, ctx.maxProtrusionM + 0.10);
 
-  // Assign a role to each column (vertical coherence)
+  // Assign roles using shop-unit patterns — each shop gets one door
+  // followed by blank/display bays, then the next shop starts
   const columnRoles: ColumnRole[] = [];
-  for (let i = 0; i < bayCount; i += 1) {
-    const roll = ctx.rng.next();
-    if (ctx.isMainLane || ctx.isShopfrontZone) {
-      columnRoles.push(roll < 0.20 ? "door" : roll < 0.46 ? "window" : "blank");
-    } else if (ctx.isSideHall) {
-      columnRoles.push(roll < 0.06 ? "door" : roll < 0.22 ? "window" : "blank");
-    } else {
-      columnRoles.push(roll < 0.10 ? "door" : roll < 0.30 ? "window" : "blank");
+  let col = 0;
+  while (col < bayCount) {
+    const shopBays = (ctx.isMainLane || ctx.isShopfrontZone)
+      ? ctx.rng.int(2, 4)
+      : ctx.isSideHall
+        ? ctx.rng.int(3, 6)
+        : ctx.rng.int(3, 5);
+
+    for (let b = 0; b < shopBays && col < bayCount; b += 1, col += 1) {
+      if (b === 0) {
+        columnRoles.push("door");
+      } else if (b === 1 && (ctx.isMainLane || ctx.isShopfrontZone) && ctx.rng.next() < 0.40) {
+        columnRoles.push("window");
+      } else {
+        columnRoles.push("blank");
+      }
     }
   }
 
