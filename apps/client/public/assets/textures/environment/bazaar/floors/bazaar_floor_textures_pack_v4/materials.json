@@ -1,0 +1,89 @@
+{
+  "materials": [
+    {
+      "id": "large_sandstone_blocks_01",
+      "tileSizeM": 4,
+      "albedoBoost": 0.92,
+      "albedoGamma": 0.93,
+      "dustStrength": 0.22,
+      "roughness": 0.98,
+      "normalScale": 0.25,
+      "aoIntensity": 0.35,
+      "textures": {
+        "4k": {
+          "albedo": "./medieval_blocks_05/medieval_blocks_05_diff_4k.jpg",
+          "normal": "./medieval_blocks_05/medieval_blocks_05_nor_gl_4k.jpg",
+          "arm": "./medieval_blocks_05/medieval_blocks_05_arm_4k.jpg"
+        }
+      }
+    },
+    {
+      "id": "grey_tiles",
+      "tileSizeM": 4,
+      "albedoBoost": 0.92,
+      "albedoGamma": 0.93,
+      "dustStrength": 0.22,
+      "roughness": 0.98,
+      "normalScale": 0.25,
+      "aoIntensity": 0.35,
+      "textures": {
+        "4k": {
+          "albedo": "./medieval_blocks_05/medieval_blocks_05_diff_4k.jpg",
+          "normal": "./medieval_blocks_05/medieval_blocks_05_nor_gl_4k.jpg",
+          "arm": "./medieval_blocks_05/medieval_blocks_05_arm_4k.jpg"
+        }
+      }
+    },
+    {
+      "id": "cobblestone_pavement",
+      "tileSizeM": 4,
+      "albedoBoost": 0.92,
+      "albedoGamma": 0.93,
+      "dustStrength": 0.22,
+      "roughness": 0.98,
+      "normalScale": 0.25,
+      "aoIntensity": 0.35,
+      "textures": {
+        "4k": {
+          "albedo": "./medieval_blocks_05/medieval_blocks_05_diff_4k.jpg",
+          "normal": "./medieval_blocks_05/medieval_blocks_05_nor_gl_4k.jpg",
+          "arm": "./medieval_blocks_05/medieval_blocks_05_arm_4k.jpg"
+        }
+      }
+    },
+    {
+      "id": "cobblestone_color",
+      "tileSizeM": 4,
+      "albedoBoost": 0.92,
+      "albedoGamma": 0.93,
+      "dustStrength": 0.22,
+      "roughness": 0.98,
+      "normalScale": 0.25,
+      "aoIntensity": 0.35,
+      "textures": {
+        "4k": {
+          "albedo": "./medieval_blocks_05/medieval_blocks_05_diff_4k.jpg",
+          "normal": "./medieval_blocks_05/medieval_blocks_05_nor_gl_4k.jpg",
+          "arm": "./medieval_blocks_05/medieval_blocks_05_arm_4k.jpg"
+        }
+      }
+    },
+    {
+      "id": "sand_01",
+      "tileSizeM": 4,
+      "albedoBoost": 0.92,
+      "albedoGamma": 0.93,
+      "dustStrength": 0.22,
+      "roughness": 0.98,
+      "normalScale": 0.25,
+      "aoIntensity": 0.35,
+      "textures": {
+        "4k": {
+          "albedo": "./medieval_blocks_05/medieval_blocks_05_diff_4k.jpg",
+          "normal": "./medieval_blocks_05/medieval_blocks_05_nor_gl_4k.jpg",
+          "arm": "./medieval_blocks_05/medieval_blocks_05_arm_4k.jpg"
+        }
+      }
+    }
+  ]
+}

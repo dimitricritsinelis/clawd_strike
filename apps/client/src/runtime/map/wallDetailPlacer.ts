@@ -14,6 +14,23 @@ const DETAIL_ZONE_TYPES = new Set([
 
 const SEGMENT_EDGE_MARGIN_M = 0.35;
 const INSTANCE_BUDGET = 9800;
+const STORY_HEIGHT_M = 3.0;
+const WINDOW_GLASS_THICKNESS_M = 0.02;
+
+// Roof cap constants
+const ROOF_DEPTH_M = 10.0;
+const ROOF_THICKNESS_M = 0.20;
+const ROOF_OVERHANG_M = 0.15;
+
+// Balcony constants
+const BALCONY_DEPTH_M = 1.1;
+const BALCONY_SLAB_THICKNESS_M = 0.12;
+const BALCONY_WALL_H = 0.95;
+const BALCONY_WALL_THICKNESS_M = 0.15;
+const BALCONY_DOOR_H = 2.2;
+const BALCONY_DOOR_SILL_OFFSET = 0.08;
+const BALCONY_CHANCE = 0.20;
+const BALCONY_ELIGIBLE_ZONES = new Set(["main_lane_segment", "spawn_plaza"]);
 
 type SegmentFrame = {
   lengthM: number;
@@ -26,12 +43,33 @@ type SegmentFrame = {
   yawRad: number;
 };
 
+type ColumnRole = "door" | "window" | "blank";
+
+type FacadeSpec = {
+  bayCount: number;
+  bayWidth: number;
+  usableLength: number;
+  stories: number;
+  columnRoles: ColumnRole[];
+  windowW: number;
+  windowH: number;
+  sillOffset: number;
+  doorW: number;
+  doorH: number;
+  recessDepth: number;
+  frameThickness: number;
+  frameDepth: number;
+  jambDepth: number;
+};
+
 type SegmentDecorContext = {
   frame: SegmentFrame;
   zone: RuntimeBlockoutZone | null;
   isMainLane: boolean;
   isShopfrontZone: boolean;
   isSideHall: boolean;
+  isConnector: boolean;
+  isCut: boolean;
   profile: BuildWallDetailProfile;
   wallMaterialId: string;
   wallHeightM: number;
@@ -69,6 +107,7 @@ export type WallDetailPlacementStats = {
 
 export type WallDetailPlacementResult = {
   instances: WallDetailInstance[];
+  segmentHeights: number[];
   stats: WallDetailPlacementStats;
 };
 
@@ -158,13 +197,15 @@ function pushBox(
   depth: number,
   height: number,
   length: number,
+  pitchRad?: number,
+  rollRad?: number,
 ): boolean {
   if (instances.length >= maxInstances) {
     return false;
   }
 
   const world = toWorld(frame, alongS, y, inwardN);
-  instances.push({
+  const instance: WallDetailInstance = {
     meshId,
     position: world,
     scale: {
@@ -174,10 +215,118 @@ function pushBox(
     },
     yawRad: frame.yawRad,
     wallMaterialId,
-  });
+  };
+  if (pitchRad !== undefined) instance.pitchRad = pitchRad;
+  if (rollRad !== undefined) instance.rollRad = rollRad;
+  instances.push(instance);
 
   return true;
 }
+
+// ── Per-segment height variation ───────────────────────────────────────────
+
+function resolveSegmentWallHeight(
+  baseHeight: number,
+  zone: RuntimeBlockoutZone | null,
+  rng: DeterministicRng,
+): number {
+  const zoneType = zone?.type ?? "main_lane_segment";
+  let minStories: number;
+  let maxStories: number;
+
+  if (zoneType === "main_lane_segment" || zoneType === "spawn_plaza") {
+    minStories = 2;
+    maxStories = 3;
+  } else if (zoneType === "side_hall") {
+    minStories = 1;
+    maxStories = 2;
+  } else {
+    minStories = 2;
+    maxStories = 2;
+  }
+
+  const stories = minStories + Math.floor(rng.next() * (maxStories - minStories + 1));
+  const jitter = rng.range(-0.3, 0.4);
+  return clamp(stories * STORY_HEIGHT_M + jitter, baseHeight * 0.5, baseHeight * 1.6);
+}
+
+// ── Parapet cap ────────────────────────────────────────────────────────────
+
+function placeParapetCap(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+  const capHeight = ctx.rng.range(0.18, 0.35);
+  const capDepth = clamp(ctx.rng.range(0.06, 0.14), 0.04, ctx.maxProtrusionM + 0.06);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 0.5;
+  const y = ctx.wallHeightM + capHeight * 0.5;
+  pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
+    ctx.frame, 0, y, capDepth * 0.5, capDepth, capHeight, usableLength);
+}
+
+// ── Roof cap ───────────────────────────────────────────────────────────────
+
+function placeRoofCap(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+
+  const roofY = ctx.wallHeightM + ROOF_THICKNESS_M * 0.5;
+  const roofLength = ctx.frame.lengthM;
+  // Positive inwardN = toward walkable zone, negative = into building mass
+  const centerInwardN = (ROOF_OVERHANG_M - ROOF_DEPTH_M) * 0.5;
+
+  pushBox(
+    ctx.instances, ctx.maxInstances,
+    "balcony_slab", ctx.wallMaterialId,
+    ctx.frame,
+    0,
+    roofY,
+    centerInwardN,
+    ROOF_DEPTH_M + ROOF_OVERHANG_M,
+    ROOF_THICKNESS_M,
+    roofLength,
+  );
+}
+
+// ── Horizontal banding ─────────────────────────────────────────────────────
+
+function placePlinthStrip(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+  const plinthHeight = ctx.rng.range(0.28, 0.48);
+  const plinthDepth = clamp(ctx.rng.range(0.06, 0.13), 0.04, ctx.maxProtrusionM + 0.06);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 0.3) return;
+  pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
+    ctx.frame, 0, plinthHeight * 0.5, plinthDepth * 0.5,
+    plinthDepth, plinthHeight, usableLength);
+}
+
+function placeStringCourses(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.5) return;
+  const courseHeight = ctx.rng.range(0.10, 0.18);
+  const courseDepth = clamp(ctx.rng.range(0.06, 0.11), 0.04, ctx.maxProtrusionM + 0.04);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 0.5) return;
+
+  for (let storyY = STORY_HEIGHT_M; storyY < ctx.wallHeightM - 0.5; storyY += STORY_HEIGHT_M) {
+    if (!pushBox(ctx.instances, ctx.maxInstances, "string_course_strip", ctx.wallMaterialId,
+      ctx.frame, 0, storyY, courseDepth * 0.5,
+      courseDepth, courseHeight, usableLength)) {
+      return;
+    }
+  }
+}
+
+function placeCorniceStrip(ctx: SegmentDecorContext): void {
+  if (ctx.frame.lengthM < 1.0) return;
+  const corniceHeight = ctx.rng.range(0.18, 0.30);
+  const corniceDepth = clamp(ctx.rng.range(0.10, 0.19), 0.06, ctx.maxProtrusionM + 0.08);
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 0.5) return;
+  const y = ctx.wallHeightM - corniceHeight * 0.5;
+  pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
+    ctx.frame, 0, y, corniceDepth * 0.5,
+    corniceDepth, corniceHeight, usableLength);
+}
+
+// ── Corner piers ───────────────────────────────────────────────────────────
 
 function placeCornerPiers(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 0.8) return;
@@ -199,42 +348,25 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
   for (const side of [-1, 1] as const) {
     const s = side * Math.max(0.02, halfLen - pierWidth * 0.5 - marginM);
     if (!pushBox(
-      ctx.instances,
-      ctx.maxInstances,
-      "corner_pier",
-      ctx.wallMaterialId,
-      ctx.frame,
-      s,
-      pierHeight * 0.5,
-      pierDepth * 0.5,
-      pierDepth,
-      pierHeight,
-      pierWidth,
+      ctx.instances, ctx.maxInstances, "corner_pier", ctx.wallMaterialId,
+      ctx.frame, s, pierHeight * 0.5, pierDepth * 0.5,
+      pierDepth, pierHeight, pierWidth,
     )) {
       return;
     }
 
     const capChance = clamp(
       0.22 + (ctx.isShopfrontZone ? 0.08 : 0) - (ctx.isSideHall ? 0.08 : 0) + ctx.density * 0.04,
-      0.08,
-      0.45,
+      0.08, 0.45,
     );
     if (ctx.rng.next() < capChance) {
       const capDepth = clamp(pierDepth * 0.7, 0.04, ctx.maxProtrusionM);
       const capHeight = clamp(ctx.rng.range(0.55, 1.05), 0.45, pierHeight * 0.42);
       const capWidth = clamp(pierWidth * ctx.rng.range(0.4, 0.62), 0.18, pierWidth);
       if (!pushBox(
-        ctx.instances,
-        ctx.maxInstances,
-        "corner_pier",
-        ctx.wallMaterialId,
-        ctx.frame,
-        s,
-        pierHeight - capHeight * 0.5,
-        capDepth * 0.5,
-        capDepth,
-        capHeight,
-        capWidth,
+        ctx.instances, ctx.maxInstances, "corner_pier", ctx.wallMaterialId,
+        ctx.frame, s, pierHeight - capHeight * 0.5, capDepth * 0.5,
+        capDepth, capHeight, capWidth,
       )) {
         return;
       }
@@ -242,10 +374,341 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
   }
 }
 
+// ── Facade spec: decide all proportions ONCE per segment ───────────────────
+
+function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
+  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  if (usableLength < 1.4) return null;
+
+  const stories = Math.max(1, Math.floor(ctx.wallHeightM / STORY_HEIGHT_M));
+
+  // Uniform bay width — pick a target, then round to get an integer count
+  const targetBayW = ctx.rng.range(1.8, 2.6);
+  const bayCount = Math.max(1, Math.round(usableLength / targetBayW));
+  const bayWidth = usableLength / bayCount;
+
+  // Uniform opening dimensions for the entire facade
+  const windowW = clamp(bayWidth * ctx.rng.range(0.35, 0.50), 0.55, bayWidth * 0.62);
+  const windowH = ctx.rng.range(1.05, 1.35);
+  const sillOffset = ctx.rng.range(0.85, 1.05);
+  const doorW = clamp(bayWidth * ctx.rng.range(0.45, 0.60), 0.75, bayWidth * 0.72);
+  const doorH = ctx.rng.range(2.35, 2.65);
+  const recessDepth = ctx.rng.range(0.07, 0.12);
+  const frameThickness = ctx.rng.range(0.09, 0.14);
+  const frameDepth = clamp(ctx.rng.range(0.06, 0.10), 0.04, ctx.maxProtrusionM + 0.06);
+  const jambDepth = clamp(ctx.rng.range(0.10, 0.16), 0.06, ctx.maxProtrusionM + 0.10);
+
+  // Assign roles using shop-unit patterns — each shop gets one door
+  // followed by blank/display bays, then the next shop starts
+  const columnRoles: ColumnRole[] = [];
+  let col = 0;
+  while (col < bayCount) {
+    const shopBays = (ctx.isMainLane || ctx.isShopfrontZone)
+      ? ctx.rng.int(2, 4)
+      : ctx.isSideHall
+        ? ctx.rng.int(3, 6)
+        : ctx.rng.int(3, 5);
+
+    for (let b = 0; b < shopBays && col < bayCount; b += 1, col += 1) {
+      if (b === 0) {
+        columnRoles.push("door");
+      } else if (b === 1 && (ctx.isMainLane || ctx.isShopfrontZone) && ctx.rng.next() < 0.40) {
+        columnRoles.push("window");
+      } else {
+        columnRoles.push("blank");
+      }
+    }
+  }
+
+  return {
+    bayCount, bayWidth, usableLength, stories, columnRoles,
+    windowW, windowH, sillOffset, doorW, doorH,
+    recessDepth, frameThickness, frameDepth, jambDepth,
+  };
+}
+
+// ── Column center position from uniform grid ───────────────────────────────
+
+function columnCenterS(spec: FacadeSpec, columnIndex: number): number {
+  return -spec.usableLength * 0.5 + spec.bayWidth * (columnIndex + 0.5);
+}
+
+// ── Window placement (uniform dimensions from spec) ────────────────────────
+
+function placeWindowOpening(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  storyBaseY: number,
+  spec: FacadeSpec,
+): void {
+  const sillY = storyBaseY + spec.sillOffset;
+  const centerY = sillY + spec.windowH * 0.5;
+
+  // 1. Dark void — flush with wall surface (tiny offset prevents z-fighting)
+  pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
+    ctx.frame, centerS, centerY, 0.003,
+    0.006, spec.windowH, spec.windowW);
+
+  // 2. Glass pane — in front of void, behind frames
+  pushBox(ctx.instances, ctx.maxInstances, "window_glass", null,
+    ctx.frame, centerS, centerY, 0.015,
+    WINDOW_GLASS_THICKNESS_M, spec.windowH, spec.windowW);
+
+  // 3–4. Frame jambs — protruding forward, creating depth contrast with void
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
+      ctx.frame, centerS + side * (spec.windowW + spec.frameThickness) * 0.5, centerY, spec.frameDepth * 0.5,
+      spec.frameDepth, spec.windowH + spec.frameThickness, spec.frameThickness);
+  }
+
+  // 5. Sill shelf — protruding ledge (wider + deeper than lintel)
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, sillY - spec.frameThickness * 0.5, spec.frameDepth * 0.65,
+    spec.frameDepth * 1.4, spec.frameThickness, spec.windowW + spec.frameThickness * 2);
+
+  // 6. Lintel — slightly thicker for visual weight
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, sillY + spec.windowH + spec.frameThickness * 0.5, spec.frameDepth * 0.5,
+    spec.frameDepth, spec.frameThickness * 1.2, spec.windowW + spec.frameThickness * 2);
+
+  // 7. Horizontal crossbar across glass center
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", null,
+    ctx.frame, centerS, centerY, 0.018,
+    0.035, 0.055, spec.windowW * 0.92);
+
+  // 8. Vertical crossbar
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", null,
+    ctx.frame, centerS, centerY, 0.018,
+    0.035, spec.windowH * 0.92, 0.055);
+
+}
+
+// ── Arched door placement (uniform dimensions from spec) ───────────────────
+
+function placeArchedDoor(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  spec: FacadeSpec,
+): void {
+  // 1. Dark void — flush with wall surface (tiny offset prevents z-fighting)
+  pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
+    ctx.frame, centerS, spec.doorH * 0.5, 0.003,
+    0.006, spec.doorH, spec.doorW);
+
+  // 2. Lintel bar — marks the top edge of the opening
+  pushBox(ctx.instances, ctx.maxInstances, "door_lintel", null,
+    ctx.frame, centerS, spec.doorH + spec.frameThickness * 0.5, spec.frameDepth * 0.5,
+    spec.frameDepth, spec.frameThickness, spec.doorW + spec.frameThickness * 2);
+}
+
+// ── Recessed panel (uses window width from spec for alignment) ─────────────
+
+function placeRecessedPanel(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  storyBaseY: number,
+  spec: FacadeSpec,
+): void {
+  const panelW = spec.windowW * 0.85;
+  const panelH = spec.windowH * 0.7;
+  const centerY = storyBaseY + spec.sillOffset + panelH * 0.5;
+  const depth = spec.recessDepth * 0.7;
+
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
+    ctx.frame, centerS, centerY, -depth * 0.5,
+    depth, panelH, panelW);
+}
+
+// ── Balcony placement (stone balustrade style) ─────────────────────────────
+
+function placeBalcony(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  storyBaseY: number,
+  spec: FacadeSpec,
+): void {
+  const balconyW = Math.min(spec.bayWidth * 1.8, spec.usableLength * 0.45);
+  const slabY = storyBaseY + BALCONY_SLAB_THICKNESS_M * 0.5;
+
+  // 1. Slab — extends outward toward walkable zone (positive inwardN)
+  pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+    ctx.frame, centerS, slabY, BALCONY_DEPTH_M * 0.5,
+    BALCONY_DEPTH_M, BALCONY_SLAB_THICKNESS_M, balconyW);
+
+  // 2. French door opening — taller & wider than regular window, starts near floor
+  const doorW = Math.min(spec.windowW * 1.8, balconyW * 0.55);
+  const doorCenterY = storyBaseY + BALCONY_DOOR_SILL_OFFSET + BALCONY_DOOR_H * 0.5;
+
+  // 2a. Dark void
+  pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
+    ctx.frame, centerS, doorCenterY, 0.003,
+    0.006, BALCONY_DOOR_H, doorW);
+
+  // 2b. Glass pane
+  pushBox(ctx.instances, ctx.maxInstances, "window_glass", null,
+    ctx.frame, centerS, doorCenterY, 0.015,
+    WINDOW_GLASS_THICKNESS_M, BALCONY_DOOR_H, doorW);
+
+  // 2c. Frame jambs
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
+      ctx.frame, centerS + side * (doorW + spec.frameThickness) * 0.5, doorCenterY, spec.frameDepth * 0.5,
+      spec.frameDepth, BALCONY_DOOR_H + spec.frameThickness, spec.frameThickness);
+  }
+
+  // 2d. Lintel
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, storyBaseY + BALCONY_DOOR_SILL_OFFSET + BALCONY_DOOR_H + spec.frameThickness * 0.5,
+    spec.frameDepth * 0.5,
+    spec.frameDepth, spec.frameThickness * 1.2, doorW + spec.frameThickness * 2);
+
+  // 2e. Horizontal crossbar
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", null,
+    ctx.frame, centerS, doorCenterY, 0.018,
+    0.035, 0.04, doorW * 0.92);
+
+  // 3. Stone balustrade — front wall at outer edge of slab
+  const wallY = storyBaseY + BALCONY_SLAB_THICKNESS_M + BALCONY_WALL_H * 0.5;
+  pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+    ctx.frame, centerS, wallY, BALCONY_DEPTH_M,
+    BALCONY_WALL_THICKNESS_M, BALCONY_WALL_H, balconyW);
+
+  // 4. Stone balustrade — side walls
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+      ctx.frame, centerS + side * balconyW * 0.5, wallY, BALCONY_DEPTH_M * 0.5,
+      BALCONY_DEPTH_M, BALCONY_WALL_H, BALCONY_WALL_THICKNESS_M);
+  }
+
+  // 5. Support brackets — small stone corbels under slab
+  const bracketH = 0.25;
+  const bracketD = 0.3;
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+      ctx.frame, centerS + side * (balconyW * 0.35), storyBaseY - bracketH * 0.5, bracketD * 0.5,
+      bracketD, bracketH, 0.12);
+  }
+}
+
+// ── Pilasters aligned to bay grid ──────────────────────────────────────────
+
+function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
+  if (spec.bayCount < 2) return;
+  if (ctx.frame.lengthM < 3.0) return;
+
+  const pilasterDepth = clamp(ctx.rng.range(0.04, 0.09), 0.03, ctx.maxProtrusionM + 0.02);
+  const pilasterWidth = ctx.rng.range(0.14, 0.24);
+  const pilasterHeight = ctx.wallHeightM;
+
+  // Place between bay columns — aligned to the same grid as openings
+  for (let i = 1; i < spec.bayCount; i += 1) {
+    const s = -spec.usableLength * 0.5 + spec.bayWidth * i;
+    if (!pushBox(ctx.instances, ctx.maxInstances, "pilaster", ctx.wallMaterialId,
+      ctx.frame, s, pilasterHeight * 0.5, pilasterDepth * 0.5,
+      pilasterDepth, pilasterHeight, pilasterWidth)) {
+      return;
+    }
+  }
+}
+
+// ── Cable segments ─────────────────────────────────────────────────────────
+
+function placeCableSegments(ctx: SegmentDecorContext): void {
+  if (!ctx.isSideHall && !ctx.isCut) return;
+  if (ctx.rng.next() > 0.28) return;
+  if (ctx.frame.lengthM < 2.0) return;
+
+  const cableY = ctx.rng.range(ctx.wallHeightM * 0.55, ctx.wallHeightM * 0.82);
+  const cableLength = ctx.frame.lengthM * ctx.rng.range(0.3, 0.6);
+
+  pushBox(ctx.instances, ctx.maxInstances, "cable_segment", null,
+    ctx.frame, 0, cableY, ctx.rng.range(0.02, 0.05),
+    0.02, 0.02, cableLength);
+}
+
+// ── Main decoration orchestrator ───────────────────────────────────────────
+
 function decorateSegment(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < SEGMENT_EDGE_MARGIN_M * 2) return;
+
+  // Structural framing
   placeCornerPiers(ctx);
+  placeParapetCap(ctx);
+  placeRoofCap(ctx);
+
+  // Horizontal banding
+  placePlinthStrip(ctx);
+  placeStringCourses(ctx);
+  placeCorniceStrip(ctx);
+
+  // Compute facade spec — all proportions decided once
+  const spec = computeFacadeSpec(ctx);
+  if (!spec) {
+    placeCableSegments(ctx);
+    return;
+  }
+
+  // Pilasters aligned to the bay grid
+  placePilasters(ctx, spec);
+
+  // Pre-compute balcony placements — architect logic:
+  // Decision is per COLUMN (not per bay×story) → vertical stacks.
+  // If a column gets a balcony, ALL upper floors on that column get one.
+  // Minimum 2-bay spacing between balcony columns for visual rhythm.
+  const balconyColumns = new Set<number>();
+  if (BALCONY_ELIGIBLE_ZONES.has(ctx.zone?.type ?? "") && spec.stories >= 2) {
+    const balconyRng = ctx.rng.fork("balconies");
+    let lastBalconyCol = -3;
+    for (let col = 0; col < spec.bayCount; col += 1) {
+      if (spec.columnRoles[col] !== "window") continue;
+      if (col - lastBalconyCol < 2) continue;
+      if (balconyRng.next() < BALCONY_CHANCE) {
+        balconyColumns.add(col);
+        lastBalconyCol = col;
+      }
+    }
+  }
+
+  const balconySet = new Set<string>();
+  for (const col of balconyColumns) {
+    for (let story = 1; story < spec.stories; story += 1) {
+      balconySet.add(`${col}:${story}`);
+    }
+  }
+
+  // Walk columns × stories with vertical coherence
+  for (let col = 0; col < spec.bayCount; col += 1) {
+    const role = spec.columnRoles[col]!;
+    const centerS = columnCenterS(spec, col);
+
+    for (let story = 0; story < spec.stories; story += 1) {
+      const storyBaseY = story * STORY_HEIGHT_M;
+
+      if (story === 0 && role === "door") {
+        // Ground floor door column → arched door
+        placeArchedDoor(ctx, centerS, spec);
+      } else if (role === "window") {
+        if (balconySet.has(`${col}:${story}`)) {
+          placeBalcony(ctx, centerS, storyBaseY, spec);
+        } else {
+          placeWindowOpening(ctx, centerS, storyBaseY, spec);
+        }
+      } else if (role === "door" && story > 0 && ctx.rng.next() < 0.50) {
+        // Above a door, 50% chance of window (rest is blank wall)
+        placeWindowOpening(ctx, centerS, storyBaseY, spec);
+      } else if (role === "blank" && ctx.rng.next() < 0.25) {
+        // Blank column — occasional subtle recess for texture
+        placeRecessedPanel(ctx, centerS, storyBaseY, spec);
+      }
+    }
+
+  }
+
+  // Cables on side halls/cuts
+  placeCableSegments(ctx);
 }
+
+// ── Public entry point ─────────────────────────────────────────────────────
 
 export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOptions): WallDetailPlacementResult {
   const seed = typeof options.detailSeed === "number"
@@ -255,10 +718,12 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   const maxProtrusionM = clamp(options.maxProtrusionM, 0.03, 0.2);
   const maxInstances = Math.max(1, INSTANCE_BUDGET);
   const instances: WallDetailInstance[] = [];
+  const segmentHeights: number[] = [];
 
   if (!options.enabled || options.segments.length === 0) {
     return {
       instances,
+      segmentHeights,
       stats: {
         enabled: false,
         seed,
@@ -274,23 +739,31 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   let segmentsDecorated = 0;
 
   for (let index = 0; index < options.segments.length; index += 1) {
-    if (instances.length >= maxInstances) {
-      break;
-    }
-
     const segment = options.segments[index]!;
     const frame = toSegmentFrame(segment);
     const zone = resolveSegmentZone(frame, options.zones);
     const isMainLane = isMainLaneZone(zone);
     const isShopfront = isShopfrontZone(zone);
     const isSideHall = zone?.type === "side_hall";
+    const isConnector = zone?.type === "connector";
+    const isCut = zone?.type === "cut";
     const wallMaterialId = resolveWallMaterialIdForZone(zone?.id ?? null);
+
+    // Compute per-segment height
+    const heightSeed = deriveSubSeed(seed, `height:${index}:${zone?.id ?? "none"}`);
+    const heightRng = new DeterministicRng(heightSeed);
+    const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng);
+    segmentHeights.push(segHeight);
+
+    if (instances.length >= maxInstances) {
+      continue;
+    }
 
     const segmentDensityRaw = density
       * (isMainLane ? 1.04 : 1)
       * (isShopfront ? 1.08 : 1)
       * (isSideHall ? 0.84 : 1)
-      * (zone?.type === "connector" ? 0.78 : 1);
+      * (isConnector ? 0.78 : 1);
     const segmentDensity = clamp(segmentDensityRaw, 0.06, 1.2);
     const segmentMaxProtrusion = clamp(
       isMainLane ? Math.min(maxProtrusionM, 0.14) : maxProtrusionM,
@@ -307,9 +780,11 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       isMainLane,
       isShopfrontZone: isShopfront,
       isSideHall,
+      isConnector,
+      isCut,
       profile: options.profile,
       wallMaterialId,
-      wallHeightM: options.wallHeightM,
+      wallHeightM: segHeight,
       maxProtrusionM: segmentMaxProtrusion,
       density: segmentDensity,
       rng: segRng,
@@ -323,6 +798,7 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
 
   return {
     instances,
+    segmentHeights,
     stats: {
       enabled: true,
       seed,

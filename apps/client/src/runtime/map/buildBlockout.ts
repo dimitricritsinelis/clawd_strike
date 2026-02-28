@@ -201,6 +201,7 @@ function createWallInstances(
   wallHeightM: number,
   wallThicknessM: number,
   floorTopY: number,
+  segmentHeights?: readonly number[],
 ): InstancedMesh<BoxGeometry, MeshLambertMaterial> | null {
   if (segments.length === 0) return null;
 
@@ -209,11 +210,12 @@ function createWallInstances(
   mesh.frustumCulled = false;
 
   const dummy = new Object3D();
-  const centerY = floorTopY + wallHeightM * 0.5;
 
   for (let i = 0; i < segments.length; i += 1) {
     const segment = segments[i]!;
     const lengthM = segment.end - segment.start;
+    const segHeight = segmentHeights?.[i] ?? wallHeightM;
+    const centerY = floorTopY + segHeight * 0.5;
 
     let centerX = 0;
     let centerZ = 0;
@@ -233,7 +235,7 @@ function createWallInstances(
     }
 
     dummy.position.set(centerX, centerY, centerZ);
-    dummy.scale.set(sizeX, wallHeightM, sizeZ);
+    dummy.scale.set(sizeX, segHeight, sizeZ);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
 
@@ -361,32 +363,8 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
   const colliders: RuntimeColliderAabb[] = [];
   appendWallSegmentColliders(wallSegments, spec.defaults.wall_height, wallThicknessM, floorTopY, colliders);
 
-  if (options.wallMode === "pbr" && options.wallMaterials) {
-    const pbrWalls = buildPbrWalls({
-      segments: wallSegments,
-      zones: spec.zones,
-      seed: options.seed,
-      quality: wallTextureQuality,
-      manifest: options.wallMaterials,
-      wallHeightM: spec.defaults.wall_height,
-      floorTopY,
-    });
-    root.add(pbrWalls);
-  } else {
-    const wallInstances = createWallInstances(
-      wallSegments,
-      new MeshLambertMaterial({ color: palette.wall }),
-      spec.defaults.wall_height,
-      wallThicknessM,
-      floorTopY,
-    );
-    if (wallInstances) {
-      wallInstances.castShadow = true;
-      wallInstances.receiveShadow = true;
-      root.add(wallInstances);
-    }
-  }
-
+  // Run wall detail placements first — they compute per-segment heights
+  // that the wall geometry builder needs for varied building silhouettes.
   const wallDetailDensityScale = typeof options.wallDetails.densityScale === "number"
     ? options.wallDetails.densityScale
     : 1;
@@ -403,6 +381,37 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     density: clamp(spec.wall_details.density * wallDetailDensityScale, 0, 1.25),
     maxProtrusionM: spec.wall_details.maxProtrusion,
   });
+
+  const segmentHeights = wallDetailPlacements.segmentHeights;
+
+  if (options.wallMode === "pbr" && options.wallMaterials) {
+    const pbrWalls = buildPbrWalls({
+      segments: wallSegments,
+      zones: spec.zones,
+      seed: options.seed,
+      quality: wallTextureQuality,
+      manifest: options.wallMaterials,
+      wallHeightM: spec.defaults.wall_height,
+      floorTopY,
+      segmentHeights,
+    });
+    root.add(pbrWalls);
+  } else {
+    const wallInstances = createWallInstances(
+      wallSegments,
+      new MeshLambertMaterial({ color: palette.wall }),
+      spec.defaults.wall_height,
+      wallThicknessM,
+      floorTopY,
+      segmentHeights,
+    );
+    if (wallInstances) {
+      wallInstances.castShadow = true;
+      wallInstances.receiveShadow = true;
+      root.add(wallInstances);
+    }
+  }
+
   if (wallDetailPlacements.instances.length > 0) {
     const detailRoot = buildWallDetailMeshes(wallDetailPlacements.instances, {
       highVis: options.highVis,
