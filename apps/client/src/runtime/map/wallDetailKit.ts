@@ -105,12 +105,7 @@ const WALL_SURFACE_INHERIT_MESH_IDS = new Set<WallDetailMeshId>([
   "corner_pier",
   "vertical_edge_trim",
   "pilaster",
-  "recessed_panel_frame_h",
-  "recessed_panel_frame_v",
   "recessed_panel_back",
-  "door_jamb",
-  "door_lintel",
-  "door_arch_lintel",
   "balcony_slab",
 ]);
 
@@ -151,6 +146,16 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     roughness: 0.64,
     metalness: 0.34,
   });
+  const frameTrim = new MeshStandardMaterial({
+    color: highVis ? 0x8a7d6d : 0x7a6b55,
+    roughness: 0.78,
+    metalness: 0.04,
+  });
+  const woodShutter = new MeshStandardMaterial({
+    color: highVis ? 0x7a5c42 : 0x6b4c38,
+    roughness: 0.82,
+    metalness: 0.02,
+  });
   const windowGlass = new MeshPhysicalMaterial({
     color: highVis ? 0x4a7a9a : 0x2e5472,
     roughness: 0.12,
@@ -190,11 +195,11 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     },
     recessed_panel_frame_h: {
       geometry: new BoxGeometry(1, 1, 1),
-      material: stoneTrim,
+      material: frameTrim,
     },
     recessed_panel_frame_v: {
       geometry: new BoxGeometry(1, 1, 1),
-      material: stoneTrim,
+      material: frameTrim,
     },
     recessed_panel_back: {
       geometry: new BoxGeometry(1, 1, 1),
@@ -202,15 +207,15 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     },
     door_jamb: {
       geometry: new BoxGeometry(1, 1, 1),
-      material: stoneTrim,
+      material: frameTrim,
     },
     door_lintel: {
       geometry: new BoxGeometry(1, 1, 1),
-      material: stoneTrim,
+      material: frameTrim,
     },
     door_arch_lintel: {
       geometry: new CylinderGeometry(0.5, 0.5, 1, 14, 1, false, 0, Math.PI),
-      material: stoneTrim,
+      material: frameTrim,
     },
     door_void: {
       geometry: new BoxGeometry(1, 1, 1),
@@ -234,7 +239,7 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     },
     window_shutter: {
       geometry: new BoxGeometry(1, 1, 1),
-      material: stonePrimary,
+      material: woodShutter,
     },
     window_glass: {
       geometry: new BoxGeometry(1, 1, 1),
