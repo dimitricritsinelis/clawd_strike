@@ -1,11 +1,29 @@
 import "./styles.css";
 import type { LoadingScreenHandle } from "./loading-screen/bootstrap";
 import { bootstrapLoadingScreen } from "./loading-screen/bootstrap";
+import type { LoadingScreenMode, RuntimeLaunchSelection } from "./loading-screen/types";
+import { sanitizeRuntimePlayerName } from "./runtime/utils/UrlParams";
 
 let loadingHandle: LoadingScreenHandle | null = null;
 let runtimeHandle: { teardown: () => void } | null = null;
 let runtimeBootPromise: Promise<void> | null = null;
-const autoStartMode = new URLSearchParams(window.location.search).get("autostart");
+
+function parseAutoStartSelection(search: string): RuntimeLaunchSelection | null {
+  const params = new URLSearchParams(search);
+  const rawMode = params.get("autostart")?.trim().toLowerCase();
+  if (rawMode !== "human" && rawMode !== "agent") {
+    return null;
+  }
+
+  const mode = rawMode as LoadingScreenMode;
+  const rawName = params.get("name") ?? params.get("player") ?? params.get("playerName");
+  return {
+    mode,
+    playerName: sanitizeRuntimePlayerName(rawName, mode),
+  };
+}
+
+let runtimeLaunchSelection: RuntimeLaunchSelection | null = parseAutoStartSelection(window.location.search);
 
 function hideLoadingOverlay(): void {
   const startOverlay = document.querySelector<HTMLElement>("#start");
@@ -20,13 +38,26 @@ function hideLoadingOverlay(): void {
   }
 }
 
-async function transitionToGame(): Promise<void> {
+async function transitionToGame(selection?: RuntimeLaunchSelection): Promise<void> {
   if (runtimeHandle) return;
   if (runtimeBootPromise) return runtimeBootPromise;
 
+  if (selection) {
+    runtimeLaunchSelection = {
+      mode: selection.mode,
+      playerName: sanitizeRuntimePlayerName(selection.playerName, selection.mode),
+    };
+  }
+
   runtimeBootPromise = (async () => {
     const { bootstrapRuntime } = await import("./runtime/bootstrap");
-    runtimeHandle = await bootstrapRuntime();
+    const runtimeOptions = runtimeLaunchSelection
+      ? {
+          controlMode: runtimeLaunchSelection.mode,
+          playerName: runtimeLaunchSelection.playerName,
+        }
+      : {};
+    runtimeHandle = await bootstrapRuntime(runtimeOptions);
     hideLoadingOverlay();
 
     loadingHandle?.teardown();
@@ -44,6 +75,6 @@ loadingHandle = bootstrapLoadingScreen({
   },
 });
 
-if (autoStartMode === "human") {
-  void transitionToGame();
+if (runtimeLaunchSelection) {
+  void transitionToGame(runtimeLaunchSelection);
 }

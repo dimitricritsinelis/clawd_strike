@@ -20,6 +20,7 @@ import { type RuntimeColliderAabb, WorldColliders } from "../sim/collision/World
 import { resolveRuntimeSeed } from "../utils/Rng";
 import { disposeObjectRoot } from "../utils/disposeObjectRoot";
 import type {
+  RuntimeControlMode,
   RuntimeFloorMode,
   RuntimeFloorQuality,
   RuntimeLightingPreset,
@@ -30,12 +31,15 @@ import type {
 } from "../utils/UrlParams";
 import type { Ak47ShotEvent } from "../weapons/Ak47FireController";
 import { Ak47Weapon, type Ak47AmmoSnapshot } from "../weapons/Ak47Weapon";
+import { resetTickIntent, type AgentAction, type TickIntent } from "../input/AgentAction";
 
 const DEFAULT_FOV = 75;
 const LOOK_SENSITIVITY = 0.002;
 const MIN_PITCH = -(Math.PI / 2) + 0.001;
 const MAX_PITCH = (Math.PI / 2) - 0.001;
 const RAD_TO_DEG = 180 / Math.PI;
+const DEG_TO_RAD = Math.PI / 180;
+const AGENT_LOOK_ACCUM_LIMIT_DEG = 540;
 const MAP_PROPS_ENABLED = false;
 
 // ── Camera shake constants ────────────────────────────────────────────────────
@@ -67,6 +71,7 @@ export type CameraPose = {
 export type WeaponShotPayload = Ak47ShotEvent;
 
 type GameOptions = {
+  controlMode: RuntimeControlMode;
   mapId: string;
   seedOverride: number | null;
   propChaos: RuntimePropChaosOptions;
@@ -105,11 +110,22 @@ export class Game {
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
 
+  private controlMode: RuntimeControlMode = "human";
   private readonly pressedKeys = new Set<string>();
   private readonly lookDirection = new Vector3();
   private readonly cameraForward = new Vector3();
   private readonly playerController = new PlayerController();
   private weapon = new Ak47Weapon({ seed: 1 });
+  private readonly tickIntent: TickIntent = {
+    moveX: 0,
+    moveZ: 0,
+    lookYawDelta: 0,
+    lookPitchDelta: 0,
+    jump: false,
+    fire: false,
+    reload: false,
+    sprint: true,
+  };
   private readonly frameInput: PlayerInputState = {
     forward: 0,
     right: 0,
@@ -120,9 +136,20 @@ export class Game {
   private yaw = 0;
   private pitch = 0;
   private pointerLocked = false;
-  private fireHeld = false;
   private freezeInput = false;
-  private jumpQueued = false;
+  private humanFireHeld = false;
+  private humanJumpQueued = false;
+  private humanReloadQueued = false;
+  private humanLookDeltaX = 0;
+  private humanLookDeltaY = 0;
+  private agentMoveX = 0;
+  private agentMoveZ = 0;
+  private agentLookYawDeltaDeg = 0;
+  private agentLookPitchDeltaDeg = 0;
+  private agentJumpQueued = false;
+  private agentReloadQueued = false;
+  private agentFireHeld = false;
+  private agentSprintHeld = true;
   private spawn: RuntimeSpawnId = "A";
   private mapId = "bazaar-map";
   private seedOverride: number | null = null;
@@ -222,15 +249,15 @@ export class Game {
 
     this.pressedKeys.add(event.code);
     if (event.code === "Space" && !event.repeat) {
-      this.jumpQueued = true;
+      this.humanJumpQueued = true;
     }
     if (
       event.code === "KeyR" &&
       !event.repeat &&
-      this.pointerLocked &&
-      !this.freezeInput
+      this.controlMode === "human" &&
+      this.canAcceptGameplayInput()
     ) {
-      this.weapon.queueReload();
+      this.humanReloadQueued = true;
       event.preventDefault();
     }
   };
@@ -240,29 +267,31 @@ export class Game {
   };
 
   private readonly onWindowBlur = (): void => {
-    this.resetInputState();
+    if (this.controlMode === "human") {
+      this.resetInputState();
+    }
   };
 
   private readonly onVisibilityChange = (): void => {
-    if (document.visibilityState !== "visible") {
+    if (this.controlMode === "human" && document.visibilityState !== "visible") {
       this.resetInputState();
     }
   };
 
   private readonly onMouseDown = (event: MouseEvent): void => {
     if (event.button !== 0) return;
-    if (!this.pointerLocked || this.freezeInput) return;
-    this.fireHeld = true;
+    if (this.controlMode !== "human" || !this.canAcceptGameplayInput()) return;
+    this.humanFireHeld = true;
     event.preventDefault();
   };
 
   private readonly onMouseUp = (event: MouseEvent): void => {
     if (event.button !== 0) return;
-    this.fireHeld = false;
+    this.humanFireHeld = false;
   };
 
   private readonly onContextMenu = (event: MouseEvent): void => {
-    if (!this.pointerLocked) return;
+    if (this.controlMode !== "human" || !this.pointerLocked) return;
     event.preventDefault();
   };
 
@@ -273,6 +302,7 @@ export class Game {
     this.camera.rotation.order = "YXZ";
     this.camera.position.set(0, PLAYER_EYE_HEIGHT_M, 8);
 
+    this.controlMode = options.controlMode;
     this.mapId = options.mapId;
     this.seedOverride = options.seedOverride;
     this.highVis = options.highVis ?? false;
@@ -344,7 +374,7 @@ export class Game {
 
   setPointerLocked(locked: boolean): void {
     this.pointerLocked = locked;
-    if (!locked) {
+    if (!locked && this.controlMode === "human") {
       this.resetInputState();
     }
   }
@@ -352,7 +382,11 @@ export class Game {
   setFreezeInput(freeze: boolean): void {
     this.freezeInput = freeze;
     if (freeze) {
-      this.fireHeld = false;
+      this.humanFireHeld = false;
+      this.humanReloadQueued = false;
+      this.agentFireHeld = false;
+      this.agentReloadQueued = false;
+      this.agentJumpQueued = false;
       this.weapon.cancelTrigger();
     }
   }
@@ -389,16 +423,19 @@ export class Game {
   }
 
   onMouseDelta(deltaX: number, deltaY: number): void {
-    if (!this.pointerLocked || this.freezeInput) return;
-
-    const nextYaw = this.yaw - deltaX * LOOK_SENSITIVITY;
-    const nextPitch = this.pitch - deltaY * LOOK_SENSITIVITY;
-    this.setLookAngles(nextYaw, nextPitch);
+    if (this.controlMode !== "human" || !this.canAcceptGameplayInput()) return;
+    this.humanLookDeltaX += deltaX;
+    this.humanLookDeltaY += deltaY;
   }
 
   update(deltaSeconds: number): void {
     if (this.worldColliders) {
+      this.buildTickIntent();
+      this.applyLookIntent();
       this.updateInputState();
+      if (this.tickIntent.reload && this.canAcceptGameplayInput()) {
+        this.weapon.queueReload();
+      }
       this.playerController.step(deltaSeconds, this.frameInput, this.yaw);
       // Detect landing transition: airborne → grounded
       const nowGrounded = this.playerController.getGrounded();
@@ -414,7 +451,7 @@ export class Game {
       const fireResult = this.weapon.update(
         {
           deltaSeconds,
-          fireHeld: this.fireHeld && this.pointerLocked && !this.freezeInput,
+          fireHeld: this.tickIntent.fire && this.canAcceptGameplayInput(),
           origin: this.camera.position,
           forward: this.cameraForward,
           grounded: this.playerController.getGrounded(),
@@ -631,6 +668,49 @@ export class Game {
     return this.isDead;
   }
 
+  getControlMode(): RuntimeControlMode {
+    return this.controlMode;
+  }
+
+  isPointerLocked(): boolean {
+    return this.pointerLocked;
+  }
+
+  applyAgentAction(action: AgentAction): void {
+    if (action.moveX !== undefined) {
+      this.agentMoveX = action.moveX;
+    }
+    if (action.moveZ !== undefined) {
+      this.agentMoveZ = action.moveZ;
+    }
+    if (action.lookYawDelta !== undefined) {
+      this.agentLookYawDeltaDeg = this.clamp(
+        this.agentLookYawDeltaDeg + action.lookYawDelta,
+        -AGENT_LOOK_ACCUM_LIMIT_DEG,
+        AGENT_LOOK_ACCUM_LIMIT_DEG,
+      );
+    }
+    if (action.lookPitchDelta !== undefined) {
+      this.agentLookPitchDeltaDeg = this.clamp(
+        this.agentLookPitchDeltaDeg + action.lookPitchDelta,
+        -AGENT_LOOK_ACCUM_LIMIT_DEG,
+        AGENT_LOOK_ACCUM_LIMIT_DEG,
+      );
+    }
+    if (action.jump === true) {
+      this.agentJumpQueued = true;
+    }
+    if (action.reload === true) {
+      this.agentReloadQueued = true;
+    }
+    if (action.fire !== undefined) {
+      this.agentFireHeld = action.fire;
+    }
+    if (action.sprint !== undefined) {
+      this.agentSprintHeld = action.sprint;
+    }
+  }
+
   respawn(): void {
     this.playerHealth = 100;
     this.isDead = false;
@@ -703,24 +783,107 @@ export class Game {
     this.syncAnglesFromCamera();
   }
 
+  private canAcceptGameplayInput(): boolean {
+    if (this.freezeInput) {
+      return false;
+    }
+    if (this.controlMode === "human") {
+      return this.pointerLocked;
+    }
+    return true;
+  }
+
+  private buildTickIntent(): void {
+    resetTickIntent(this.tickIntent);
+
+    if (this.controlMode === "human") {
+      this.buildHumanIntent();
+    } else {
+      this.buildAgentIntent();
+    }
+
+    if (!this.canAcceptGameplayInput()) {
+      this.tickIntent.moveX = 0;
+      this.tickIntent.moveZ = 0;
+      this.tickIntent.lookYawDelta = 0;
+      this.tickIntent.lookPitchDelta = 0;
+      this.tickIntent.jump = false;
+      this.tickIntent.fire = false;
+      this.tickIntent.reload = false;
+    }
+  }
+
+  private buildHumanIntent(): void {
+    this.tickIntent.moveZ = (this.pressedKeys.has("KeyW") ? 1 : 0) + (this.pressedKeys.has("KeyS") ? -1 : 0);
+    this.tickIntent.moveX = (this.pressedKeys.has("KeyD") ? 1 : 0) + (this.pressedKeys.has("KeyA") ? -1 : 0);
+    this.tickIntent.sprint = !(this.pressedKeys.has("ShiftLeft") || this.pressedKeys.has("ShiftRight"));
+    this.tickIntent.jump = this.humanJumpQueued;
+    this.tickIntent.fire = this.humanFireHeld;
+    this.tickIntent.reload = this.humanReloadQueued;
+    this.tickIntent.lookYawDelta = this.humanLookDeltaX * LOOK_SENSITIVITY * RAD_TO_DEG;
+    this.tickIntent.lookPitchDelta = -this.humanLookDeltaY * LOOK_SENSITIVITY * RAD_TO_DEG;
+
+    this.humanJumpQueued = false;
+    this.humanReloadQueued = false;
+    this.humanLookDeltaX = 0;
+    this.humanLookDeltaY = 0;
+  }
+
+  private buildAgentIntent(): void {
+    this.tickIntent.moveX = this.agentMoveX;
+    this.tickIntent.moveZ = this.agentMoveZ;
+    this.tickIntent.lookYawDelta = this.agentLookYawDeltaDeg;
+    this.tickIntent.lookPitchDelta = this.agentLookPitchDeltaDeg;
+    this.tickIntent.jump = this.agentJumpQueued;
+    this.tickIntent.fire = this.agentFireHeld;
+    this.tickIntent.reload = this.agentReloadQueued;
+    this.tickIntent.sprint = this.agentSprintHeld;
+
+    this.agentLookYawDeltaDeg = 0;
+    this.agentLookPitchDeltaDeg = 0;
+    this.agentJumpQueued = false;
+    this.agentReloadQueued = false;
+  }
+
+  private applyLookIntent(): void {
+    if (!this.canAcceptGameplayInput()) return;
+    if (this.tickIntent.lookYawDelta === 0 && this.tickIntent.lookPitchDelta === 0) return;
+
+    // Agent API uses degrees-per-tick: +yaw turns right, +pitch turns up.
+    const nextYaw = this.yaw - this.tickIntent.lookYawDelta * DEG_TO_RAD;
+    const nextPitch = this.pitch + this.tickIntent.lookPitchDelta * DEG_TO_RAD;
+    this.setLookAngles(nextYaw, nextPitch);
+  }
+
   private updateInputState(): void {
-    if (!this.pointerLocked || this.freezeInput) {
+    if (!this.canAcceptGameplayInput()) {
       this.resetFrameInput();
       return;
     }
 
-    this.frameInput.forward = (this.pressedKeys.has("KeyW") ? 1 : 0) + (this.pressedKeys.has("KeyS") ? -1 : 0);
-    this.frameInput.right = (this.pressedKeys.has("KeyD") ? 1 : 0) + (this.pressedKeys.has("KeyA") ? -1 : 0);
-    this.frameInput.walkHeld = this.pressedKeys.has("ShiftLeft") || this.pressedKeys.has("ShiftRight");
-    this.frameInput.jumpPressed = this.jumpQueued;
-    this.jumpQueued = false;
+    this.frameInput.forward = this.tickIntent.moveZ;
+    this.frameInput.right = this.tickIntent.moveX;
+    this.frameInput.walkHeld = !this.tickIntent.sprint;
+    this.frameInput.jumpPressed = this.tickIntent.jump;
   }
 
   private resetInputState(): void {
     this.pressedKeys.clear();
-    this.jumpQueued = false;
-    this.fireHeld = false;
+    this.humanJumpQueued = false;
+    this.humanReloadQueued = false;
+    this.humanFireHeld = false;
+    this.humanLookDeltaX = 0;
+    this.humanLookDeltaY = 0;
+    this.agentMoveX = 0;
+    this.agentMoveZ = 0;
+    this.agentLookYawDeltaDeg = 0;
+    this.agentLookPitchDeltaDeg = 0;
+    this.agentJumpQueued = false;
+    this.agentReloadQueued = false;
+    this.agentFireHeld = false;
+    this.agentSprintHeld = true;
     this.weapon.cancelTrigger();
+    resetTickIntent(this.tickIntent);
     this.resetFrameInput();
   }
 
@@ -754,6 +917,10 @@ export class Game {
     this.camera.rotation.x = this.pitch;
     this.camera.rotation.y = this.yaw;
     this.camera.rotation.z = 0;
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
   }
 
   private selectSpawnPose(spec: RuntimeBlockoutSpec, spawn: RuntimeSpawnId): SpawnPose {

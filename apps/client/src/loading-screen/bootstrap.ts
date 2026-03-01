@@ -51,13 +51,24 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
       if (disposed) return;
       selectedMode = mode;
       selectedPlayerName = playerName;
+      const runtimeUrl = new URL(window.location.href);
+      runtimeUrl.searchParams.set("mode", mode);
+      if (playerName.trim().length > 0) {
+        runtimeUrl.searchParams.set("name", playerName.trim());
+      } else {
+        runtimeUrl.searchParams.delete("name");
+      }
+      window.history.replaceState(window.history.state, "", `${runtimeUrl.pathname}${runtimeUrl.search}${runtimeUrl.hash}`);
       if (!loadingAmbient.isMuted()) {
         void loadingAmbient.start();
       }
 
       const transitionToGame = options.handoff?.transitionToGame;
       if (transitionToGame) {
-        void transitionToGame();
+        void transitionToGame({
+          mode,
+          playerName,
+        });
         return;
       }
 
@@ -97,9 +108,14 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
     };
   }
 
+  window.agent_apply_action = (_action: unknown) => {
+    // Runtime-only API. Loading screen intentionally ignores agent actions.
+  };
+
   window.render_game_to_text = () => {
     const uiState = ui.getState();
     return JSON.stringify({
+      apiVersion: 2,
       mode: "loading-screen",
       ui: {
         visible: true,

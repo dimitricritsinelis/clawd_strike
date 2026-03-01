@@ -1,5 +1,10 @@
 export type LoadingScreenMode = "human" | "agent";
 
+export type RuntimeLaunchSelection = {
+  mode: LoadingScreenMode;
+  playerName: string;
+};
+
 export type LoadingScreenHandoff = {
   /**
    * Called once the loading screen UI is wired up (DOM, listeners, initial state).
@@ -17,5 +22,5 @@ export type LoadingScreenHandoff = {
    * Called when it's time to transition from the loading UI into gameplay.
    * Callers can stub or override this when gameplay bootstrap is unavailable.
    */
-  transitionToGame?: () => Promise<void> | void;
+  transitionToGame?: (selection?: RuntimeLaunchSelection) => Promise<void> | void;
 };

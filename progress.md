@@ -2,14 +2,14 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- Runtime map is still generated from `docs/map-design/specs/map_spec.json` into `apps/client/public/maps/bazaar-map/` via `gen:maps`.
-- Runtime now tracks focus/visibility explicitly (`window` focus/blur + `document` visibilitychange) and normalizes visibility to `visible|hidden`.
-- Agent Mode no longer intentionally pauses/resets input on blur/hidden; Human mode keeps existing pointer-lock/pause behavior.
-- `requestAnimationFrame` hidden->visible resume now resets frame baseline time to avoid large `deltaMs` spikes.
-- `window.render_game_to_text()` now includes `gameplay.focused`, `gameplay.visibility`, and `gameplay.backgroundThrottled`.
-- Agent Mode shows a non-blocking background-throttling banner when unfocused/hidden.
-- Loading-screen mode selection now writes `mode` and `name` into URL params before runtime handoff.
-- `/skills.md` now documents unfocused-vs-hidden Agent Mode behavior and recommends keeping the window visible for uninterrupted watchability.
+- Runtime map is generated from `docs/map-design/specs/map_spec.json` into `apps/client/public/maps/bazaar-map/` via `pnpm --filter @clawd-strike/client gen:maps`.
+- Loading name-entry flow is Enter-only; loading-screen `Start` button is removed.
+- Agent runtime APIs are active: `window.render_game_to_text`, `window.agent_apply_action`, `window.advanceTime`.
+- Runtime now tracks `focused` + normalized `visibility` and exposes `gameplay.backgroundThrottled`.
+- Agent Mode does not intentionally pause on blur/hidden; Human mode keeps pointer-lock/pause behavior.
+- Hidden->visible RAF resume resets frame-time baseline to avoid large `deltaMs` spikes.
+- Agent Mode shows a non-blocking background/throttling banner when unfocused or hidden.
+- Map approval is still pending blockout traversal/readability signoff.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
@@ -22,30 +22,20 @@
 pnpm dev
 pnpm typecheck
 pnpm build
+BASE_URL=http://127.0.0.1:5174 AGENT_NAME=SmokeRunner pnpm --filter @clawd-strike/client smoke:agent
 VERCEL_TOKEN=<token> vercel deploy --prod --yes
 ```
 
 ## Last Completed Prompt
-- Implemented Agent Mode background/focus behavior in runtime:
-  - added explicit focus/visibility tracking + normalized state output
-  - added `gameplay.backgroundThrottled` to automation snapshot
-  - added Agent Mode background-throttling banner overlay
-  - avoided `deltaMs` jump on hidden->visible RAF resume
-  - kept blur/visibility input resets and pause flow human-only
-- Added mode plumbing so runtime honors `mode=agent` from URL/loading screen (`autostart=agent` now transitions directly).
-- Updated deployed playbook docs in `apps/client/public/skills.md` with the new behavior contract.
-- Captured deterministic compare-shot screenshots:
-  - `artifacts/screenshots/2026-03-01-agent-mode-background-focus/before.png`
-  - `artifacts/screenshots/2026-03-01-agent-mode-background-focus/after.png`
-- Files touched: `apps/client/src/runtime/bootstrap.ts`, `apps/client/src/runtime/game/Game.ts`, `apps/client/src/runtime/utils/UrlParams.ts`, `apps/client/src/loading-screen/bootstrap.ts`, `apps/client/src/main.ts`, `apps/client/public/skills.md`, `progress.md`.
-- Validation: `pnpm typecheck` and `pnpm build` pass.
+- Persisted selected loading-screen mode + name into URL (`mode`, `name`) before runtime handoff in `apps/client/src/loading-screen/bootstrap.ts`.
+- Prior prompt also shipped Agent Mode background behavior: focus/visibility tracking, `backgroundThrottled` state, overlay banner, and hidden->visible RAF delta protection.
+- Branch is prepared for playtest on `codex/agent-dev` and merged into `main` locally.
 
 ## Next 3 Tasks
-1. Do a true manual OS-level check (real alt-tab + minimize/restore) to confirm `focused/visibility/backgroundThrottled` transitions in a regular desktop session.
-2. Extend smoke coverage to assert the Agent Mode banner visibility transitions from runtime DOM in headed runs.
-3. Re-run deploy verification so `/skills.md` behavior notes are confirmed on production.
+1. Manual desktop check: alt-tab and minimize/restore while Agent Mode is running.
+2. Re-verify pointer-lock/pause flow for Human mode after merge.
+3. Deploy and validate `/skills.md` behavior notes on production.
 
 ## Known Issues / Risks
-- `gen:maps` still emits clear-zone anchor warnings for several landmarks/open-node anchors.
-- Playwright could not reliably force `focused=false`/`visibility=hidden` transitions in this environment; OS-level manual validation is still required.
-- Pointer-lock verification remains partially manual in automation contexts.
+- `gen:maps` still emits expected clear-zone anchor warnings for several landmarks/open-node anchors.
+- Playwright pointer-lock/focus-visibility transitions can be flaky; OS-level manual verification remains required.
