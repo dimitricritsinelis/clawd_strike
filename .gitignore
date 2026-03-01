@@ -20,3 +20,4 @@ artifacts/screenshots/**/state-*.json
 artifacts/screenshots/**/shot-*.png
 artifacts/tmp/
 artifacts/tmp/**
+.vercel/
