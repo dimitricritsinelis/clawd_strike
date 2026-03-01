@@ -188,6 +188,30 @@
       "notes": "Extended to reach widened west hall inner edge at x=8.0."
     },
     {
+      "id": "JOG_E_FILL_N",
+      "type": "main_lane_segment",
+      "rect": {
+        "x": 29.75,
+        "y": 50,
+        "w": 1.5,
+        "h": 18
+      },
+      "label": "Jog East Fill (North) — closes east stub wall at Z=50",
+      "notes": "Fills X=29.75-31.25, Z=50-68. Symmetric fix to JOG_E_FILL_S for the north jog transition."
+    },
+    {
+      "id": "JOG_E_FILL_S",
+      "type": "main_lane_segment",
+      "rect": {
+        "x": 29.75,
+        "y": 14,
+        "w": 1.5,
+        "h": 18
+      },
+      "label": "Jog East Fill (South) — closes east stub wall at Z=32",
+      "notes": "Fills X=29.75-31.25, Z=14-32. BZ_M2_JOG extends 1.5m further east than BZ_M1, creating a 1.5m-wide stub south-face wall at Z=32 and a black void floor area. Making this walkable merges the east wall into a continuous 9m face at X=31.25 from Z=14-68."
+    },
+    {
       "id": "JOG_W_FILL",
       "type": "main_lane_segment",
       "rect": {
