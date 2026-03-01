@@ -93,7 +93,9 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
   loadingAmbient.setMuted(false);
   ui.setMuteState(loadingAmbient.isMuted());
   ui.show();
-  ui.setAssetReady(false);
+  // Fail-open: keep controls visible even if preload/init gets interrupted.
+  // We still run preload in the background and mark ready when done.
+  ui.setAssetReady(true);
 
   void preloadCriticalLoadingAssets().finally(() => {
     if (disposed) return;
