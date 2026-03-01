@@ -22,7 +22,8 @@ import { TimerHud } from "./ui/TimerHud";
 import { DamageNumbers } from "./ui/DamageNumbers";
 import { PauseMenu } from "./ui/PauseMenu";
 import { FadeOverlay } from "./ui/FadeOverlay";
-import { parseRuntimeUrlParams } from "./utils/UrlParams";
+import { parseRuntimeUrlParams, sanitizeRuntimePlayerName, type RuntimeControlMode } from "./utils/UrlParams";
+import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
 
 type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["Ak47ViewModel"]>;
 
@@ -35,6 +36,9 @@ const PROP_MANIFEST_URL = "/assets/models/environment/bazaar/props/bazaar_prop_m
 const PBR_FLOORS_ENABLED = true;
 const PBR_WALLS_ENABLED = false;
 const MAP_PROPS_ENABLED = false;
+const RUNTIME_TEXT_API_VERSION = 2;
+const SCORE_STORAGE_PREFIX = "clawd-strike:score-best";
+const SCORE_RULESET_KEY = "wave-score-v1-k10-hs2_5";
 
 type ScenePerfSnapshot = {
   materials: number;
@@ -85,6 +89,7 @@ function collectScenePerfSnapshot(worldScene: { traverse: (cb: (node: unknown) =
 }
 
 export type RuntimeTextState = {
+  apiVersion: number;
   mode: "runtime";
   map: {
     loaded: boolean;
@@ -120,10 +125,31 @@ export type RuntimeTextState = {
   };
   gameplay: {
     active: true;
+    alive: boolean;
     pointerLocked: boolean;
+    focused: boolean;
+    visibility: "visible" | "hidden";
     inputFrozen: boolean;
     grounded: boolean;
     speedMps: number;
+  };
+  agent: {
+    enabled: boolean;
+    name: string;
+  };
+  player: {
+    name: string;
+  };
+  score: {
+    current: number;
+    best: number;
+    lastRun?: number;
+  };
+  gameOver: {
+    visible: boolean;
+    finalScore: number;
+    bestScore: number;
+    canPlayAgain: boolean;
   };
   anchorsDebug: {
     markersVisible: boolean;
@@ -171,6 +197,11 @@ export type RuntimeTextState = {
 
 export type RuntimeHandle = {
   teardown: () => void;
+};
+
+export type RuntimeBootstrapOptions = {
+  controlMode?: RuntimeControlMode;
+  playerName?: string;
 };
 
 function getAppRoot(): HTMLElement {
@@ -252,10 +283,44 @@ function formatMapLoadError(error: unknown): string {
   return `Failed to load map JSON\n${String(error)}`;
 }
 
-export async function bootstrapRuntime(): Promise<RuntimeHandle> {
+function makeScoreStorageKey(mapId: string): string {
+  return `${SCORE_STORAGE_PREFIX}:${mapId}:${SCORE_RULESET_KEY}`;
+}
+
+function readBestScore(storageKey: string): number {
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (raw === null) return 0;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.max(0, Math.round(parsed));
+  } catch {
+    return 0;
+  }
+}
+
+function writeBestScore(storageKey: string, value: number): void {
+  try {
+    window.localStorage.setItem(storageKey, String(Math.max(0, Math.round(value))));
+  } catch {
+    // Ignore storage errors in constrained browser contexts.
+  }
+}
+
+export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): Promise<RuntimeHandle> {
   const appRoot = getAppRoot();
   const runtimeRoot = createRuntimeRoot(appRoot);
-  const urlParams = parseRuntimeUrlParams(window.location.search);
+  const parsedUrlParams = parseRuntimeUrlParams(window.location.search);
+  const controlMode = options.controlMode ?? parsedUrlParams.controlMode;
+  const playerName = sanitizeRuntimePlayerName(
+    options.playerName ?? parsedUrlParams.playerName,
+    controlMode,
+  );
+  const runtimeParams = {
+    ...parsedUrlParams,
+    controlMode,
+    playerName,
+  };
 
   const warningOverlay = createOverlay(runtimeRoot, {
     left: "16px",
@@ -282,14 +347,14 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     lineHeight: "1.35",
   });
   const crosshair = createCrosshair(runtimeRoot);
-  const perfHud = new PerfHud(runtimeRoot, urlParams.perf);
+  const perfHud = new PerfHud(runtimeRoot, runtimeParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
   const healthHud = new HealthHud(runtimeRoot);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
   const killFeed = new KillFeed(runtimeRoot);
   const hitMarker = new HitMarker(crosshair);
-  const scoreHud = new ScoreHud(runtimeRoot, urlParams.playerName);
+  const scoreHud = new ScoreHud(runtimeRoot, runtimeParams.playerName);
   const roundEndScreen = new RoundEndScreen(runtimeRoot);
   const timerHud = new TimerHud(runtimeRoot);
   const damageNumbers = new DamageNumbers(runtimeRoot);
@@ -304,7 +369,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
 
   let mapAssets: RuntimeMapAssets | null = null;
   try {
-    mapAssets = await loadMap(urlParams.mapId);
+    mapAssets = await loadMap(runtimeParams.mapId);
     mapLoaded = true;
   } catch (error) {
     mapErrorMessage = formatMapLoadError(error);
@@ -313,12 +378,12 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   }
 
   const renderer = new Renderer(runtimeRoot, {
-    highVis: urlParams.highVis,
-    lightingPreset: urlParams.lightingPreset,
+    highVis: runtimeParams.highVis,
+    lightingPreset: runtimeParams.lightingPreset,
   });
   let disposed = false;
   const weaponAudio = new WeaponAudio();
-  const viewModelEnabled = urlParams.vm;
+  const viewModelEnabled = runtimeParams.vm;
   let viewModel: ViewModelInstance | null = null;
   let viewModelLoadStarted = false;
   let viewModelVisible = false;
@@ -332,7 +397,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     warningOverlay.style.display = "block";
   };
 
-  let resolvedFloorMode = PBR_FLOORS_ENABLED ? urlParams.floorMode : "blockout";
+  let resolvedFloorMode = PBR_FLOORS_ENABLED ? runtimeParams.floorMode : "blockout";
   let floorMaterials: FloorMaterialLibrary | null = null;
   if (PBR_FLOORS_ENABLED && resolvedFloorMode === "pbr") {
     try {
@@ -345,7 +410,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     }
   }
 
-  let resolvedWallMode = PBR_WALLS_ENABLED ? urlParams.wallMode : "blockout";
+  let resolvedWallMode = PBR_WALLS_ENABLED ? runtimeParams.wallMode : "blockout";
   let wallMaterials: WallMaterialLibrary | null = null;
   if (PBR_WALLS_ENABLED && resolvedWallMode === "pbr") {
     try {
@@ -358,7 +423,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     }
   }
 
-  let resolvedPropVisuals = MAP_PROPS_ENABLED ? urlParams.propVisuals : "blockout";
+  let resolvedPropVisuals = MAP_PROPS_ENABLED ? runtimeParams.propVisuals : "blockout";
   let propModels: PropModelLibrary | null = null;
   if (MAP_PROPS_ENABLED && resolvedPropVisuals === "bazaar") {
     try {
@@ -382,7 +447,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       if (disposed) return;
 
       const nextViewModel = new Ak47ViewModel({
-        vmDebug: urlParams.vmDebug && urlParams.debug,
+        vmDebug: runtimeParams.vmDebug && runtimeParams.debug,
       });
       nextViewModel.setAspect(renderer.getAspect());
       viewModel = nextViewModel;
@@ -396,34 +461,35 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     });
   };
 
-  const resolvedShot = mapAssets ? resolveShot(mapAssets.shots, urlParams.shot) : null;
+  const resolvedShot = mapAssets ? resolveShot(mapAssets.shots, runtimeParams.shot) : null;
   shotActive = resolvedShot?.active ?? false;
   shotId = resolvedShot?.id ?? null;
   inputFrozen = resolvedShot?.freezeInput ?? false;
 
   const game = new Game({
-    mapId: urlParams.mapId,
-    seedOverride: urlParams.seed,
-    propChaos: urlParams.propChaos,
+    controlMode: runtimeParams.controlMode,
+    mapId: runtimeParams.mapId,
+    seedOverride: runtimeParams.seed,
+    propChaos: runtimeParams.propChaos,
     floorMode: resolvedFloorMode,
     wallMode: resolvedWallMode,
-    wallDetails: urlParams.wallDetails,
-    wallDetailDensity: urlParams.wallDetailDensity,
-    floorQuality: urlParams.floorQuality,
-    lightingPreset: urlParams.lightingPreset,
+    wallDetails: runtimeParams.wallDetails,
+    wallDetailDensity: runtimeParams.wallDetailDensity,
+    floorQuality: runtimeParams.floorQuality,
+    lightingPreset: runtimeParams.lightingPreset,
     floorMaterials,
     wallMaterials,
     propVisuals: resolvedPropVisuals,
     propModels,
     freezeInput: inputFrozen,
-    spawn: urlParams.spawn,
-    debug: urlParams.debug,
-    highVis: urlParams.highVis,
+    spawn: runtimeParams.spawn,
+    debug: runtimeParams.debug,
+    highVis: runtimeParams.highVis,
     mountEl: runtimeRoot,
     anchorsDebug: {
-      showMarkers: urlParams.anchors,
-      showLabels: urlParams.labels,
-      anchorTypes: urlParams.anchorTypes,
+      showMarkers: runtimeParams.anchors,
+      showLabels: runtimeParams.labels,
+      anchorTypes: runtimeParams.anchorTypes,
     },
     onWeaponShot: (shot) => {
       viewModel?.triggerShotFx();
@@ -473,8 +539,8 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
         }
       }
     },
-    unlimitedHealth: urlParams.unlimitedHealth,
-    ...(urlParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
+    unlimitedHealth: runtimeParams.unlimitedHealth,
+    ...(runtimeParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
   });
 
   // Wire enemy gunshot audio (quiet distant shots from AI enemies)
@@ -494,7 +560,9 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
 
   // Pause menu: resume by re-requesting pointer lock
   pauseMenu.onResume = () => {
-    void renderer.canvas.requestPointerLock();
+    if (runtimeParams.controlMode === "human") {
+      void renderer.canvas.requestPointerLock();
+    }
   };
   pauseMenu.onReturnToLobby = () => {
     const lobbyUrl = `${window.location.origin}${window.location.pathname}`;
@@ -506,7 +574,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   const TOTAL_ENEMIES = 9;
   scoreHud.setTotal(TOTAL_ENEMIES);
   game.setEnemyKillCallback((name, isHeadshot) => {
-    killFeed.addKill(urlParams.playerName, name, isHeadshot);
+    killFeed.addKill(runtimeParams.playerName, name, isHeadshot);
     weaponAudio.playKillDing();
     scoreHud.addKill();
     waveStats.kills++;
@@ -537,7 +605,9 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       game.respawn();
       game.setFreezeInput(false);
       pauseMenu.hide();
-      void renderer.canvas.requestPointerLock();
+      if (runtimeParams.controlMode === "human") {
+        void renderer.canvas.requestPointerLock();
+      }
       // Brief hold at black, then fade back in
       setTimeout(() => {
         fadeOverlay.fadeIn(0.3);
@@ -561,7 +631,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   }
 
   let pointerLock: PointerLockController | null = null;
-  if (!inputFrozen) {
+  if (!inputFrozen && runtimeParams.controlMode === "human") {
     pointerLock = new PointerLockController({
       mountEl: runtimeRoot,
       lockEl: renderer.canvas,
@@ -618,17 +688,40 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   };
   const camFwdScratch = new Vector3();
   const hitPointScratch = new Vector3();
+  const scoreStorageKey = makeScoreStorageKey(runtimeParams.mapId);
+  let bestScore = readBestScore(scoreStorageKey);
+  scoreHud.setBestScore(bestScore);
+  let lastRunScore: number | null = null;
+  let wasAlive = !game.getIsDead();
+  const pendingAgentActions: AgentAction[] = [];
+
+  const applyQueuedAgentActions = (): void => {
+    if (pendingAgentActions.length === 0) return;
+    if (runtimeParams.controlMode === "agent") {
+      for (const action of pendingAgentActions) {
+        game.applyAgentAction(action);
+      }
+    }
+    pendingAgentActions.length = 0;
+  };
 
   const state = (): RuntimeTextState => {
     const yawPitch = game.getYawPitchDeg();
+    const alive = !game.getIsDead();
+    const pointerLocked = game.isPointerLocked();
+    const currentScore = scoreHud.getScore();
+    const finalScore = lastRunScore ?? currentScore;
+    const gameOverVisible = deathScreen.isVisible();
+    const visibility = document.visibilityState === "hidden" ? "hidden" : "visible";
     return {
+      apiVersion: RUNTIME_TEXT_API_VERSION,
       mode: "runtime",
       map: {
         loaded: mapLoaded,
-        mapId: urlParams.mapId,
+        mapId: runtimeParams.mapId,
         seed: game.getPropsBuildStats().seed,
-        spawn: urlParams.spawn,
-        highVis: urlParams.highVis,
+        spawn: runtimeParams.spawn,
+        highVis: runtimeParams.highVis,
         colliderCount: game.getColliderCount(),
         wallDetails: {
           enabled: game.getWallDetailStats().enabled,
@@ -659,10 +752,31 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       },
       gameplay: {
         active: true,
-        pointerLocked: pointerLock?.isLocked() ?? false,
+        alive,
+        pointerLocked,
+        focused: document.hasFocus(),
+        visibility,
         inputFrozen,
         grounded: game.getGrounded(),
         speedMps: game.getSpeedMps(),
+      },
+      agent: {
+        enabled: runtimeParams.controlMode === "agent",
+        name: runtimeParams.controlMode === "agent" ? runtimeParams.playerName : "",
+      },
+      player: {
+        name: runtimeParams.playerName,
+      },
+      score: {
+        current: currentScore,
+        best: bestScore,
+        ...(lastRunScore !== null ? { lastRun: lastRunScore } : {}),
+      },
+      gameOver: {
+        visible: gameOverVisible,
+        finalScore,
+        bestScore,
+        canPlayAgain: gameOverVisible,
       },
       anchorsDebug: game.getAnchorsDebugState(),
       props: {
@@ -712,6 +826,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   const step = (deltaMs: number): void => {
     const clampedMs = Math.min(Math.max(deltaMs, 0), 100);
     const dt = clampedMs / 1000;
+    applyQueuedAgentActions();
 
     // Freeze game input when pause menu is open (death-freeze is managed inside Game.ts)
     if (pauseMenu.isVisible()) {
@@ -720,6 +835,17 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       game.setFreezeInput(false);
     }
     game.update(dt);
+
+    const aliveNow = !game.getIsDead();
+    if (!aliveNow && wasAlive) {
+      lastRunScore = scoreHud.getScore();
+      if (lastRunScore > bestScore) {
+        bestScore = lastRunScore;
+        writeBestScore(scoreStorageKey, bestScore);
+        scoreHud.setBestScore(bestScore);
+      }
+    }
+    wasAlive = aliveNow;
 
     // ── Health tracking & hit vignette ───────────────────────────────────────
     const currentHealth = game.getPlayerHealth();
@@ -758,7 +884,11 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
 
     // ── Death detection ──────────────────────────────────────────────────────
     if (game.getIsDead() && !deathScreen.isVisible()) {
-      deathScreen.show();
+      deathScreen.show({
+        playerName: runtimeParams.playerName,
+        finalScore: scoreHud.getScore(),
+        bestScore,
+      });
     }
 
     const overviewCamera = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
@@ -842,7 +972,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
       instancedInstances: scenePerfSnapshot.instancedInstances,
       dpr: renderer.getCurrentPixelRatio(),
       dprCap: renderer.getPixelRatioCap(),
-      debugEnabled: urlParams.debug,
+      debugEnabled: runtimeParams.debug,
     });
   };
 
@@ -856,6 +986,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
 
   // Escape key toggles pause menu (when pointer lock is NOT held by the browser)
   const onKeyDownPause = (e: KeyboardEvent): void => {
+    if (runtimeParams.controlMode !== "human") return;
     if (e.code !== "Escape") return;
     if (game.getIsDead()) return; // ignore Esc on death screen
     if (inputFrozen) return;
@@ -882,6 +1013,11 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
   timerHud.start(); // begin counting from game boot
   rafId = window.requestAnimationFrame(animate);
 
+  window.agent_apply_action = (action: AgentAction) => {
+    const normalized = normalizeAgentAction(action);
+    if (!normalized) return;
+    pendingAgentActions.push(normalized);
+  };
   window.render_game_to_text = () => JSON.stringify(state());
   window.advanceTime = async (ms: number) => {
     const frameMs = 1000 / 60;
@@ -907,6 +1043,7 @@ export async function bootstrapRuntime(): Promise<RuntimeHandle> {
     window.removeEventListener("resize", onResize);
     window.removeEventListener("pagehide", teardown);
     window.removeEventListener("beforeunload", teardown);
+    delete window.agent_apply_action;
 
     pointerLock?.dispose();
     game.teardown();

@@ -2,14 +2,12 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- `docs/map-design` remains the source-of-truth input (spec + refs) and is only used by `gen:maps` to emit runtime copies under `apps/client/public/maps/bazaar-map/`.
-- Facade details: `window_glass` reflective blue shader + balconies (35% facade gate, spawn-plaza forced, A/B symmetric; main lane weighted 1/2/3-bay mix; doors scale with slab; connectors/side-halls/corners have 0 balconies).
-- Outer shell: roof caps depth 4 m; side-hall inner/outer wall heights 9 m / 3 m; connector corner zones raised to 9 m to close plaza corner gaps.
-- Jog fillers: W/E fill zones close main-lane exterior wall/floor voids so the 9 m shell is continuous from Z=14-68.
-- Loading screen info overlay textbox positioned at `--info-textbox-y-lift: -90px`.
-- `gen:maps` still emits anchor clearance warnings during build (expected, not a bug).
-- Agent playbook is served at `/skills.md`; loading screen button opens it (same-origin).
-- Vercel deploy agent skill installed: `.agents/skills/vercel-cli/` + `skills-lock.json`.
+- Runtime map is generated from `docs/map-design/specs/map_spec.json` via `pnpm --filter @clawd-strike/client gen:maps` into `apps/client/public/maps/bazaar-map/`.
+- Loading name-entry flow is now Enter-only; the loading-screen `Start` button has been removed.
+- Agent smoke runner now submits entry via Enter in the agent-name input.
+- Agent Mode UI flow and runtime APIs are active (`window.render_game_to_text`, `window.agent_apply_action`, `window.advanceTime`).
+- Canonical local playtest URL remains unchanged.
+- Map approval still pending blockout traversal/readability signoff.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
@@ -22,18 +20,24 @@
 pnpm dev
 pnpm typecheck
 pnpm build
+BASE_URL=http://127.0.0.1:5174 AGENT_NAME=SmokeRunner pnpm --filter @clawd-strike/client smoke:agent
 ```
 
 ## Last Completed Prompt
-- Imported Vercel agent skill `vercel-cli` into the repo for Codex: `.agents/skills/vercel-cli/` + `skills-lock.json`.
-- `pnpm typecheck` + `pnpm build` pass clean.
+- Removed the loading-screen `Start` button; loading mode selection now enters gameplay only via Enter key in the name field.
+- Updated automation/docs to match Enter submission (agent smoke runner + `public/skills.md` example flow).
+- Captured deterministic loading-nameplate screenshots:
+  - `artifacts/screenshots/2026-03-01-enter-key-loading-flow/before.png`
+  - `artifacts/screenshots/2026-03-01-enter-key-loading-flow/after.png`
+- Files touched: `apps/client/index.html`, `apps/client/src/loading-screen/ui.ts`, `apps/client/src/styles.css`, `apps/client/scripts/agent-smoke-runner.mjs`, `apps/client/public/skills.md`, `progress.md`.
+- Validation: `pnpm typecheck` + `pnpm build` pass; Enter-flow smoke and `smoke:agent` pass locally.
 
 ## Next 3 Tasks
-1. Set up Vercel deployment (project link + build settings) for the pnpm workspace client.
-2. Review door placement policy (spawn walls, terminal main-lane zones) against design intent.
-3. Mark map `APPROVED` once blockout geometry satisfies design brief acceptance criteria.
+1. Manually verify human pointer-lock + pause/resume behavior in a desktop browser session.
+2. Add a visible Enter-key hint near the nameplate only if UX requests clearer affordance.
+3. Decide whether smoke runner should optionally preserve run artifacts (`state.json` / screenshot) for CI triage.
 
 ## Known Issues / Risks
-- `gen:maps` still emits clear-zone anchor warnings for several landmarks/open-node anchors.
-- Automated pointer-lock verification is flaky in Playwright and requires manual browser confirmation.
-- Headless Playwright WebGL context unreliable; headed capture remains the dependable path.
+- `gen:maps` still reports expected clear-zone anchor warnings for several landmarks/open-node anchors.
+- Playwright pointer-lock checks remain unreliable; pointer-lock validation is still manual.
+- Browser background/minimized-tab throttling can reduce simulation cadence for automation loops.

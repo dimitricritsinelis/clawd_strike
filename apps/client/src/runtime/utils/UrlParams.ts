@@ -1,8 +1,10 @@
 const DEFAULT_MAP_ID = "bazaar-map";
 const DEFAULT_PROP_PROFILE = "subtle";
 const DEFAULT_FLOOR_QUALITY = "4k";
+export const PLAYER_NAME_MAX_LENGTH = 15;
 
 export type RuntimeSpawnId = "A" | "B";
+export type RuntimeControlMode = "human" | "agent";
 export type RuntimePropProfile = "subtle" | "medium" | "high";
 export type RuntimeFloorMode = "blockout" | "pbr";
 export type RuntimeWallMode = "blockout" | "pbr";
@@ -18,6 +20,7 @@ export type RuntimePropChaosOptions = {
 
 export type RuntimeUrlParams = {
   mapId: string;
+  controlMode: RuntimeControlMode;
   playerName: string;
   shot: string | null;
   spawn: RuntimeSpawnId;
@@ -129,16 +132,35 @@ function getParam(params: URLSearchParams, ...keys: string[]): string | null {
   return null;
 }
 
-function parsePlayerName(value: string | null): string {
-  if (!value) return "Operator";
+function parseControlMode(modeValue: string | null, autostartValue: string | null): RuntimeControlMode {
+  const mode = modeValue?.trim().toLowerCase();
+  if (mode === "human" || mode === "agent") {
+    return mode;
+  }
+
+  const autostart = autostartValue?.trim().toLowerCase();
+  if (autostart === "agent") {
+    return "agent";
+  }
+  return "human";
+}
+
+export function sanitizeRuntimePlayerName(
+  value: string | null | undefined,
+  mode: RuntimeControlMode,
+): string {
+  const fallback = mode === "agent" ? "Agent" : "Operator";
+  if (!value) return fallback;
   const trimmed = value.trim();
-  if (trimmed.length === 0) return "Operator";
-  return trimmed.slice(0, 24);
+  if (trimmed.length === 0) return fallback;
+  return trimmed.slice(0, PLAYER_NAME_MAX_LENGTH);
 }
 
 export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const params = new URLSearchParams(search);
   const rawMapId = getParam(params, "map");
+  const rawControlMode = getParam(params, "mode", "controlMode");
+  const rawAutostart = getParam(params, "autostart");
   const rawPlayerName = getParam(params, "name", "player", "playerName");
   const rawShot = getParam(params, "shot");
   const rawSpawn = getParam(params, "spawn");
@@ -165,7 +187,8 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawUnlimitedHealth = getParam(params, "unlimitedHealth", "god", "godMode");
 
   const mapId = rawMapId && rawMapId.trim().length > 0 ? rawMapId.trim() : DEFAULT_MAP_ID;
-  const playerName = parsePlayerName(rawPlayerName);
+  const controlMode = parseControlMode(rawControlMode, rawAutostart);
+  const playerName = sanitizeRuntimePlayerName(rawPlayerName, controlMode);
   const shot = rawShot && rawShot.trim().length > 0 ? rawShot.trim() : null;
   const spawn = rawSpawn?.trim().toUpperCase() === "B" ? "B" : "A";
   const debug = parseBooleanFlag(rawDebug);
@@ -194,6 +217,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
 
   return {
     mapId,
+    controlMode,
     playerName,
     shot,
     spawn,

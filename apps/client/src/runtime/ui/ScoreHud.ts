@@ -7,6 +7,7 @@ export class ScoreHud {
   private readonly killsEl: HTMLSpanElement;
   private readonly headshotsEl: HTMLSpanElement;
   private readonly scoreEl: HTMLSpanElement;
+  private readonly bestScoreEl: HTMLSpanElement;
 
   private kills = 0;
   private headshots = 0;
@@ -15,8 +16,9 @@ export class ScoreHud {
   private readonly SCORE_PER_KILL = 10;
   private readonly SCORE_PER_HEADSHOT = 2.5;
 
-  constructor(mountEl: HTMLElement, playerName = "Operator") {
+  constructor(mountEl: HTMLElement, playerName: string) {
     this.root = document.createElement("div");
+    this.root.dataset.testid = "score-hud";
     Object.assign(this.root.style, {
       position: "absolute",
       top: "20px",
@@ -109,6 +111,7 @@ export class ScoreHud {
     this.headshotsEl.textContent = "0";
 
     this.scoreEl = document.createElement("span");
+    this.scoreEl.dataset.testid = "score";
     Object.assign(this.scoreEl.style, {
       fontSize: "30px",
       fontWeight: "700",
@@ -118,8 +121,42 @@ export class ScoreHud {
     });
     this.scoreEl.textContent = this.formatScore(this.score);
 
+    const bestRow = document.createElement("div");
+    Object.assign(bestRow.style, {
+      display: "flex",
+      width: "100%",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      marginTop: "4px",
+      fontFamily: '"Segoe UI", Tahoma, Verdana, sans-serif',
+      borderTop: "1px solid rgba(255,255,255,0.08)",
+      paddingTop: "5px",
+    });
+
+    const bestLabel = document.createElement("span");
+    Object.assign(bestLabel.style, {
+      fontSize: "11px",
+      fontWeight: "600",
+      letterSpacing: "0.12em",
+      textTransform: "uppercase",
+      color: "rgba(180, 200, 230, 0.6)",
+    });
+    bestLabel.textContent = "Best Score";
+
+    this.bestScoreEl = document.createElement("span");
+    this.bestScoreEl.dataset.testid = "best-score";
+    Object.assign(this.bestScoreEl.style, {
+      fontSize: "17px",
+      fontWeight: "700",
+      fontVariantNumeric: "tabular-nums",
+      letterSpacing: "0.04em",
+      color: "rgba(228, 238, 252, 0.95)",
+    });
+    this.bestScoreEl.textContent = this.formatScore(0);
+    bestRow.append(bestLabel, this.bestScoreEl);
+
     row.append(this.killsEl, this.headshotsEl, this.scoreEl);
-    this.root.append(nameEl, labels, row);
+    this.root.append(nameEl, labels, row, bestRow);
     mountEl.append(this.root);
   }
 
@@ -166,6 +203,14 @@ export class ScoreHud {
 
   setVisible(visible: boolean): void {
     this.root.style.display = visible ? "flex" : "none";
+  }
+
+  getScore(): number {
+    return this.score;
+  }
+
+  setBestScore(value: number): void {
+    this.bestScoreEl.textContent = this.formatScore(value);
   }
 
   dispose(): void {

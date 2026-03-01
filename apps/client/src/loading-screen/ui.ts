@@ -20,11 +20,35 @@ export type LoadingScreenUI = {
 };
 
 const SKILLS_MD_PLACEHOLDER_URL = "/skills.md";
+const AGENT_NAME_STORAGE_KEY = "clawd-strike:last-agent-name";
 
 function getRequiredEl<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
   if (!el) throw new Error(`Missing required loading screen element: ${selector}`);
   return el;
+}
+
+function clampNameToMaxLength(raw: string, maxLength: number): string {
+  if (maxLength <= 0) return raw.trim();
+  return raw.trim().slice(0, maxLength);
+}
+
+function readPersistedAgentName(maxLength: number): string {
+  try {
+    const stored = window.localStorage.getItem(AGENT_NAME_STORAGE_KEY);
+    if (!stored) return "";
+    return clampNameToMaxLength(stored, maxLength);
+  } catch {
+    return "";
+  }
+}
+
+function writePersistedAgentName(value: string): void {
+  try {
+    window.localStorage.setItem(AGENT_NAME_STORAGE_KEY, value);
+  } catch {
+    // Ignore storage errors in constrained browser contexts.
+  }
 }
 
 export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): LoadingScreenUI {
@@ -41,6 +65,11 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   let disposed = false;
   let bannerTimer: number | null = null;
   let pendingMode: LoadingScreenMode | null = null;
+  const playerNameMaxLength = playerNameInput.maxLength > 0 ? playerNameInput.maxLength : 15;
+  let persistedAgentName = readPersistedAgentName(playerNameMaxLength);
+  if (persistedAgentName.length > 0) {
+    playerNameInput.value = persistedAgentName;
+  }
   start.dataset.agentSubmenu = "false";
   start.dataset.nameEntryVisible = "false";
   start.dataset.infoVisible = "false";
@@ -72,6 +101,9 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   function revealNameEntry(mode: LoadingScreenMode) {
     pendingMode = mode;
     playerNameInput.placeholder = mode === "agent" ? "AGENT NAME" : "HUMAN NAME";
+    if (mode === "agent" && persistedAgentName.length > 0) {
+      playerNameInput.value = persistedAgentName;
+    }
     start.dataset.agentSubmenu = "false";
     start.dataset.nameEntryVisible = "true";
     window.requestAnimationFrame(() => {
@@ -113,10 +145,19 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
   function closeNameAndModePanels() {
     pendingMode = null;
-    playerNameInput.value = "";
     playerNameInput.placeholder = "ENTER NAME";
     start.dataset.nameEntryVisible = "false";
     start.dataset.agentSubmenu = "false";
+  }
+
+  function submitPendingModeSelection() {
+    if (!pendingMode) return;
+    const sanitizedPlayerName = clampNameToMaxLength(playerNameInput.value, playerNameMaxLength);
+    if (pendingMode === "agent" && sanitizedPlayerName.length > 0) {
+      persistedAgentName = sanitizedPlayerName;
+      writePersistedAgentName(sanitizedPlayerName);
+    }
+    callbacks.onSelectMode(pendingMode, sanitizedPlayerName);
   }
 
   function onSelectHuman() {
@@ -140,7 +181,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       return;
     }
     if (event.key !== "Enter" || !pendingMode) return;
-    callbacks.onSelectMode(pendingMode, playerNameInput.value.trim());
+    submitPendingModeSelection();
   }
 
   function showTransientBanner(message: string) {

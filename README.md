@@ -33,7 +33,7 @@ Open the URL, then click `Human` on the loading screen to enter the gameplay run
 - `vm-debug=1` viewmodel debug axes (requires `debug=1`)
 - `spawn=B` spawn selector (`A` default)
 - `prop-profile=subtle|medium|high`, `prop-jitter=0..1`, `prop-cluster=0..1`, `prop-density=0..1`
-- `autostart=human` skip menu and bootstrap runtime immediately
+- `autostart=human|agent` skip menu and bootstrap runtime immediately
 
 Legacy aliases are still accepted (`highvis`, `vmDebug`, `anchorTypes`, `propProfile`, `propJitter`, `propCluster`, `propDensity`).
 
@@ -61,6 +61,26 @@ pnpm --filter @clawd-strike/client gen:maps
 
 ## Automation Hooks
 - `window.render_game_to_text(): string`
-  - Returns a concise JSON snapshot of current loading/runtime state for automation checks.
+  - Returns a concise JSON snapshot of current loading/runtime state for automation checks (includes `apiVersion`, `agent`, `gameplay.alive/focused/visibility`, `score`, and `player` fields).
+- `window.agent_apply_action(action): void`
+  - Agent-mode action API (`moveX`, `moveZ`, `lookYawDelta`, `lookPitchDelta`, `jump`, `fire`, `reload`, `sprint`) applied deterministically at tick boundaries.
 - `window.advanceTime(ms): Promise<void>`
   - Advances simulation time in deterministic frame steps for automation clients.
+
+## Optional Agent Smoke Runner
+
+Runs a headed Chrome Playwright session that drives the loading screen + runtime using only Playwright clicks and `page.evaluate(...)` calls.
+
+```bash
+BASE_URL=http://127.0.0.1:5174 AGENT_NAME=SmokeRunner pnpm --filter @clawd-strike/client smoke:agent
+```
+
+- `BASE_URL` is optional (default: `http://127.0.0.1:5174`).
+- `AGENT_NAME` is optional (default: `SmokeRunner`; trimmed to 15 chars to match UI limit).
+- The script:
+  - opens `BASE_URL`
+  - clicks `agent-mode` -> `play`
+  - fills `agent-name` and clicks `start`
+  - waits for runtime-ready using `window.render_game_to_text()`
+  - drives ~10s of simple agent actions via `window.agent_apply_action(...)`
+  - asserts camera position changed and `score.current` is numeric

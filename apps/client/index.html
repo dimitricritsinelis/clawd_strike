@@ -316,7 +316,9 @@
                     aria-hidden="true"
                   />
                 </picture>
-                <button id="multi-player-btn" class="hit" aria-label="Agent">Agent</button>
+                <button id="multi-player-btn" class="hit" aria-label="Agent mode" data-testid="agent-mode">
+                  Agent
+                </button>
               </div>
               <div class="option-art" data-action-set="agent">
                 <picture>
@@ -382,7 +384,12 @@
                     aria-hidden="true"
                   />
                 </picture>
-                <button id="enter-agent-mode-btn" class="hit" aria-label="Enter agent mode">
+                <button
+                  id="enter-agent-mode-btn"
+                  class="hit"
+                  aria-label="Play in agent mode"
+                  data-testid="play"
+                >
                   Enter agent mode
                 </button>
               </div>
@@ -398,6 +405,7 @@
                   maxlength="15"
                   autocomplete="off"
                   spellcheck="false"
+                  data-testid="agent-name"
                 />
               </div>
             </div>

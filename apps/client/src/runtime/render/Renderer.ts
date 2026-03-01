@@ -50,6 +50,7 @@ export class Renderer {
     );
 
     this.canvas = this.renderer.domElement;
+    this.canvas.dataset.testid = "game-canvas";
     this.canvas.style.width = "100%";
     this.canvas.style.height = "100%";
     this.canvas.style.display = "block";
