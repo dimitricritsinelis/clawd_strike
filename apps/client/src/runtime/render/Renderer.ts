@@ -41,7 +41,7 @@ export class Renderer {
     this.renderer.toneMappingExposure = 1.45;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = PCFSoftShadowMap;
-    this.renderer.shadowMap.autoUpdate = true;
+    this.renderer.shadowMap.autoUpdate = false;
     this.renderer.info.autoReset = false;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
     this.renderer.setClearColor(
@@ -78,6 +78,10 @@ export class Renderer {
 
   getCurrentPixelRatio(): number {
     return this.renderer.getPixelRatio();
+  }
+
+  requestShadowUpdate(): void {
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   getPerfInfo(): RendererPerfInfo {

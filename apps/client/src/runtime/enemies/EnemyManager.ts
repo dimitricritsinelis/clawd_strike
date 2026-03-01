@@ -56,6 +56,7 @@ export class EnemyManager {
 
   // Pre-allocated scratch structures
   private readonly aabbScratch: EnemyAabb[] = [];
+  private readonly targetPool: EnemyTarget[];
   private readonly targetsScratch: EnemyTarget[] = [];
 
   // Player AABB — updated every frame, used by enemy fire checks
@@ -71,7 +72,26 @@ export class EnemyManager {
   constructor(scene: Scene) {
     this.scene = scene;
     this.sharedLoader = new GLTFLoader();
+    // Player + every configured enemy target (updated in-place every frame).
+    this.targetPool = Array.from({ length: ENEMY_SPAWN_CONFIG.length + 1 }, () => ({
+      id: "",
+      position: { x: 0, y: 0, z: 0 },
+      health: 0,
+    }));
+    this.targetPool[0]!.id = "player";
   }
+
+  private readonly handleEnemyShot = (targetId: string, damage: number): void => {
+    this.resolveEnemyShot(targetId, damage);
+  };
+
+  private readonly handleFootstep = (distanceToPlayer: number): void => {
+    const audio = this.weaponAudio;
+    if (!audio) return;
+    // Normalise distance: max audible range ~20m
+    const distNorm = Math.min(1, distanceToPlayer / 20);
+    audio.playEnemyFootstep(distNorm);
+  };
 
   setAudio(audio: WeaponAudio): void {
     this.weaponAudio = audio;
@@ -103,37 +123,64 @@ export class EnemyManager {
   }
 
   spawn(worldColliders: WorldColliders): void {
-    // Dispose previous enemies if any (e.g. map rebuild or wave reset)
-    this.dispose(this.scene);
     this.worldCollidersRef = worldColliders;
 
     this.waveNumber += 1;
     this.waveRespawnTimer = null;
+    this.deathFadeStarted.clear();
+    this.playerHealthDelta = 0;
+
+    // Safety fallback: if config size changed between waves, recreate from scratch once.
+    if (
+      this.controllers.length > 0 &&
+      (this.controllers.length !== ENEMY_SPAWN_CONFIG.length || this.visuals.length !== ENEMY_SPAWN_CONFIG.length)
+    ) {
+      this.dispose(this.scene);
+    }
 
     const mapSeed = resolveRuntimeSeed("bazaar-map", null);
     // Use a per-wave seed so each wave has different jitter
     const waveSeed = deriveSubSeed(mapSeed, `wave_${this.waveNumber}`);
     const jitterRng = new DeterministicRng(waveSeed);
-
     const pb = worldColliders.playableBounds;
 
-    for (const config of ENEMY_SPAWN_CONFIG) {
-      const id: EnemyId = `enemy_${config.name.toLowerCase()}`;
-      const seed = deriveSubSeed(mapSeed, id);
-
-      // Apply random jitter, then clamp to playable bounds with a margin
-      const jX = jitterRng.range(-SPAWN_JITTER_M, SPAWN_JITTER_M);
-      const jZ = jitterRng.range(-SPAWN_JITTER_M, SPAWN_JITTER_M);
-      const margin = ENEMY_HALF_WIDTH_M + 0.5;
-      const spawnX = Math.max(pb.minX + margin, Math.min(pb.maxX - margin, config.x + jX));
-      const spawnZ = Math.max(pb.minZ + margin, Math.min(pb.maxZ - margin, config.z + jZ));
-
-      const controller = new EnemyController(id, config.name, spawnX, spawnZ, seed);
-      const visual = new EnemyVisual(config.name, this.scene, this.sharedLoader);
-
-      this.controllers.push(controller);
-      this.visuals.push(visual);
+    if (this.controllers.length === 0) {
+      for (const config of ENEMY_SPAWN_CONFIG) {
+        const id: EnemyId = `enemy_${config.name.toLowerCase()}`;
+        const seed = deriveSubSeed(waveSeed, id);
+        const { spawnX, spawnZ } = this.getJitteredSpawn(config.x, config.z, jitterRng, pb);
+        const controller = new EnemyController(id, config.name, spawnX, spawnZ, seed);
+        const visual = new EnemyVisual(config.name, this.scene, this.sharedLoader);
+        this.controllers.push(controller);
+        this.visuals.push(visual);
+      }
+      return;
     }
+
+    for (let i = 0; i < ENEMY_SPAWN_CONFIG.length; i += 1) {
+      const config = ENEMY_SPAWN_CONFIG[i]!;
+      const ctrl = this.controllers[i]!;
+      const visual = this.visuals[i]!;
+      const seed = deriveSubSeed(waveSeed, ctrl.id);
+      const { spawnX, spawnZ } = this.getJitteredSpawn(config.x, config.z, jitterRng, pb);
+      ctrl.reset(spawnX, spawnZ, seed);
+      visual.reset();
+    }
+  }
+
+  private getJitteredSpawn(
+    baseX: number,
+    baseZ: number,
+    jitterRng: DeterministicRng,
+    playableBounds: { minX: number; minZ: number; maxX: number; maxZ: number },
+  ): { spawnX: number; spawnZ: number } {
+    const jX = jitterRng.range(-SPAWN_JITTER_M, SPAWN_JITTER_M);
+    const jZ = jitterRng.range(-SPAWN_JITTER_M, SPAWN_JITTER_M);
+    const margin = ENEMY_HALF_WIDTH_M + 0.5;
+    return {
+      spawnX: Math.max(playableBounds.minX + margin, Math.min(playableBounds.maxX - margin, baseX + jX)),
+      spawnZ: Math.max(playableBounds.minZ + margin, Math.min(playableBounds.maxZ - margin, baseZ + jZ)),
+    };
   }
 
   update(
@@ -162,25 +209,27 @@ export class EnemyManager {
     // Add player AABB so enemies can shoot the player
     this.aabbScratch.push(this.playerAabb);
 
-    // Rebuild targets scratch: player + living enemies
-    this.targetsScratch.length = 0;
-    this.targetsScratch.push({
-      id: "player",
-      position: playerPos,
-      health: playerHealth,
-    });
+    // Rebuild targets scratch: player + living enemies (in-place updates, no per-frame objects)
+    let targetCount = 1;
+    const playerTarget = this.targetPool[0]!;
+    playerTarget.id = "player";
+    playerTarget.position = playerPos;
+    playerTarget.health = playerHealth;
+    this.targetsScratch[0] = playerTarget;
     for (const ctrl of this.controllers) {
       if (!ctrl.isDead()) {
-        this.targetsScratch.push({
-          id: ctrl.id,
-          position: ctrl.getPosition(),
-          health: ctrl.getHealth(),
-        });
+        const target = this.targetPool[targetCount]!;
+        target.id = ctrl.id;
+        target.position = ctrl.getPosition();
+        target.health = ctrl.getHealth();
+        this.targetsScratch[targetCount] = target;
+        targetCount += 1;
       }
     }
+    this.targetsScratch.length = targetCount;
 
     // Step each living controller
-    const audio = this.weaponAudio;
+    const onFootstep = this.weaponAudio ? this.handleFootstep : undefined;
     for (const ctrl of this.controllers) {
       if (ctrl.isDead()) continue;
       ctrl.step(
@@ -188,12 +237,8 @@ export class EnemyManager {
         this.targetsScratch,
         worldColliders,
         this.aabbScratch,
-        (targetId, damage) => this.resolveEnemyShot(targetId, damage),
-        audio ? (distToPlayer) => {
-          // Normalise distance: max audible range ~20m
-          const distNorm = Math.min(1, distToPlayer / 20);
-          audio.playEnemyFootstep(distNorm);
-        } : undefined,
+        this.handleEnemyShot,
+        onFootstep,
       );
     }
 

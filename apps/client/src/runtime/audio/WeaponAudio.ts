@@ -2,6 +2,7 @@ const AK47_CLOSE_BASENAME = "/assets/audio/weapons/ak47/fire_close_01";
 const AK47_TAIL_BASENAME = "/assets/audio/weapons/ak47/fire_tail_01";
 const AUDIO_EXTENSIONS = [".ogg", ".mp3", ".wav"] as const;
 const FALLBACK_NOISE_SECONDS = 0.22;
+const EVENT_NOISE_POOL_SIZE = 4;
 
 type LoadedLayer = {
   buffer: AudioBuffer | null;
@@ -32,6 +33,10 @@ export class WeaponAudio {
   private loadPromise: Promise<void> | null = null;
   private didLogMissingAssetWarning = false;
   private variationState = 0x12345678;
+  private hitThudNoisePool: AudioBuffer[] | null = null;
+  private dryFireNoisePool: AudioBuffer[] | null = null;
+  private reloadStartNoisePool: AudioBuffer[] | null = null;
+  private reloadSnapNoisePool: AudioBuffer[] | null = null;
 
   private footstepNoiseBuffer: AudioBuffer | null = null;
   private footstepAlt = false;
@@ -121,14 +126,12 @@ export class WeaponAudio {
     const now = ctx.currentTime;
     const DURATION_S = 0.04;
 
-    // Lazy-create a short noise buffer for the impact
-    const frames = Math.ceil(DURATION_S * ctx.sampleRate);
-    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < frames; i++) ch[i] = this.randRange(-1, 1);
+    if (!this.hitThudNoisePool) {
+      this.hitThudNoisePool = this.buildNoisePool(ctx, DURATION_S);
+    }
 
     const source = ctx.createBufferSource();
-    source.buffer = buf;
+    source.buffer = this.pickPooledNoise(this.hitThudNoisePool);
 
     // Bandpass: flesh impact sits ~900Hz
     const bp = ctx.createBiquadFilter();
@@ -246,15 +249,13 @@ export class WeaponAudio {
     if (ctx.state === "suspended") return;
 
     const now = ctx.currentTime;
+    if (!this.dryFireNoisePool) {
+      this.dryFireNoisePool = this.buildNoisePool(ctx, 0.018);
+    }
 
     // Metallic click transient: very short highpass noise burst
-    const frames = Math.ceil(0.018 * ctx.sampleRate);
-    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < frames; i++) ch[i] = this.randRange(-1, 1);
-
     const source = ctx.createBufferSource();
-    source.buffer = buf;
+    source.buffer = this.pickPooledNoise(this.dryFireNoisePool);
 
     const hp = ctx.createBiquadFilter();
     hp.type = "highpass";
@@ -310,14 +311,12 @@ export class WeaponAudio {
 
     const now = ctx.currentTime;
     const DURATION_S = 0.12;
-
-    const frames = Math.ceil(DURATION_S * ctx.sampleRate);
-    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < frames; i++) ch[i] = this.randRange(-1, 1);
+    if (!this.reloadStartNoisePool) {
+      this.reloadStartNoisePool = this.buildNoisePool(ctx, DURATION_S);
+    }
 
     const source = ctx.createBufferSource();
-    source.buffer = buf;
+    source.buffer = this.pickPooledNoise(this.reloadStartNoisePool);
 
     // Bandpass centred ~320Hz — hollow plastic/polymer mag drop
     const bp = ctx.createBiquadFilter();
@@ -336,7 +335,7 @@ export class WeaponAudio {
     gain.gain.exponentialRampToValueAtTime(0.0001, now + DURATION_S);
 
     const drive = ctx.createWaveShaper();
-    drive.curve = new Float32Array(DRIVE_CURVE);
+    drive.curve = DRIVE_CURVE as Float32Array<ArrayBuffer>;
 
     source.connect(bp);
     bp.connect(lowShelf);
@@ -371,13 +370,12 @@ export class WeaponAudio {
 
     // Layer 2: charging handle snap (0.08s later) — sharp highpass click
     const SNAP_DELAY = 0.08;
-    const frames = Math.ceil(0.03 * ctx.sampleRate);
-    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
-    const ch = buf.getChannelData(0);
-    for (let i = 0; i < frames; i++) ch[i] = this.randRange(-1, 1);
+    if (!this.reloadSnapNoisePool) {
+      this.reloadSnapNoisePool = this.buildNoisePool(ctx, 0.03);
+    }
 
     const source = ctx.createBufferSource();
-    source.buffer = buf;
+    source.buffer = this.pickPooledNoise(this.reloadSnapNoisePool);
 
     const hp = ctx.createBiquadFilter();
     hp.type = "highpass";
@@ -525,6 +523,10 @@ export class WeaponAudio {
     this.closeBuffer = null;
     this.tailBuffer = null;
     this.fallbackNoiseBuffer = null;
+    this.hitThudNoisePool = null;
+    this.dryFireNoisePool = null;
+    this.reloadStartNoisePool = null;
+    this.reloadSnapNoisePool = null;
     this.footstepNoiseBuffer = null;
 
     this.masterGain?.disconnect();
@@ -665,7 +667,7 @@ export class WeaponAudio {
     highShelf.gain.value = this.randRange(1.2, 2.8);
 
     const drive = this.audioContext.createWaveShaper();
-    drive.curve = new Float32Array(DRIVE_CURVE);
+    drive.curve = DRIVE_CURVE as Float32Array<ArrayBuffer>;
     drive.oversample = "2x";
 
     source.connect(gainNode);
@@ -822,7 +824,7 @@ export class WeaponAudio {
 
     // Drive: tanh saturation for physical impact punch
     const drive = ctx.createWaveShaper();
-    drive.curve = new Float32Array(DRIVE_CURVE);
+    drive.curve = DRIVE_CURVE as Float32Array<ArrayBuffer>;
     drive.oversample = "2x";
 
     source.connect(bandpass);
@@ -840,6 +842,20 @@ export class WeaponAudio {
       gainNode.disconnect();
       drive.disconnect();
     };
+  }
+
+  private buildNoisePool(ctx: AudioContext, durationSeconds: number): AudioBuffer[] {
+    const pool = new Array<AudioBuffer>(EVENT_NOISE_POOL_SIZE);
+    for (let i = 0; i < EVENT_NOISE_POOL_SIZE; i += 1) {
+      pool[i] = this.createNoiseBuffer(ctx, durationSeconds);
+    }
+    return pool;
+  }
+
+  private pickPooledNoise(pool: readonly AudioBuffer[]): AudioBuffer {
+    const rawIndex = Math.floor(this.randRange(0, pool.length));
+    const index = Math.min(pool.length - 1, Math.max(0, rawIndex));
+    return pool[index]!;
   }
 
   private createNoiseBuffer(ctx: AudioContext, durationSeconds: number): AudioBuffer {

@@ -23,6 +23,8 @@ const RISE_SPEED_PX = 38; // px/s upward drift
 export class DamageNumbers {
   private readonly root: HTMLDivElement;
   private readonly entries: DamageEntry[] = [];
+  private readonly freeEls: HTMLDivElement[] = [];
+  private readonly scratch = new Vector3();
 
   constructor(mountEl: HTMLElement) {
     this.root = document.createElement("div");
@@ -50,7 +52,7 @@ export class DamageNumbers {
     isHeadshot: boolean,
   ): void {
     // Project 3D position to NDC
-    const v = new Vector3(worldPos.x, worldPos.y, worldPos.z);
+    const v = this.scratch.set(worldPos.x, worldPos.y, worldPos.z);
     v.project(camera);
 
     // NDC to screen percent
@@ -64,7 +66,7 @@ export class DamageNumbers {
     const jitterX = (Math.random() - 0.5) * 3.5; // in % units
     const jitterY = (Math.random() - 0.5) * 1.5;
 
-    const el = document.createElement("div");
+    const el = this.freeEls.pop() ?? document.createElement("div");
 
     // Size scales with damage: 25 dmg → ~1.21rem, 100 dmg → ~1.83rem
     const sizeRem = (1.0 + damage / 120).toFixed(2);
@@ -93,7 +95,7 @@ export class DamageNumbers {
 
     this.root.append(el);
 
-    const startY = (parseFloat(el.style.top) / 100) * window.innerHeight;
+    const startY = ((screenY + jitterY) / 100) * window.innerHeight;
 
     this.entries.push({
       el,
@@ -112,7 +114,12 @@ export class DamageNumbers {
 
       if (entry.timerS <= 0) {
         entry.el.remove();
-        this.entries.splice(i, 1);
+        this.freeEls.push(entry.el);
+        const lastIndex = this.entries.length - 1;
+        if (i !== lastIndex) {
+          this.entries[i] = this.entries[lastIndex]!;
+        }
+        this.entries.pop();
         continue;
       }
 
@@ -133,6 +140,7 @@ export class DamageNumbers {
       entry.el.remove();
     }
     this.entries.length = 0;
+    this.freeEls.length = 0;
     this.root.remove();
   }
 }

@@ -621,6 +621,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   if (mapAssets) {
     game.setBlockoutSpec(mapAssets.blockout);
     game.setAnchorsSpec(mapAssets.anchors);
+    renderer.requestShadowUpdate();
   }
   if (resolvedShot?.cameraPose) {
     game.setCameraPose(resolvedShot.cameraPose);
@@ -945,35 +946,40 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       viewModelVisible,
     );
 
-    perfMsPerFrame = perfMsPerFrame * 0.9 + clampedMs * 0.1;
-    perfFps = 1000 / Math.max(0.01, perfMsPerFrame);
+    if (perfHud.isVisible()) {
+      perfMsPerFrame = perfMsPerFrame * 0.9 + clampedMs * 0.1;
+      perfFps = 1000 / Math.max(0.01, perfMsPerFrame);
 
-    const perfInfo = renderer.getPerfInfo();
-    perfDrawCalls = perfInfo.drawCalls;
-    perfTriangles = perfInfo.triangles;
-    perfGeometries = perfInfo.geometries;
-    perfTextures = perfInfo.textures;
+      const perfInfo = renderer.getPerfInfo();
+      perfDrawCalls = perfInfo.drawCalls;
+      perfTriangles = perfInfo.triangles;
+      perfGeometries = perfInfo.geometries;
+      perfTextures = perfInfo.textures;
 
-    scenePerfSampleElapsed += clampedMs;
-    if (scenePerfSampleElapsed >= PERF_SCENE_SAMPLE_INTERVAL_MS) {
-      scenePerfSnapshot = collectScenePerfSnapshot(game.scene, viewModel?.viewModelScene ?? null);
-      scenePerfSampleElapsed = 0;
+      scenePerfSampleElapsed += clampedMs;
+      if (scenePerfSampleElapsed >= PERF_SCENE_SAMPLE_INTERVAL_MS) {
+        scenePerfSnapshot = collectScenePerfSnapshot(game.scene, viewModel?.viewModelScene ?? null);
+        scenePerfSampleElapsed = 0;
+      }
+
+      perfHud.update({
+        fps: perfFps,
+        msPerFrame: perfMsPerFrame,
+        drawCalls: perfDrawCalls,
+        triangles: perfTriangles,
+        geometries: perfGeometries,
+        textures: perfTextures,
+        materials: scenePerfSnapshot.materials,
+        instancedMeshes: scenePerfSnapshot.instancedMeshes,
+        instancedInstances: scenePerfSnapshot.instancedInstances,
+        dpr: renderer.getCurrentPixelRatio(),
+        dprCap: renderer.getPixelRatioCap(),
+        debugEnabled: runtimeParams.debug,
+      });
+    } else {
+      // Sample immediately when the HUD is re-enabled.
+      scenePerfSampleElapsed = PERF_SCENE_SAMPLE_INTERVAL_MS;
     }
-
-    perfHud.update({
-      fps: perfFps,
-      msPerFrame: perfMsPerFrame,
-      drawCalls: perfDrawCalls,
-      triangles: perfTriangles,
-      geometries: perfGeometries,
-      textures: perfTextures,
-      materials: scenePerfSnapshot.materials,
-      instancedMeshes: scenePerfSnapshot.instancedMeshes,
-      instancedInstances: scenePerfSnapshot.instancedInstances,
-      dpr: renderer.getCurrentPixelRatio(),
-      dprCap: renderer.getPixelRatioCap(),
-      debugEnabled: runtimeParams.debug,
-    });
   };
 
   const animate = (time: number): void => {

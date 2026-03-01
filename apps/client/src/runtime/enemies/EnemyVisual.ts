@@ -329,6 +329,27 @@ export class EnemyVisual {
     this.root.rotation.y = yaw;
   }
 
+  reset(): void {
+    this.fadingOut = false;
+    this.fadeTimerS = 0;
+    this.root.visible = true;
+
+    this.bodyMat.opacity = 1;
+    this.headMat.opacity = 1;
+    this.nameMaterial.opacity = 1;
+    for (const mat of this.modelFadeMaterials) {
+      mat.opacity = 1;
+      mat.depthWrite = true;
+    }
+
+    this.muzzleTimerS = 0;
+    this.muzzleBaseScale = 1;
+    this.muzzleLightPeak = 0;
+    if (this.muzzleFlash) this.muzzleFlash.visible = false;
+    if (this.muzzleFlashMat) this.muzzleFlashMat.opacity = 0;
+    if (this.muzzleLight) this.muzzleLight.intensity = 0;
+  }
+
   startDeathFade(): void {
     if (this.fadingOut) return;
     this.fadingOut = true;

@@ -64,8 +64,9 @@ export class EnemyController {
   readonly name: string;
 
   private readonly position: MutablePosition;
-  private readonly spawnX: number;
-  private readonly spawnZ: number;
+  private readonly aabb: EnemyAabb;
+  private spawnX: number;
+  private spawnZ: number;
   private yaw = 0;
   private health = ENEMY_MAX_HEALTH;
   private state: EnemyState = "PATROL";
@@ -105,7 +106,7 @@ export class EnemyController {
   private footstepTimerS = 0;
 
   private readonly solver: AabbCollisionSolver;
-  private readonly rng: DeterministicRng;
+  private rng: DeterministicRng;
   private readonly motionResult: MotionResult = { hitX: false, hitY: false, hitZ: false, grounded: false };
 
   // Scratch vectors for raycasting
@@ -130,6 +131,15 @@ export class EnemyController {
   constructor(id: EnemyId, name: string, spawnX: number, spawnZ: number, seed: number) {
     this.id = id;
     this.name = name;
+    this.aabb = {
+      id,
+      minX: 0,
+      minY: 0,
+      minZ: 0,
+      maxX: 0,
+      maxY: 0,
+      maxZ: 0,
+    };
     this.spawnX = spawnX;
     this.spawnZ = spawnZ;
     this.position = { x: spawnX, y: 0, z: spawnZ };
@@ -140,6 +150,51 @@ export class EnemyController {
     // Stagger initial patrol timer so all enemies don't change direction simultaneously
     this.patrolChangeTimer = this.rng.range(0.5, 2.0);
     // Stagger initial shoot timer so enemies don't all fire on frame 1
+    this.shootTimer = this.rng.range(0.1, ENEMY_SHOOT_INTERVAL_S);
+  }
+
+  reset(spawnX: number, spawnZ: number, seed: number): void {
+    this.spawnX = spawnX;
+    this.spawnZ = spawnZ;
+    this.position.x = spawnX;
+    this.position.y = 0;
+    this.position.z = spawnZ;
+
+    this.yaw = 0;
+    this.health = ENEMY_MAX_HEALTH;
+    this.state = "PATROL";
+    this.dead = false;
+    this.lastHitWasHeadshot = false;
+
+    this.patrolTargetX = spawnX;
+    this.patrolTargetZ = spawnZ;
+    this.patrolChangeTimer = 0;
+
+    this.losBlockedTimer = 0;
+    this.shootTimer = 0;
+    this.firingThisFrame = false;
+    this.velocityY = 0;
+    this.grounded = false;
+
+    this.mag = ENEMY_MAG_CAPACITY;
+    this.reserve = ENEMY_RESERVE_START;
+    this.reloading = false;
+    this.reloadTimer = 0;
+
+    this.desiredVX = 0;
+    this.desiredVZ = 0;
+    this.stuckTimer = 0;
+    this.strafeDir = 1;
+    this.strafeChangeTimer = 0;
+    this.footstepTimerS = 0;
+
+    this.motionResult.hitX = false;
+    this.motionResult.hitY = false;
+    this.motionResult.hitZ = false;
+    this.motionResult.grounded = false;
+
+    this.rng = new DeterministicRng(deriveSubSeed(seed, this.id));
+    this.patrolChangeTimer = this.rng.range(0.5, 2.0);
     this.shootTimer = this.rng.range(0.1, ENEMY_SHOOT_INTERVAL_S);
   }
 
@@ -370,15 +425,13 @@ export class EnemyController {
   }
 
   getAabb(): EnemyAabb {
-    return {
-      id: this.id,
-      minX: this.position.x - ENEMY_HALF_WIDTH_M,
-      minY: this.position.y,
-      minZ: this.position.z - ENEMY_HALF_WIDTH_M,
-      maxX: this.position.x + ENEMY_HALF_WIDTH_M,
-      maxY: this.position.y + ENEMY_HEIGHT_M,
-      maxZ: this.position.z + ENEMY_HALF_WIDTH_M,
-    };
+    this.aabb.minX = this.position.x - ENEMY_HALF_WIDTH_M;
+    this.aabb.minY = this.position.y;
+    this.aabb.minZ = this.position.z - ENEMY_HALF_WIDTH_M;
+    this.aabb.maxX = this.position.x + ENEMY_HALF_WIDTH_M;
+    this.aabb.maxY = this.position.y + ENEMY_HEIGHT_M;
+    this.aabb.maxZ = this.position.z + ENEMY_HALF_WIDTH_M;
+    return this.aabb;
   }
 
   applyDamage(amount: number, isHeadshot = false): void {
