@@ -12,13 +12,18 @@ const DETAIL_ZONE_TYPES = new Set([
   "cut",
 ]);
 
+// DEV FLAG — strip all windows/balconies for blockout layout review.
+// Set to false to re-enable glazing when moving to pbr/lookdev pass.
+const DISABLE_WINDOWS = true;
+
 const SEGMENT_EDGE_MARGIN_M = 0.35;
 const INSTANCE_BUDGET = 9800;
 const STORY_HEIGHT_M = 3.0;
 const WINDOW_GLASS_THICKNESS_M = 0.02;
 
 // Roof cap constants
-const ROOF_DEPTH_M = 10.0;
+// 4 m depth ensures a solid-looking roofline without slabs floating above shorter adjacent zones.
+const ROOF_DEPTH_M = 4.0;
 const ROOF_THICKNESS_M = 0.20;
 const ROOF_OVERHANG_M = 0.15;
 
@@ -70,6 +75,10 @@ type SegmentDecorContext = {
   isSideHall: boolean;
   isConnector: boolean;
   isCut: boolean;
+  /** X coordinate of the map centre — used for inside/outside wall detection. */
+  mapCenterX: number;
+  /** Z coordinate of the map centre — used for inside/outside wall detection. */
+  mapCenterZ: number;
   profile: BuildWallDetailProfile;
   wallMaterialId: string;
   wallHeightM: number;
@@ -231,23 +240,31 @@ function resolveSegmentWallHeight(
   rng: DeterministicRng,
 ): number {
   const zoneType = zone?.type ?? "main_lane_segment";
-  let minStories: number;
-  let maxStories: number;
 
-  if (zoneType === "main_lane_segment" || zoneType === "spawn_plaza") {
-    minStories = 2;
-    maxStories = 3;
-  } else if (zoneType === "side_hall") {
-    minStories = 1;
-    maxStories = 2;
-  } else {
-    minStories = 2;
-    maxStories = 2;
+  // Main-lane buildings are fixed at 3 stories (9 m).
+  // A fixed, zone-uniform height eliminates corner holes and floating slabs that
+  // appear when different wall segments of the same building independently pick
+  // 2 vs 3 stories.  All walls probing into the same main_lane_segment zone will
+  // resolve to this same constant, so every face (front, back, end caps) matches.
+  if (zoneType === "main_lane_segment") {
+    return 3 * STORY_HEIGHT_M; // exactly 9 m
   }
 
-  const stories = minStories + Math.floor(rng.next() * (maxStories - minStories + 1));
-  const jitter = rng.range(-0.3, 0.4);
-  return clamp(stories * STORY_HEIGHT_M + jitter, baseHeight * 0.5, baseHeight * 1.6);
+  // Spawn plazas: fixed 2 stories (6 m) — matches the spec wall_height default.
+  if (zoneType === "spawn_plaza") {
+    return 2 * STORY_HEIGHT_M; // exactly 6 m
+  }
+
+  // Side halls: randomised 1–2 stories, but the seed is zone-scoped (no segment
+  // index) so every wall of the same side-hall zone gets the same height.
+  // Heights are always an exact story multiple — no jitter — so computeFacadeSpec
+  // returns the correct story count and there is no blank wall strip at the top.
+  if (zoneType === "side_hall") {
+    const stories = 1 + Math.floor(rng.next() * 2); // 1 or 2 stories
+    return stories * STORY_HEIGHT_M; // exactly 3 m or 6 m
+  }
+
+  return baseHeight; // connectors / cuts → spec default
 }
 
 // ── Parapet cap ────────────────────────────────────────────────────────────
@@ -374,6 +391,140 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
   }
 }
 
+// ── Zone-aware door placement policy ────────────────────────────────────────
+
+type DoorPolicy = {
+  /** Minimum wall length that qualifies for a door at all. */
+  minSegmentLengthForDoor: number;
+  /** Approximate spacing between door centres (doors = floor(length / this)). */
+  metersPerDoor: number;
+  /** Hard cap on door count. */
+  maxDoors: number;
+  /** Probability [0,1] that ANY door is placed on this segment. */
+  probabilityOfAny: number;
+};
+
+const NO_DOOR_POLICY: DoorPolicy = {
+  minSegmentLengthForDoor: Infinity,
+  metersPerDoor: Infinity,
+  maxDoors: 0,
+  probabilityOfAny: 0,
+};
+
+/**
+ * Returns true when this wall segment should have NO doors at all.
+ *
+ * Uses the inward vector to determine whether a wall faces "inside" (toward the
+ * map centre / building back) or "outside" (toward the perimeter / corridor).
+ *
+ * Rule: `sign(frame.center − mapCenter) === sign(frame.inward)` → inside wall.
+ */
+function shouldSkipDoors(ctx: SegmentDecorContext): boolean {
+  if (!ctx.zone) return false;
+
+  // Connectors and cuts are always doorless.
+  if (ctx.isConnector || ctx.isCut) return true;
+
+  // Main-lane and shopfront walls always get doors (spatial filtering
+  // is handled by minSegmentLengthForDoor in getDoorPolicy instead).
+  if (ctx.isMainLane || ctx.isShopfrontZone) return false;
+
+  // Side halls: horizontal end-caps (short ~6.5 m) are always skipped.
+  // Vertical inside walls (back of main-lane buildings) are also skipped;
+  // outside walls (perimeter) get sparse doors.
+  if (ctx.isSideHall) {
+    const isVertical = Math.abs(ctx.frame.inwardX) > 0.5;
+    if (!isVertical) return true; // horizontal end caps
+    // Inside wall: inward vector points same way as offset from map centre.
+    const offsetSign = Math.sign(ctx.frame.centerX - ctx.mapCenterX);
+    return offsetSign !== 0 && offsetSign === Math.sign(ctx.frame.inwardX);
+  }
+
+  // Spawn plazas: inner walls (facing toward the main lane interior) are skipped;
+  // outer walls (long back wall + short side walls) get doors.
+  if (ctx.zone.type === "spawn_plaza") {
+    const isHorizontal = Math.abs(ctx.frame.inwardZ) > 0.5;
+    if (isHorizontal) {
+      // Inner if inwardZ points the same way as Z-offset from map centre.
+      const offsetSign = Math.sign(ctx.frame.centerZ - ctx.mapCenterZ);
+      return offsetSign !== 0 && offsetSign === Math.sign(ctx.frame.inwardZ);
+    } else {
+      // Vertical side wall — inner if inwardX points same way as X-offset.
+      const offsetSign = Math.sign(ctx.frame.centerX - ctx.mapCenterX);
+      return offsetSign !== 0 && offsetSign === Math.sign(ctx.frame.inwardX);
+    }
+  }
+
+  return true; // unknown zone type → no doors
+}
+
+function getDoorPolicy(ctx: SegmentDecorContext): DoorPolicy {
+  if (shouldSkipDoors(ctx)) return NO_DOOR_POLICY;
+
+  // Side-hall outside (perimeter) walls — 4 sparse doors across ~62 m.
+  if (ctx.isSideHall) {
+    return { minSegmentLengthForDoor: 3.0, metersPerDoor: 15.0, maxDoors: 4, probabilityOfAny: 1.0 };
+  }
+
+  // Main lane / shopfront.
+  if (ctx.isMainLane || ctx.isShopfrontZone) {
+    // BZ_M1 and BZ_M3 directly border the spawns — use fewer, wider-spaced doors.
+    // minSegmentLengthForDoor=8.0 filters the short jog sub-segments (<8 m) that
+    // appear at BZ_M1/BZ_M2 and BZ_M2/BZ_M3 junctions.
+    const zoneId = ctx.zone?.id ?? "";
+    if (zoneId === "BZ_M1" || zoneId === "BZ_M3") {
+      return { minSegmentLengthForDoor: 8.0, metersPerDoor: 8.5, maxDoors: 2, probabilityOfAny: 1.0 };
+    }
+    return { minSegmentLengthForDoor: 3.0, metersPerDoor: 5.5, maxDoors: 3, probabilityOfAny: 1.0 };
+  }
+
+  // Spawn plazas — outer walls only (inner were excluded by shouldSkipDoors).
+  if (ctx.zone?.type === "spawn_plaza") {
+    const isHorizontal = Math.abs(ctx.frame.inwardZ) > 0.5;
+    if (isHorizontal) {
+      // Long outer wall (~22 m) — 3 evenly spaced doors.
+      return { minSegmentLengthForDoor: 3.0, metersPerDoor: 7.0, maxDoors: 3, probabilityOfAny: 1.0 };
+    } else {
+      // Short side wall (~14 m) — 1 centred door.
+      return { minSegmentLengthForDoor: 3.0, metersPerDoor: 14.0, maxDoors: 1, probabilityOfAny: 1.0 };
+    }
+  }
+
+  return NO_DOOR_POLICY;
+}
+
+function computeDoorCount(usableLength: number, policy: DoorPolicy, rng: DeterministicRng): number {
+  if (usableLength < policy.minSegmentLengthForDoor) return 0;
+  if (policy.maxDoors === 0) return 0;
+  if (rng.next() > policy.probabilityOfAny) return 0;
+  const rawCount = Math.max(1, Math.floor(usableLength / policy.metersPerDoor));
+  return Math.min(rawCount, policy.maxDoors);
+}
+
+/**
+ * Evenly distribute `doorCount` door bays across `bayCount` bays.
+ * A 1-bay gap is reserved at each end so no door sits flush at a wall edge.
+ */
+function assignDoorColumns(bayCount: number, doorCount: number): number[] {
+  if (doorCount <= 0 || bayCount <= 0) return [];
+  const clamped = Math.min(doorCount, bayCount);
+
+  if (clamped === 1) {
+    return [Math.floor(bayCount / 2)];
+  }
+
+  const first = bayCount > 2 ? 1 : 0;
+  const last = bayCount > 2 ? bayCount - 2 : bayCount - 1;
+  const range = last - first;
+
+  const columns: number[] = [];
+  for (let i = 0; i < clamped; i += 1) {
+    const col = range > 0 ? first + Math.round((i * range) / (clamped - 1)) : first;
+    if (!columns.includes(col)) columns.push(col);
+  }
+  return columns;
+}
+
 // ── Facade spec: decide all proportions ONCE per segment ───────────────────
 
 function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
@@ -382,9 +533,15 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
 
   const stories = Math.max(1, Math.floor(ctx.wallHeightM / STORY_HEIGHT_M));
 
-  // Uniform bay width — pick a target, then round to get an integer count
+  // Uniform bay width — pick a target, then round to get an integer count.
+  // Pre-compute door count first so we can guarantee enough bays for doors + margins.
+  const doorPolicy = getDoorPolicy(ctx);
+  const doorCount = computeDoorCount(usableLength, doorPolicy, ctx.rng);
+
   const targetBayW = ctx.rng.range(1.8, 2.6);
-  const bayCount = Math.max(1, Math.round(usableLength / targetBayW));
+  let bayCount = Math.max(1, Math.round(usableLength / targetBayW));
+  // Ensure enough bays for doors (each door needs at least one margin bay on each side).
+  if (doorCount > 0 && bayCount < doorCount + 2) bayCount = doorCount + 2;
   const bayWidth = usableLength / bayCount;
 
   // Uniform opening dimensions for the entire facade
@@ -398,25 +555,19 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
   const frameDepth = clamp(ctx.rng.range(0.06, 0.10), 0.04, ctx.maxProtrusionM + 0.06);
   const jambDepth = clamp(ctx.rng.range(0.10, 0.16), 0.06, ctx.maxProtrusionM + 0.10);
 
-  // Assign roles using shop-unit patterns — each shop gets one door
-  // followed by blank/display bays, then the next shop starts
+  // Assign column roles using the spatial door policy.
+  // Doors are placed at evenly distributed bays; remaining bays are window/blank
+  // (windows only when DISABLE_WINDOWS is false).
+  const doorColSet = new Set(assignDoorColumns(bayCount, doorCount));
   const columnRoles: ColumnRole[] = [];
-  let col = 0;
-  while (col < bayCount) {
-    const shopBays = (ctx.isMainLane || ctx.isShopfrontZone)
-      ? ctx.rng.int(2, 4)
-      : ctx.isSideHall
-        ? ctx.rng.int(3, 6)
-        : ctx.rng.int(3, 5);
-
-    for (let b = 0; b < shopBays && col < bayCount; b += 1, col += 1) {
-      if (b === 0) {
-        columnRoles.push("door");
-      } else if (b === 1 && (ctx.isMainLane || ctx.isShopfrontZone) && ctx.rng.next() < 0.40) {
-        columnRoles.push("window");
-      } else {
-        columnRoles.push("blank");
-      }
+  for (let col = 0; col < bayCount; col += 1) {
+    if (doorColSet.has(col)) {
+      columnRoles.push("door");
+    } else if (!DISABLE_WINDOWS && (ctx.isMainLane || ctx.isShopfrontZone)) {
+      const adjacentToDoor = doorColSet.has(col - 1) || doorColSet.has(col + 1);
+      columnRoles.push(adjacentToDoor && ctx.rng.next() < 0.35 ? "window" : "blank");
+    } else {
+      columnRoles.push("blank");
     }
   }
 
@@ -687,17 +838,17 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       if (story === 0 && role === "door") {
         // Ground floor door column → arched door
         placeArchedDoor(ctx, centerS, spec);
-      } else if (role === "window") {
+      } else if (role === "window" && !DISABLE_WINDOWS) {
         if (balconySet.has(`${col}:${story}`)) {
           placeBalcony(ctx, centerS, storyBaseY, spec);
         } else {
           placeWindowOpening(ctx, centerS, storyBaseY, spec);
         }
-      } else if (role === "door" && story > 0 && ctx.rng.next() < 0.50) {
-        // Above a door, 50% chance of window (rest is blank wall)
+      } else if (role === "door" && story > 0 && !DISABLE_WINDOWS && ctx.rng.next() < 0.50) {
+        // Above a door, 50% chance of window (rest is blank wall) — only when windows enabled
         placeWindowOpening(ctx, centerS, storyBaseY, spec);
-      } else if (role === "blank" && ctx.rng.next() < 0.25) {
-        // Blank column — occasional subtle recess for texture
+      } else if (role === "blank" && !DISABLE_WINDOWS && ctx.rng.next() < 0.25) {
+        // Blank column — occasional subtle recess for texture — only when windows enabled
         placeRecessedPanel(ctx, centerS, storyBaseY, spec);
       }
     }
@@ -735,6 +886,17 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     };
   }
 
+  // Compute map centre from main-lane zones (used for inside/outside wall detection).
+  const mainLaneZones = options.zones.filter(z => z.type === "main_lane_segment");
+  const fallbackX = options.zones.reduce((s, z) => s + z.rect.x + z.rect.w * 0.5, 0) / Math.max(1, options.zones.length);
+  const fallbackZ = options.zones.reduce((s, z) => s + z.rect.y + z.rect.h * 0.5, 0) / Math.max(1, options.zones.length);
+  const mapCenterX = mainLaneZones.length > 0
+    ? mainLaneZones.reduce((s, z) => s + z.rect.x + z.rect.w * 0.5, 0) / mainLaneZones.length
+    : fallbackX;
+  const mapCenterZ = mainLaneZones.length > 0
+    ? mainLaneZones.reduce((s, z) => s + z.rect.y + z.rect.h * 0.5, 0) / mainLaneZones.length
+    : fallbackZ;
+
   const rootRng = new DeterministicRng(seed);
   let segmentsDecorated = 0;
 
@@ -749,8 +911,11 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     const isCut = zone?.type === "cut";
     const wallMaterialId = resolveWallMaterialIdForZone(zone?.id ?? null);
 
-    // Compute per-segment height
-    const heightSeed = deriveSubSeed(seed, `height:${index}:${zone?.id ?? "none"}`);
+    // Compute per-segment height.
+    // Seed is zone-scoped (no segment index) so every wall segment belonging to
+    // the same zone resolves to the same story count — eliminating the corner
+    // holes and floating slabs caused by per-segment independent height picks.
+    const heightSeed = deriveSubSeed(seed, `height:${zone?.id ?? "none"}`);
     const heightRng = new DeterministicRng(heightSeed);
     const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng);
     segmentHeights.push(segHeight);
@@ -782,6 +947,8 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       isSideHall,
       isConnector,
       isCut,
+      mapCenterX,
+      mapCenterZ,
       profile: options.profile,
       wallMaterialId,
       wallHeightM: segHeight,
