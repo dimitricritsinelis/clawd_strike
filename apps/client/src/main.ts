@@ -2,11 +2,32 @@ import "./styles.css";
 import type { LoadingScreenHandle } from "./loading-screen/bootstrap";
 import { bootstrapLoadingScreen } from "./loading-screen/bootstrap";
 import type { LoadingScreenMode, RuntimeLaunchSelection } from "./loading-screen/types";
+import type { RuntimeWarmupAssets } from "./runtime/warmup";
 import { sanitizeRuntimePlayerName } from "./runtime/utils/UrlParams";
 
 let loadingHandle: LoadingScreenHandle | null = null;
 let runtimeHandle: { teardown: () => void } | null = null;
 let runtimeBootPromise: Promise<void> | null = null;
+let warmupPromise: Promise<RuntimeWarmupAssets | null> | null = null;
+let warmupAssets: RuntimeWarmupAssets | null = null;
+
+function startWarmup(): void {
+  if (warmupPromise) return;
+
+  warmupPromise = import("./runtime/warmup")
+    .then((module) => module.warmupRuntimeAssets())
+    .then((assets) => {
+      warmupAssets = assets;
+      return assets;
+    })
+    .catch((error: unknown) => {
+      warmupAssets = null;
+      console.warn(
+        `[runtime] visible-asset warmup failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    });
+}
 
 function parseAutoStartSelection(search: string): RuntimeLaunchSelection | null {
   const params = new URLSearchParams(search);
@@ -51,12 +72,17 @@ async function transitionToGame(selection?: RuntimeLaunchSelection): Promise<voi
 
   runtimeBootPromise = (async () => {
     const { bootstrapRuntime } = await import("./runtime/bootstrap");
+    startWarmup();
+    const assets = warmupPromise ? await warmupPromise : warmupAssets;
     const runtimeOptions = runtimeLaunchSelection
       ? {
           controlMode: runtimeLaunchSelection.mode,
           playerName: runtimeLaunchSelection.playerName,
+          warmup: assets,
         }
-      : {};
+      : {
+          warmup: assets,
+        };
     runtimeHandle = await bootstrapRuntime(runtimeOptions);
     hideLoadingOverlay();
 
@@ -71,6 +97,7 @@ async function transitionToGame(selection?: RuntimeLaunchSelection): Promise<voi
 
 loadingHandle = bootstrapLoadingScreen({
   handoff: {
+    onLoadingReady: startWarmup,
     transitionToGame,
   },
 });

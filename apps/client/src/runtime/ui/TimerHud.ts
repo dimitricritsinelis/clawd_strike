@@ -8,7 +8,6 @@ export class TimerHud {
   readonly root: HTMLDivElement;
   private readonly timeEl: HTMLSpanElement;
   private readonly baseTopPx = 14;
-  private readonly bannerClearanceTopPx = 46;
 
   private elapsedS = 0;
   private running = false;
@@ -34,7 +33,6 @@ export class TimerHud {
       userSelect: "none",
       minWidth: "148px",
       transformOrigin: "center center",
-      transition: "top 140ms ease-out",
     });
 
     this.timeEl = document.createElement("span");
@@ -112,11 +110,11 @@ export class TimerHud {
   }
 
   /**
-   * When browser pointer-lock/fullscreen safety banners are expected,
-   * shift the timer downward so native Chrome UI does not overlap it.
+   * Legacy API kept for compatibility with runtime bootstrap.
+   * Timer is now intentionally locked to a fixed top position.
    */
-  setChromeBannerClearance(active: boolean): void {
-    this.root.style.top = `${active ? this.bannerClearanceTopPx : this.baseTopPx}px`;
+  setChromeBannerClearance(_active: boolean): void {
+    // Intentionally no-op: timer stays pinned at baseTopPx.
   }
 
   dispose(): void {

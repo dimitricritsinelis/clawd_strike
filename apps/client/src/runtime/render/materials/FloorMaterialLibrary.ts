@@ -180,6 +180,31 @@ export class FloorMaterialLibrary {
     return this.requireMaterial(materialId).tileSizeM;
   }
 
+  getMaterialIds(): readonly string[] {
+    return Array.from(this.materialsById.keys());
+  }
+
+  async preloadAllTextures(quality: FloorTextureQuality): Promise<void> {
+    const seenUrls = new Set<string>();
+    const preloadTasks: Promise<Texture>[] = [];
+
+    const enqueueTexture = (relativeOrAbsoluteUrl: string, colorSpace: Texture["colorSpace"]): void => {
+      const resolvedUrl = this.resolveTextureUrl(relativeOrAbsoluteUrl);
+      if (seenUrls.has(resolvedUrl)) return;
+      seenUrls.add(resolvedUrl);
+      preloadTasks.push(this.loadTexture(relativeOrAbsoluteUrl, colorSpace));
+    };
+
+    for (const entry of this.materialsById.values()) {
+      const maps = resolveTextureSetForQuality(entry.textures, quality);
+      enqueueTexture(maps.albedo, SRGBColorSpace);
+      enqueueTexture(maps.normal, NoColorSpace);
+      enqueueTexture(maps.arm, NoColorSpace);
+    }
+
+    await Promise.all(preloadTasks);
+  }
+
   createStandardMaterial(materialId: string, quality: FloorTextureQuality): MeshStandardMaterial {
     const entry = this.requireMaterial(materialId);
     const maps = resolveTextureSetForQuality(entry.textures, quality);

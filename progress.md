@@ -3,15 +3,14 @@
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
 - Runtime map is generated from `docs/map-design/specs/map_spec.json` into `apps/client/public/maps/bazaar-map/` via `pnpm --filter @clawd-strike/client gen:maps`.
-- Wave respawn now reuses enemy controllers/visuals via reset methods instead of per-wave teardown/recreate.
-- Enemy hot loops now avoid per-frame target object/closure churn; controller AABBs are reused in place.
-- Weapon audio now reuses shared drive curve + cached pooled noise buffers for hit/reload/dryfire events.
-- DamageNumbers now reuses a scratch `Vector3`, pools DOM nodes, and uses swap-remove cleanup.
-- Renderer shadow map updates are frozen (`autoUpdate=false`) with explicit `requestShadowUpdate()` after map build.
-- Kill-feed notifications are now anchored from the live Score HUD bottom (+8px gap), removing overlap with score/best-score rows.
-- Score label text now reads `HIGH SCORE` in both Score HUD and death screen.
-- Compare-shot artifacts: `artifacts/screenshots/targeted-perf-optimizations-20260301/` and `artifacts/screenshots/hud-killfeed-overlap-20260301/` (both `review:shot-pair` passed).
-- Map approval is still pending blockout traversal/readability signoff.
+- Loading-screen handoff now starts visible-asset warmup immediately (`onLoadingReady`) and reuses warmed assets on transition.
+- Warmup covers first-frame-visible assets: PBR floor texture packs (when `floors=pbr`) and AK viewmodel (when `vm=1`/default).
+- Runtime transition now blocks on warmup completion before gameplay appears, with fail-open warnings on warmup errors.
+- Runtime boot reuses warmed assets, preloads floor maps for selected quality, and performs one pre-RAF render so first visible frame is fully populated.
+- Browser tab title now uses `Clawdstrike` (no space) via client HTML `<title>` tag.
+- Timer HUD is now hard-locked to top-center (`14px`) and no longer shifts for pointer-lock/fullscreen banner heuristics.
+- Deterministic compare-shot pair captured for this prompt under `artifacts/screenshots/2026-03-01-timer-lock-top/`.
+- Map approval remains pending traversal/readability signoff.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
@@ -25,21 +24,25 @@ pnpm dev
 pnpm typecheck
 pnpm build
 BASE_URL=http://127.0.0.1:5174 AGENT_NAME=SmokeRunner pnpm --filter @clawd-strike/client smoke:agent
-VERCEL_TOKEN=<token> vercel deploy --prod --yes
 ```
 
 ## Last Completed Prompt
-- Updated best-score wording to `HIGH SCORE` in runtime HUDs.
-- Touched files: `apps/client/src/runtime/ui/ScoreHud.ts`, `apps/client/src/runtime/ui/DeathScreen.ts`.
+- Locked in-game timer position so it no longer moves up/down during runtime.
+- Touched files: `apps/client/src/runtime/ui/TimerHud.ts`.
 - Validation completed: `pnpm typecheck` and `pnpm build` passed.
-- Smoke checks: canonical URL opened; runtime check confirmed both HUD surfaces include `HIGH SCORE`.
+- Smoke checks completed:
+  - Restarted `pnpm dev` and opened canonical URL.
+  - Headless canonical runtime probe passed (`timer top` remained `14px` over time, map loaded, no console errors).
+- Screenshots:
+  - `artifacts/screenshots/2026-03-01-timer-lock-top/before.png`
+  - `artifacts/screenshots/2026-03-01-timer-lock-top/after.png`
 
 ## Next 3 Tasks
-1. Trigger an in-game kill burst and visually confirm stacked notifications stay below the score panel under load.
-2. Capture a Chrome performance trace during wave transition + full-auto to quantify allocation and frame-time improvements.
-3. Add guardrails for any future moving shadow casters (`requestShadowUpdate()` on movement or mode-based autoUpdate fallback).
+1. Manual desktop pointer-lock pass to confirm timer remains visually fixed during lock/unlock and full-screen transitions.
+2. Add optional debug-only warmup timing telemetry (`warmup ms`, `enter->runtime ms`) for regression tracking without UI changes.
+3. Extend warmup coverage to any additional first-frame props/materials that become visible in approved blockout views.
 
 ## Known Issues / Risks
 - `gen:maps` still emits expected clear-zone anchor warnings for several landmarks/open-node anchors.
-- Playwright pointer-lock interaction remains flaky in automation; OS-level manual verification is still required for pointer-lock UX.
-- Freezing shadow updates assumes no moving `castShadow=true` actors; revisit if dynamic shadow casters are introduced.
+- Automated checks cannot fully validate OS/browser pointer-lock UX; manual verification remains required.
+- Warmup is fail-open by design: if an asset preload fails, runtime continues with warning + fallback behavior.

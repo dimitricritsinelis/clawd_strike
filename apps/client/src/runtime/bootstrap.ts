@@ -24,6 +24,7 @@ import { PauseMenu } from "./ui/PauseMenu";
 import { FadeOverlay } from "./ui/FadeOverlay";
 import { parseRuntimeUrlParams, sanitizeRuntimePlayerName, type RuntimeControlMode } from "./utils/UrlParams";
 import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
+import type { RuntimeWarmupAssets } from "./warmup";
 
 type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["Ak47ViewModel"]>;
 
@@ -202,6 +203,7 @@ export type RuntimeHandle = {
 export type RuntimeBootstrapOptions = {
   controlMode?: RuntimeControlMode;
   playerName?: string;
+  warmup?: RuntimeWarmupAssets | null;
 };
 
 function getAppRoot(): HTMLElement {
@@ -321,6 +323,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     controlMode,
     playerName,
   };
+  const warmupAssets = options.warmup ?? null;
 
   const warningOverlay = createOverlay(runtimeRoot, {
     left: "16px",
@@ -387,8 +390,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let disposed = false;
   const weaponAudio = new WeaponAudio();
   const viewModelEnabled = runtimeParams.vm;
-  let viewModel: ViewModelInstance | null = null;
-  let viewModelLoadStarted = false;
+  let viewModel: ViewModelInstance | null = warmupAssets?.viewModel ?? null;
   let viewModelVisible = false;
 
   const appendWarning = (message: string): void => {
@@ -404,8 +406,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let floorMaterials: FloorMaterialLibrary | null = null;
   if (PBR_FLOORS_ENABLED && resolvedFloorMode === "pbr") {
     try {
-      floorMaterials = await FloorMaterialLibrary.load(FLOOR_MANIFEST_URL);
+      floorMaterials = warmupAssets?.floorMaterials ?? await FloorMaterialLibrary.load(FLOOR_MANIFEST_URL);
+      await floorMaterials.preloadAllTextures(runtimeParams.floorQuality);
     } catch (error) {
+      floorMaterials = null;
       resolvedFloorMode = "blockout";
       appendWarning(
         `Failed to load floor PBR pack. Falling back to blockout floors.\n${error instanceof Error ? error.message : String(error)}`,
@@ -439,30 +443,25 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     }
   }
 
-  const startViewModelLoad = (): void => {
-    if (!viewModelEnabled || disposed || viewModelLoadStarted || viewModel) {
-      return;
-    }
-
-    viewModelLoadStarted = true;
-    void (async () => {
+  if (viewModelEnabled && viewModel) {
+    viewModel.setAspect(renderer.getAspect());
+  }
+  if (viewModelEnabled && !viewModel) {
+    try {
       const { Ak47ViewModel } = await import("./weapons/Ak47ViewModel");
-      if (disposed) return;
-
       const nextViewModel = new Ak47ViewModel({
         vmDebug: runtimeParams.vmDebug && runtimeParams.debug,
       });
       nextViewModel.setAspect(renderer.getAspect());
-      viewModel = nextViewModel;
       await nextViewModel.load();
-    })().catch((error: unknown) => {
+      viewModel = nextViewModel;
+    } catch (error: unknown) {
       const message = `Failed to load AK47 viewmodel\n${error instanceof Error ? error.message : String(error)}`;
       appendWarning(message);
       viewModel?.dispose();
       viewModel = null;
-      viewModelLoadStarted = false;
-    });
-  };
+    }
+  }
 
   const resolvedShot = mapAssets ? resolveShot(mapAssets.shots, runtimeParams.shot) : null;
   shotActive = resolvedShot?.active ?? false;
@@ -618,9 +617,6 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     });
   };
 
-  // Preload the weapon model at runtime boot so first shots don't miss viewmodel FX.
-  startViewModelLoad();
-
   if (mapAssets) {
     game.setBlockoutSpec(mapAssets.blockout);
     game.setAnchorsSpec(mapAssets.anchors);
@@ -634,6 +630,32 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     warningOverlay.style.display = "block";
   }
 
+  // Let any async map assignments resolve before we draw the first visible gameplay frame.
+  await Promise.resolve();
+
+  const overviewCameraAtBoot = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
+  viewModelVisible = Boolean(viewModelEnabled && viewModel && !overviewCameraAtBoot);
+  crosshair.style.display = overviewCameraAtBoot ? "none" : "block";
+  ammoHud.setVisible(!overviewCameraAtBoot);
+  healthHud.setVisible(!overviewCameraAtBoot);
+  timerHud.setVisible(!overviewCameraAtBoot);
+
+  if (viewModel) {
+    viewModel.updateFromMainCamera(game.camera, 0);
+    const weaponDebug = viewModel.getAlignmentSnapshot();
+    game.setWeaponDebugSnapshot(weaponDebug.loaded, weaponDebug.dot, weaponDebug.angleDeg);
+  } else {
+    game.setWeaponDebugSnapshot(false, -1, 180);
+  }
+
+  renderer.renderWithViewModel(
+    game.scene,
+    game.camera,
+    viewModel?.viewModelScene ?? null,
+    viewModel?.viewModelCamera ?? null,
+    viewModelVisible,
+  );
+
   let pointerLock: PointerLockController | null = null;
   if (!inputFrozen && runtimeParams.controlMode === "human") {
     pointerLock = new PointerLockController({
@@ -643,7 +665,6 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         game.setPointerLocked(locked);
         if (locked) {
           pointerLockBannerGraceMs = POINTER_LOCK_BANNER_GRACE_MS;
-          startViewModelLoad();
           weaponAudio.ensureResumedFromGesture();
           weaponAudio.startAmbient(); // begin wind loop once audio is unlocked
         } else {
