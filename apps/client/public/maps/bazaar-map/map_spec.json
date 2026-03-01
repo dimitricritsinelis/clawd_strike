@@ -188,6 +188,18 @@
       "notes": "Extended to reach widened west hall inner edge at x=8.0."
     },
     {
+      "id": "JOG_W_FILL",
+      "type": "main_lane_segment",
+      "rect": {
+        "x": 20.25,
+        "y": 32,
+        "w": 2.5,
+        "h": 18
+      },
+      "label": "Jog West Fill — closes exterior wall gap",
+      "notes": "Fills the non-walkable pocket created by BZ_M2_JOG stepping back 2.5m east relative to BZ_M1/M3. Without this zone the west face at X=20.25, Y=32-50 has no wall (non-walkable on both sides). Making it walkable causes extractBoundarySegments to generate the missing 9m exterior wall and removes the staircase step geometry at the jog transitions."
+    },
+    {
       "id": "SH_E",
       "type": "side_hall",
       "rect": {

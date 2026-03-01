@@ -8,6 +8,7 @@
 - Stone balconies: architect-logic placement, vertical stacking, 2-bay width, 2-bay spacing.
 - Side-hall wall heights split by face: inner wall (building-block side) = 9 m; outer wall (perimeter) = 3 m (1 story, visual balance). Uses sign(centerX−mapCenterX)===sign(inwardX) spatial test, same as door policy.
 - Connector zones (CONN_SW/SE/NW/NE) raised from 6 m → 9 m; closes 3 m corner gap at every building corner where spawn plaza meets side-hall inner wall.
+- `JOG_W_FILL` zone added to design spec (main_lane_segment, X=20.25-22.75, Z=32-50); closes the open outside wall where BZ_M2_JOG steps back 2.5 m east — creates a continuous 9 m exterior wall from Z=14-68.
 - Loading screen info overlay textbox positioned at `--info-textbox-y-lift: -90px`.
 - `gen:maps` still emits anchor clearance warnings during build (expected, not a bug).
 - Agent playbook is served at `/skills.md`; loading screen button opens it (same-origin).
@@ -26,13 +27,14 @@ pnpm build
 ```
 
 ## Last Completed Prompt
-- Connector zone walls raised to 9 m (`wallDetailPlacer.ts`):
-  - Added `connector` case to `resolveSegmentWallHeight` → `3 * STORY_HEIGHT_M`
-  - Closes visible 3 m rectangular gap at all 4 building corners (CONN_SW/SE/NW/NE)
-  - All building-enclosing zone types now flush at 9 m: main_lane_segment, spawn_plaza, cut, side_hall inner, connector
+- Jog west pocket exterior wall (`docs/map-design/specs/map_spec.json`):
+  - Added `JOG_W_FILL` zone (main_lane_segment, X=20.25-22.75, Y=32-50)
+  - Fills non-walkable pocket created by BZ_M2_JOG stepping back 2.5 m west of BZ_M1/M3
+  - Generates missing exterior wall at X=20.25, Z=32-50 → continuous 9 m west face Z=14-68
+  - Removes staircase step geometry (Z=32 and Z=50 stub walls + roof caps) — clean outside wall
 
 ## Next 3 Tasks
-1. Play-test all 4 building corners — no gap visible above connector zones.
+1. Play-test the building exterior (west and east faces) — no gap or staircase notch visible.
 2. Review door placement policy (spawn walls, terminal main-lane zones) against design intent.
 3. Mark map `APPROVED` once blockout geometry satisfies design brief acceptance criteria.
 

@@ -109,6 +109,18 @@
       "notes": "Wider stalls, fewer count. Jog +2.0m East breaks LoS. Asymmetric left/right stall count. Well node at Y=41."
     },
     {
+      "id": "JOG_W_FILL",
+      "type": "main_lane_segment",
+      "rect": {
+        "x": 20.25,
+        "y": 32.0,
+        "w": 2.5,
+        "h": 18.0
+      },
+      "label": "Jog West Fill \u2014 closes exterior wall gap",
+      "notes": "Fills the non-walkable pocket created by BZ_M2_JOG stepping back 2.5m east relative to BZ_M1/M3. Without this zone the west face at X=20.25, Y=32-50 has no wall (non-walkable on both sides). Making it walkable causes extractBoundarySegments to generate the missing 9m exterior wall and removes the staircase step geometry at the jog transitions."
+    },
+    {
       "id": "BZ_M3",
       "type": "main_lane_segment",
       "rect": {
