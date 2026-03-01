@@ -15,6 +15,14 @@ export type RuntimeBlockoutZone = {
   notes: string;
 };
 
+export type RuntimeWallPatch = {
+  orientation: "vertical" | "horizontal";
+  coord: number;
+  start: number;
+  end: number;
+  outward: -1 | 1;
+};
+
 export type RuntimeBlockoutSpec = {
   mapId: string;
   playable_boundary: RuntimeRect;
@@ -26,6 +34,7 @@ export type RuntimeBlockoutSpec = {
   };
   wall_details: RuntimeWallDetailOptions;
   zones: RuntimeBlockoutZone[];
+  exterior_wall_patches: RuntimeWallPatch[];
   constraints: {
     min_path_width_main_lane: number;
     min_path_width_side_halls: number;
@@ -234,6 +243,28 @@ export function parseBlockoutSpec(value: unknown, source = "map_spec.json"): Run
   const defaults = asObject(obj.defaults, `${source}.defaults`);
   const constraints = asObject(obj.constraints, `${source}.constraints`);
 
+  const patchesRaw = obj.exterior_wall_patches;
+  const exterior_wall_patches: RuntimeWallPatch[] = Array.isArray(patchesRaw)
+    ? patchesRaw.map((p, i) => {
+        const patch = asObject(p, `${source}.exterior_wall_patches[${i}]`);
+        const orientation = asString(patch.orientation, `${source}.exterior_wall_patches[${i}].orientation`);
+        if (orientation !== "vertical" && orientation !== "horizontal") {
+          failParse(`${source}.exterior_wall_patches[${i}].orientation`, "expected 'vertical' or 'horizontal'");
+        }
+        const outward = asNumber(patch.outward, `${source}.exterior_wall_patches[${i}].outward`);
+        if (outward !== -1 && outward !== 1) {
+          failParse(`${source}.exterior_wall_patches[${i}].outward`, "expected -1 or 1");
+        }
+        return {
+          orientation: orientation as "vertical" | "horizontal",
+          coord: asNumber(patch.coord, `${source}.exterior_wall_patches[${i}].coord`),
+          start: asNumber(patch.start, `${source}.exterior_wall_patches[${i}].start`),
+          end: asNumber(patch.end, `${source}.exterior_wall_patches[${i}].end`),
+          outward: outward as -1 | 1,
+        };
+      })
+    : [];
+
   return {
     mapId: asString(obj.mapId, `${source}.mapId`),
     playable_boundary: parseRect(obj.playable_boundary, `${source}.playable_boundary`),
@@ -248,6 +279,7 @@ export function parseBlockoutSpec(value: unknown, source = "map_spec.json"): Run
     },
     wall_details: parseWallDetailOptions(obj.wall_details, `${source}.wall_details`),
     zones,
+    exterior_wall_patches,
     constraints: {
       min_path_width_main_lane: asPositiveNumber(
         constraints.min_path_width_main_lane,

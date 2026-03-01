@@ -308,7 +308,10 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     .map((zone) => zone.rect);
   const axes = collectAxisCoordinates(walkableRects, spec.playable_boundary);
   const inside = buildInsideGrid(walkableRects, axes.xs, axes.ys);
-  const wallSegments = mergeBoundarySegments(extractBoundarySegments(inside, axes.xs, axes.ys));
+  const wallSegments = mergeBoundarySegments([
+    ...extractBoundarySegments(inside, axes.xs, axes.ys),
+    ...spec.exterior_wall_patches,
+  ]);
   const wallThicknessM = Math.max(0.05, spec.defaults.wall_thickness);
 
   const floorTopY = spec.defaults.floor_height;

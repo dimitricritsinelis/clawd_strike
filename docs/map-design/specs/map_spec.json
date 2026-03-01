@@ -109,42 +109,6 @@
       "notes": "Wider stalls, fewer count. Jog +2.0m East breaks LoS. Asymmetric left/right stall count. Well node at Y=41."
     },
     {
-      "id": "JOG_W_FILL",
-      "type": "main_lane_segment",
-      "rect": {
-        "x": 20.25,
-        "y": 32.0,
-        "w": 2.5,
-        "h": 18.0
-      },
-      "label": "Jog West Fill \u2014 closes exterior wall gap",
-      "notes": "Fills the non-walkable pocket created by BZ_M2_JOG stepping back 2.5m east relative to BZ_M1/M3. Without this zone the west face at X=20.25, Y=32-50 has no wall (non-walkable on both sides). Making it walkable causes extractBoundarySegments to generate the missing 9m exterior wall and removes the staircase step geometry at the jog transitions."
-    },
-    {
-      "id": "JOG_E_FILL_S",
-      "type": "main_lane_segment",
-      "rect": {
-        "x": 29.75,
-        "y": 14.0,
-        "w": 1.5,
-        "h": 18.0
-      },
-      "label": "Jog East Fill (South) \u2014 closes east stub wall at Z=32",
-      "notes": "Fills X=29.75-31.25, Z=14-32. BZ_M2_JOG extends 1.5m further east than BZ_M1, creating a 1.5m-wide stub south-face wall at Z=32 and a black void floor area. Making this walkable merges the east wall into a continuous 9m face at X=31.25 from Z=14-68."
-    },
-    {
-      "id": "JOG_E_FILL_N",
-      "type": "main_lane_segment",
-      "rect": {
-        "x": 29.75,
-        "y": 50.0,
-        "w": 1.5,
-        "h": 18.0
-      },
-      "label": "Jog East Fill (North) \u2014 closes east stub wall at Z=50",
-      "notes": "Fills X=29.75-31.25, Z=50-68. Symmetric fix to JOG_E_FILL_S for the north jog transition."
-    },
-    {
       "id": "BZ_M3",
       "type": "main_lane_segment",
       "rect": {
@@ -407,6 +371,32 @@
       "anchor_id": "LMK_MID_WELL_01"
     }
   },
+  "exterior_wall_patches": [
+    {
+      "orientation": "vertical",
+      "coord": 20.25,
+      "start": 32.0,
+      "end": 50.0,
+      "outward": -1,
+      "_note": "West recess exterior face: BZ_M2_JOG steps back 2.5m creating a non-walkable pocket (X=20.25-22.75, Z=32-50). Both sides of X=20.25 are non-walkable so no wall is generated. This patch injects the missing 9m exterior wall segment directly — without making the pocket walkable (which would remove the jog walls at X=22.75)."
+    },
+    {
+      "orientation": "vertical",
+      "coord": 31.25,
+      "start": 14.0,
+      "end": 32.0,
+      "outward": 1,
+      "_note": "East void south face: BZ_M2_JOG protrudes 1.5m beyond BZ_M1, creating non-walkable void at X=29.75-31.25, Z=14-32. X=31.25 east face has no wall here. Merges with the existing X=31.25, Z=32-50 segment to form a continuous east exterior wall."
+    },
+    {
+      "orientation": "vertical",
+      "coord": 31.25,
+      "start": 50.0,
+      "end": 68.0,
+      "outward": 1,
+      "_note": "East void north face: symmetric to south — X=29.75-31.25, Z=50-68 is non-walkable. Together the three patches produce a continuous 9m slab at X=31.25, Z=14-68."
+    }
+  ],
   "constraints": {
     "no_block_zone": "Clear travel zones must remain unobstructed by props/shops. Temporary gameplay items only (e.g., pickups) allowed if they do not block.",
     "min_path_width_main_lane": 6.0,
