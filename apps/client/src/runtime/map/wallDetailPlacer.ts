@@ -14,7 +14,7 @@ const DETAIL_ZONE_TYPES = new Set([
 
 // DEV FLAG — strip all windows/balconies for blockout layout review.
 // Set to false to re-enable glazing when moving to pbr/lookdev pass.
-const DISABLE_WINDOWS = true;
+const DISABLE_WINDOWS = false;
 
 const SEGMENT_EDGE_MARGIN_M = 0.35;
 const INSTANCE_BUDGET = 9800;
@@ -34,7 +34,9 @@ const BALCONY_WALL_H = 0.95;
 const BALCONY_WALL_THICKNESS_M = 0.15;
 const BALCONY_DOOR_H = 2.2;
 const BALCONY_DOOR_SILL_OFFSET = 0.08;
-const BALCONY_CHANCE = 0.20;
+// 35 % facade-level gate: if a non-spawn facade wins the roll, ALL its door
+// columns get balconies → coherent decorated/clean rhythm across a block face.
+const FACADE_BALCONY_CHANCE = 0.35;
 const BALCONY_ELIGIBLE_ZONES = new Set(["main_lane_segment", "spawn_plaza"]);
 
 type SegmentFrame = {
@@ -555,6 +557,10 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
 
   const targetBayW = ctx.rng.range(1.8, 2.6);
   let bayCount = Math.max(1, Math.round(usableLength / targetBayW));
+  // Force odd bay count for single-door segments → door lands on exact center bay.
+  if (doorCount === 1 && bayCount >= 2 && bayCount % 2 === 0) {
+    bayCount = Math.max(1, bayCount - 1);
+  }
   // Ensure enough bays for doors (each door needs at least one margin bay on each side).
   if (doorCount > 0 && bayCount < doorCount + 2) bayCount = doorCount + 2;
   const bayWidth = usableLength / bayCount;
@@ -570,21 +576,47 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
   const frameDepth = clamp(ctx.rng.range(0.06, 0.10), 0.04, ctx.maxProtrusionM + 0.06);
   const jambDepth = clamp(ctx.rng.range(0.10, 0.16), 0.06, ctx.maxProtrusionM + 0.10);
 
-  // Assign column roles using the spatial door policy.
-  // Doors are placed at evenly distributed bays; remaining bays are window/blank
-  // (windows only when DISABLE_WINDOWS is false).
-  const doorColSet = new Set(assignDoorColumns(bayCount, doorCount));
-  const columnRoles: ColumnRole[] = [];
-  for (let col = 0; col < bayCount; col += 1) {
-    if (doorColSet.has(col)) {
-      columnRoles.push("door");
-    } else if (!DISABLE_WINDOWS && (ctx.isMainLane || ctx.isShopfrontZone)) {
-      const adjacentToDoor = doorColSet.has(col - 1) || doorColSet.has(col + 1);
-      columnRoles.push(adjacentToDoor && ctx.rng.next() < 0.35 ? "window" : "blank");
-    } else {
-      columnRoles.push("blank");
+  // Assign column roles: deterministic symmetric placement.
+  // Primary walls (door-bearing): windows at even distances from each door.
+  // Secondary walls (doorless, non-connector/cut): sparse windows every 3rd from center.
+  // Connectors/cuts: all blank.
+  const columnRoles: ColumnRole[] = Array.from(
+    { length: bayCount }, () => "blank" as ColumnRole,
+  );
+
+  if (doorCount > 0) {
+    // PRIMARY wall: doors + symmetric windows at even distances from each door
+    const doorCols = assignDoorColumns(bayCount, doorCount);
+
+    for (const col of doorCols) {
+      columnRoles[col] = "door";
+    }
+
+    // Windows at ODD distances from nearest door (1, 3, 5…); even distances stay blank.
+    // Produces tight  _ W _ W D W _ W _  clusters centered on each door.
+    // Window columns are balcony candidates — balconies replace windows at render time.
+    for (let col = 0; col < bayCount; col += 1) {
+      if (columnRoles[col] !== "blank") continue;
+
+      let minDoorDist = bayCount;
+      for (const dc of doorCols) {
+        minDoorDist = Math.min(minDoorDist, Math.abs(col - dc));
+      }
+
+      if (minDoorDist % 2 === 1) {              // odd distance → window
+        columnRoles[col] = "window";
+      }
+      // even distance (≥ 2) → stays blank
+    }
+  } else if (!ctx.isConnector && !ctx.isCut) {
+    // SECONDARY wall (doorless): sparse windows at every 3rd position from center
+    const center = Math.floor(bayCount / 2);
+    for (let dist = 3; dist <= center; dist += 3) {
+      if (center - dist >= 0) columnRoles[center - dist] = "window";
+      if (center + dist < bayCount) columnRoles[center + dist] = "window";
     }
   }
+  // Connectors/cuts: all blank — no windows
 
   return {
     bayCount, bayWidth, usableLength, stories, columnRoles,
@@ -667,82 +699,70 @@ function placeArchedDoor(
     spec.frameDepth, spec.frameThickness, spec.doorW + spec.frameThickness * 2);
 }
 
-// ── Recessed panel (uses window width from spec for alignment) ─────────────
-
-function placeRecessedPanel(
-  ctx: SegmentDecorContext,
-  centerS: number,
-  storyBaseY: number,
-  spec: FacadeSpec,
-): void {
-  const panelW = spec.windowW * 0.85;
-  const panelH = spec.windowH * 0.7;
-  const centerY = storyBaseY + spec.sillOffset + panelH * 0.5;
-  const depth = spec.recessDepth * 0.7;
-
-  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-    ctx.frame, centerS, centerY, -depth * 0.5,
-    depth, panelH, panelW);
-}
-
 // ── Balcony placement (stone balustrade style) ─────────────────────────────
 
 function placeBalcony(
   ctx: SegmentDecorContext,
-  centerS: number,
+  doorCenterS: number,   // french door stays on the door column
   storyBaseY: number,
   spec: FacadeSpec,
+  leftBays: number,      // 0 or 1 — window columns available to the left of the door
+  rightBays: number,     // 0 or 1 — window columns available to the right of the door
 ): void {
-  const balconyW = Math.min(spec.bayWidth * 1.8, spec.usableLength * 0.45);
+  const totalBays   = 1 + leftBays + rightBays;          // 1, 2, or 3
+  const balconyW    = totalBays * spec.bayWidth;
+  // Slab centre is offset so the slab spans its actual columns while the
+  // french door remains visually on the door column.
+  const slabCenterS = doorCenterS + (rightBays - leftBays) * spec.bayWidth * 0.5;
   const slabY = storyBaseY + BALCONY_SLAB_THICKNESS_M * 0.5;
 
   // 1. Slab — extends outward toward walkable zone (positive inwardN)
   pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
-    ctx.frame, centerS, slabY, BALCONY_DEPTH_M * 0.5,
+    ctx.frame, slabCenterS, slabY, BALCONY_DEPTH_M * 0.5,
     BALCONY_DEPTH_M, BALCONY_SLAB_THICKNESS_M, balconyW);
 
   // 2. French door opening — taller & wider than regular window, starts near floor
-  const doorW = Math.min(spec.windowW * 1.8, balconyW * 0.55);
+  const doorW = clamp(balconyW * 0.70, spec.bayWidth * 0.52, balconyW * 0.78);
   const doorCenterY = storyBaseY + BALCONY_DOOR_SILL_OFFSET + BALCONY_DOOR_H * 0.5;
 
   // 2a. Dark void
   pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
-    ctx.frame, centerS, doorCenterY, 0.003,
+    ctx.frame, doorCenterS, doorCenterY, 0.003,
     0.006, BALCONY_DOOR_H, doorW);
 
   // 2b. Glass pane
   pushBox(ctx.instances, ctx.maxInstances, "window_glass", null,
-    ctx.frame, centerS, doorCenterY, 0.015,
+    ctx.frame, doorCenterS, doorCenterY, 0.015,
     WINDOW_GLASS_THICKNESS_M, BALCONY_DOOR_H, doorW);
 
   // 2c. Frame jambs
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
-      ctx.frame, centerS + side * (doorW + spec.frameThickness) * 0.5, doorCenterY, spec.frameDepth * 0.5,
+      ctx.frame, doorCenterS + side * (doorW + spec.frameThickness) * 0.5, doorCenterY, spec.frameDepth * 0.5,
       spec.frameDepth, BALCONY_DOOR_H + spec.frameThickness, spec.frameThickness);
   }
 
   // 2d. Lintel
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
-    ctx.frame, centerS, storyBaseY + BALCONY_DOOR_SILL_OFFSET + BALCONY_DOOR_H + spec.frameThickness * 0.5,
+    ctx.frame, doorCenterS, storyBaseY + BALCONY_DOOR_SILL_OFFSET + BALCONY_DOOR_H + spec.frameThickness * 0.5,
     spec.frameDepth * 0.5,
     spec.frameDepth, spec.frameThickness * 1.2, doorW + spec.frameThickness * 2);
 
   // 2e. Horizontal crossbar
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", null,
-    ctx.frame, centerS, doorCenterY, 0.018,
+    ctx.frame, doorCenterS, doorCenterY, 0.018,
     0.035, 0.04, doorW * 0.92);
 
   // 3. Stone balustrade — front wall at outer edge of slab
   const wallY = storyBaseY + BALCONY_SLAB_THICKNESS_M + BALCONY_WALL_H * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
-    ctx.frame, centerS, wallY, BALCONY_DEPTH_M,
+    ctx.frame, slabCenterS, wallY, BALCONY_DEPTH_M,
     BALCONY_WALL_THICKNESS_M, BALCONY_WALL_H, balconyW);
 
   // 4. Stone balustrade — side walls
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
-      ctx.frame, centerS + side * balconyW * 0.5, wallY, BALCONY_DEPTH_M * 0.5,
+      ctx.frame, slabCenterS + side * balconyW * 0.5, wallY, BALCONY_DEPTH_M * 0.5,
       BALCONY_DEPTH_M, BALCONY_WALL_H, BALCONY_WALL_THICKNESS_M);
   }
 
@@ -751,7 +771,7 @@ function placeBalcony(
   const bracketD = 0.3;
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
-      ctx.frame, centerS + side * (balconyW * 0.35), storyBaseY - bracketH * 0.5, bracketD * 0.5,
+      ctx.frame, slabCenterS + side * (balconyW * 0.35), storyBaseY - bracketH * 0.5, bracketD * 0.5,
       bracketD, bracketH, 0.12);
   }
 }
@@ -817,28 +837,68 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   // Pilasters aligned to the bay grid
   placePilasters(ctx, spec);
 
-  // Pre-compute balcony placements — architect logic:
-  // Decision is per COLUMN (not per bay×story) → vertical stacks.
-  // If a column gets a balcony, ALL upper floors on that column get one.
-  // Minimum 2-bay spacing between balcony columns for visual rhythm.
-  const balconyColumns = new Set<number>();
+  // Pre-compute balcony placements.
+  //
+  // SPAWN PLAZA: 100% chance on every door column → both side walls of a
+  // spawn (x≈14 and x≈36) always carry matching balconies — guaranteed
+  // left/right symmetry.  Wing count is still facade-spec-driven so each
+  // segment produces the widest slab its own column layout allows.
+  //
+  // MAIN LANE + other eligible zones: staged two-level decision —
+  //   Level 1 — facade gate (35 %): whole facade is either decorated or clean.
+  //   Level 2 — per-column bay-size: weighted among 1-, 2-, 3-bay options
+  //   (weights 2 : 3 : 2) producing a visible mix of sizes.  For 2-bay
+  //   slabs the slab randomly leans left or right when both wings exist.
+  const balconyInfo = new Map<string, { leftBays: number; rightBays: number }>();
+  const balconyCoveredWindows = new Set<string>();
   if (BALCONY_ELIGIBLE_ZONES.has(ctx.zone?.type ?? "") && spec.stories >= 2) {
     const balconyRng = ctx.rng.fork("balconies");
-    let lastBalconyCol = -3;
-    for (let col = 0; col < spec.bayCount; col += 1) {
-      if (spec.columnRoles[col] !== "window") continue;
-      if (col - lastBalconyCol < 2) continue;
-      if (balconyRng.next() < BALCONY_CHANCE) {
-        balconyColumns.add(col);
-        lastBalconyCol = col;
-      }
-    }
-  }
+    const isSpawnPlaza = ctx.zone?.type === "spawn_plaza";
 
-  const balconySet = new Set<string>();
-  for (const col of balconyColumns) {
-    for (let story = 1; story < spec.stories; story += 1) {
-      balconySet.add(`${col}:${story}`);
+    // Facade-level gate — spawn always passes; main lane uses FACADE_BALCONY_CHANCE.
+    const facadeHasBalconies = isSpawnPlaza || (balconyRng.next() < FACADE_BALCONY_CHANCE);
+
+    if (facadeHasBalconies) {
+      for (let col = 0; col < spec.bayCount; col += 1) {
+        if (spec.columnRoles[col] !== "door") continue;
+
+        const hasLeft  = col - 1 >= 0 && spec.columnRoles[col - 1] === "window";
+        const hasRight = col + 1 < spec.bayCount && spec.columnRoles[col + 1] === "window";
+
+        let leftBays: number;
+        let rightBays: number;
+
+        if (isSpawnPlaza) {
+          // Spawn: always claim all available adjacent windows → max slab.
+          leftBays  = hasLeft  ? 1 : 0;
+          rightBays = hasRight ? 1 : 0;
+        } else {
+          // Main lane: weighted pick — build an options array, roll an index.
+          // Weights: 1-bay ×2, 2-bay ×3, 3-bay ×2  (up to 7 entries).
+          type BayOption = [number, number];  // [leftBays, rightBays]
+          const opts: BayOption[] = [[0, 0], [0, 0]];  // 1-bay ×2
+
+          if (hasLeft || hasRight) {
+            // 2-bay wing: when both sides exist, randomly lean left or right.
+            const leanLeft = !hasRight || balconyRng.next() < 0.5;
+            const twoL = (hasLeft  && leanLeft)  ? 1 : 0;
+            const twoR = (hasRight && !leanLeft) ? 1 : 0;
+            opts.push([twoL, twoR], [twoL, twoR], [twoL, twoR]);  // 2-bay ×3
+          }
+          if (hasLeft && hasRight) {
+            opts.push([1, 1], [1, 1]);  // 3-bay ×2
+          }
+          const pick = opts[Math.floor(balconyRng.next() * opts.length)]!;
+          leftBays  = pick[0];
+          rightBays = pick[1];
+        }
+
+        for (let story = 1; story < spec.stories; story += 1) {
+          balconyInfo.set(`${col}:${story}`, { leftBays, rightBays });
+          if (leftBays  > 0) balconyCoveredWindows.add(`${col - 1}:${story}`);
+          if (rightBays > 0) balconyCoveredWindows.add(`${col + 1}:${story}`);
+        }
+      }
     }
   }
 
@@ -853,18 +913,19 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       if (story === 0 && role === "door") {
         // Ground floor door column → arched door
         placeArchedDoor(ctx, centerS, spec);
+      } else if (story > 0 && role === "door") {
+        // Upper floor door column → balcony centered above this door (if selected)
+        const info = balconyInfo.get(`${col}:${story}`);
+        if (info) {
+          placeBalcony(ctx, centerS, storyBaseY, spec, info.leftBays, info.rightBays);
+        }
+        // else → blank wall above door (no balcony chosen for this door)
       } else if (role === "window" && !DISABLE_WINDOWS) {
-        if (balconySet.has(`${col}:${story}`)) {
-          placeBalcony(ctx, centerS, storyBaseY, spec);
-        } else {
+        // Window column → skip if the adjacent balcony slab covers this slot
+        if (!balconyCoveredWindows.has(`${col}:${story}`)) {
           placeWindowOpening(ctx, centerS, storyBaseY, spec);
         }
-      } else if (role === "door" && story > 0 && !DISABLE_WINDOWS && ctx.rng.next() < 0.50) {
-        // Above a door, 50% chance of window (rest is blank wall) — only when windows enabled
-        placeWindowOpening(ctx, centerS, storyBaseY, spec);
-      } else if (role === "blank" && !DISABLE_WINDOWS && ctx.rng.next() < 0.25) {
-        // Blank column — occasional subtle recess for texture — only when windows enabled
-        placeRecessedPanel(ctx, centerS, storyBaseY, spec);
+        // covered: slab overhead — render blank (no glass poking through floor)
       }
     }
 
