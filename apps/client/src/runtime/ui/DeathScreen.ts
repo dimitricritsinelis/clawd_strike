@@ -76,7 +76,7 @@ export class DeathScreen {
     this.bestScoreEl.style.marginTop = "7px";
     this.bestScoreEl.style.letterSpacing = "0.06em";
     this.bestScoreEl.style.textTransform = "uppercase";
-    this.bestScoreEl.textContent = "Best Score 0";
+    this.bestScoreEl.textContent = "HIGH SCORE 0";
 
     this.playAgainBtn = document.createElement("button");
     this.playAgainBtn.type = "button";
@@ -146,7 +146,7 @@ export class DeathScreen {
     const finalScore = Math.max(0, Math.round(summary?.finalScore ?? 0));
     const bestScore = Math.max(0, Math.round(summary?.bestScore ?? 0));
     this.finalScoreEl.textContent = `Final Score ${this.formatScore(finalScore)}`;
-    this.bestScoreEl.textContent = `Best Score ${this.formatScore(bestScore)}`;
+    this.bestScoreEl.textContent = `HIGH SCORE ${this.formatScore(bestScore)}`;
   }
 
   hide(): void {

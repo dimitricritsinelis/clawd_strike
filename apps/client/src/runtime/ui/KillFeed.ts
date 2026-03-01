@@ -4,6 +4,11 @@ type KillEntry = {
   fadingOut: boolean;
 };
 
+type KillFeedOptions = {
+  anchorEl?: HTMLElement;
+  gapPx?: number;
+};
+
 const KILL_DISPLAY_S = 3.0;
 const KILL_FADE_S = 0.4;
 const MAX_ENTRIES = 4;
@@ -11,11 +16,17 @@ const MAX_ENTRIES = 4;
 export class KillFeed {
   private readonly root: HTMLDivElement;
   private readonly entries: KillEntry[] = [];
+  private readonly gapPx: number;
+  private anchorEl: HTMLElement | null;
+  private readonly resizeHandler: () => void;
 
-  constructor(mountEl: HTMLElement) {
+  constructor(mountEl: HTMLElement, options: KillFeedOptions = {}) {
+    this.gapPx = options.gapPx ?? 8;
+    this.anchorEl = options.anchorEl ?? null;
+    this.resizeHandler = () => this.updatePositionFromAnchor();
+
     this.root = document.createElement("div");
     this.root.style.position = "absolute";
-    // Share the same top-right anchor as ScoreHud so the two HUDs align cleanly.
     this.root.style.top = "116px";
     this.root.style.right = "22px";
     this.root.style.zIndex = "24";
@@ -28,10 +39,19 @@ export class KillFeed {
     this.root.style.alignItems = "stretch";
 
     mountEl.append(this.root);
+    this.updatePositionFromAnchor();
+    window.addEventListener("resize", this.resizeHandler);
+  }
+
+  setAnchorElement(anchorEl: HTMLElement | null): void {
+    this.anchorEl = anchorEl;
+    this.updatePositionFromAnchor();
   }
 
   /** @param isHeadshot Pass true to use headshot phrasing and gold tint. */
   addKill(killerName: string, enemyName: string, isHeadshot = false): void {
+    this.updatePositionFromAnchor();
+
     // Trim to MAX_ENTRIES by removing oldest (last visible row).
     if (this.entries.length >= MAX_ENTRIES) {
       const oldest = this.entries.pop();
@@ -96,6 +116,15 @@ export class KillFeed {
   }
 
   dispose(): void {
+    window.removeEventListener("resize", this.resizeHandler);
     this.root.remove();
+  }
+
+  private updatePositionFromAnchor(): void {
+    if (!this.anchorEl) return;
+    const anchorTop = this.anchorEl.offsetTop;
+    const anchorHeight = this.anchorEl.offsetHeight;
+    const top = Math.max(0, anchorTop + anchorHeight + this.gapPx);
+    this.root.style.top = `${top}px`;
   }
 }

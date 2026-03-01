@@ -141,7 +141,7 @@ export class ScoreHud {
       textTransform: "uppercase",
       color: "rgba(180, 200, 230, 0.6)",
     });
-    bestLabel.textContent = "Best Score";
+    bestLabel.textContent = "HIGH SCORE";
 
     this.bestScoreEl = document.createElement("span");
     this.bestScoreEl.dataset.testid = "best-score";

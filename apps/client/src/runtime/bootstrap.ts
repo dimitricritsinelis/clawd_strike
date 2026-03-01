@@ -352,9 +352,12 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const healthHud = new HealthHud(runtimeRoot);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
-  const killFeed = new KillFeed(runtimeRoot);
   const hitMarker = new HitMarker(crosshair);
   const scoreHud = new ScoreHud(runtimeRoot, runtimeParams.playerName);
+  const killFeed = new KillFeed(runtimeRoot, {
+    anchorEl: scoreHud.root,
+    gapPx: 8,
+  });
   const roundEndScreen = new RoundEndScreen(runtimeRoot);
   const timerHud = new TimerHud(runtimeRoot);
   const damageNumbers = new DamageNumbers(runtimeRoot);

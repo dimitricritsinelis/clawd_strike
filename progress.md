@@ -8,8 +8,9 @@
 - Weapon audio now reuses shared drive curve + cached pooled noise buffers for hit/reload/dryfire events.
 - DamageNumbers now reuses a scratch `Vector3`, pools DOM nodes, and uses swap-remove cleanup.
 - Renderer shadow map updates are frozen (`autoUpdate=false`) with explicit `requestShadowUpdate()` after map build.
-- Perf renderer-info reads + scene traversal sampling now run only while perf HUD is visible.
-- Compare-shot artifact pair for this pass: `artifacts/screenshots/targeted-perf-optimizations-20260301/` (`review:shot-pair` passed).
+- Kill-feed notifications are now anchored from the live Score HUD bottom (+8px gap), removing overlap with score/best-score rows.
+- Score label text now reads `HIGH SCORE` in both Score HUD and death screen.
+- Compare-shot artifacts: `artifacts/screenshots/targeted-perf-optimizations-20260301/` and `artifacts/screenshots/hud-killfeed-overlap-20260301/` (both `review:shot-pair` passed).
 - Map approval is still pending blockout traversal/readability signoff.
 
 ## Canonical Playtest URL
@@ -28,14 +29,14 @@ VERCEL_TOKEN=<token> vercel deploy --prod --yes
 ```
 
 ## Last Completed Prompt
-- Implemented targeted no-quality-reduction performance optimizations in `EnemyController`, `EnemyManager`, `EnemyVisual`, `WeaponAudio`, `DamageNumbers`, `Renderer`, and `bootstrap`.
-- Touched files: `apps/client/src/runtime/enemies/EnemyController.ts`, `apps/client/src/runtime/enemies/EnemyManager.ts`, `apps/client/src/runtime/enemies/EnemyVisual.ts`, `apps/client/src/runtime/audio/WeaponAudio.ts`, `apps/client/src/runtime/ui/DamageNumbers.ts`, `apps/client/src/runtime/render/Renderer.ts`, `apps/client/src/runtime/bootstrap.ts`.
+- Updated best-score wording to `HIGH SCORE` in runtime HUDs.
+- Touched files: `apps/client/src/runtime/ui/ScoreHud.ts`, `apps/client/src/runtime/ui/DeathScreen.ts`.
 - Validation completed: `pnpm typecheck` and `pnpm build` passed.
-- Smoke checks: canonical URL opened; `smoke:agent` passed (`moved=39.214m`) on rerun.
+- Smoke checks: canonical URL opened; runtime check confirmed both HUD surfaces include `HIGH SCORE`.
 
 ## Next 3 Tasks
-1. Capture a Chrome performance trace during wave transition + full-auto to quantify allocation and frame-time improvements.
-2. Manual desktop Human-mode pass: pointer lock, WASD/mouselook, and collision feel across full map traversal.
+1. Trigger an in-game kill burst and visually confirm stacked notifications stay below the score panel under load.
+2. Capture a Chrome performance trace during wave transition + full-auto to quantify allocation and frame-time improvements.
 3. Add guardrails for any future moving shadow casters (`requestShadowUpdate()` on movement or mode-based autoUpdate fallback).
 
 ## Known Issues / Risks
