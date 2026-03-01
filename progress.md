@@ -2,14 +2,14 @@
 
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
-- `docs/map-design` remains the source-of-truth input (spec + refs) and is only used by `gen:maps` to emit runtime copies under `apps/client/public/maps/bazaar-map/`.
-- Facade details: `window_glass` reflective blue shader + balconies (35% facade gate, spawn-plaza forced, A/B symmetric; main lane weighted 1/2/3-bay mix; doors scale with slab; connectors/side-halls/corners have 0 balconies).
-- Outer shell: roof caps depth 4 m; side-hall inner/outer wall heights 9 m / 3 m; connector corner zones raised to 9 m to close plaza corner gaps.
-- Jog fillers: W/E fill zones close main-lane exterior wall/floor voids so the 9 m shell is continuous from Z=14-68.
-- Loading screen info overlay textbox positioned at `--info-textbox-y-lift: -90px`.
-- `gen:maps` still emits anchor clearance warnings during build (expected, not a bug).
-- Agent playbook is served at `/skills.md`; loading screen button opens it (same-origin).
-- Vercel deploy agent skill installed: `.agents/skills/vercel-cli/` + `skills-lock.json`.
+- Runtime map is still generated from `docs/map-design/specs/map_spec.json` into `apps/client/public/maps/bazaar-map/` via `gen:maps`.
+- Runtime now tracks focus/visibility explicitly (`window` focus/blur + `document` visibilitychange) and normalizes visibility to `visible|hidden`.
+- Agent Mode no longer intentionally pauses/resets input on blur/hidden; Human mode keeps existing pointer-lock/pause behavior.
+- `requestAnimationFrame` hidden->visible resume now resets frame baseline time to avoid large `deltaMs` spikes.
+- `window.render_game_to_text()` now includes `gameplay.focused`, `gameplay.visibility`, and `gameplay.backgroundThrottled`.
+- Agent Mode shows a non-blocking background-throttling banner when unfocused/hidden.
+- Loading-screen mode selection now writes `mode` and `name` into URL params before runtime handoff.
+- `/skills.md` now documents unfocused-vs-hidden Agent Mode behavior and recommends keeping the window visible for uninterrupted watchability.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
@@ -22,18 +22,30 @@
 pnpm dev
 pnpm typecheck
 pnpm build
+VERCEL_TOKEN=<token> vercel deploy --prod --yes
 ```
 
 ## Last Completed Prompt
-- Imported Vercel agent skill `vercel-cli` into the repo for Codex: `.agents/skills/vercel-cli/` + `skills-lock.json`.
-- `pnpm typecheck` + `pnpm build` pass clean.
+- Implemented Agent Mode background/focus behavior in runtime:
+  - added explicit focus/visibility tracking + normalized state output
+  - added `gameplay.backgroundThrottled` to automation snapshot
+  - added Agent Mode background-throttling banner overlay
+  - avoided `deltaMs` jump on hidden->visible RAF resume
+  - kept blur/visibility input resets and pause flow human-only
+- Added mode plumbing so runtime honors `mode=agent` from URL/loading screen (`autostart=agent` now transitions directly).
+- Updated deployed playbook docs in `apps/client/public/skills.md` with the new behavior contract.
+- Captured deterministic compare-shot screenshots:
+  - `artifacts/screenshots/2026-03-01-agent-mode-background-focus/before.png`
+  - `artifacts/screenshots/2026-03-01-agent-mode-background-focus/after.png`
+- Files touched: `apps/client/src/runtime/bootstrap.ts`, `apps/client/src/runtime/game/Game.ts`, `apps/client/src/runtime/utils/UrlParams.ts`, `apps/client/src/loading-screen/bootstrap.ts`, `apps/client/src/main.ts`, `apps/client/public/skills.md`, `progress.md`.
+- Validation: `pnpm typecheck` and `pnpm build` pass.
 
 ## Next 3 Tasks
-1. Set up Vercel deployment (project link + build settings) for the pnpm workspace client.
-2. Review door placement policy (spawn walls, terminal main-lane zones) against design intent.
-3. Mark map `APPROVED` once blockout geometry satisfies design brief acceptance criteria.
+1. Do a true manual OS-level check (real alt-tab + minimize/restore) to confirm `focused/visibility/backgroundThrottled` transitions in a regular desktop session.
+2. Extend smoke coverage to assert the Agent Mode banner visibility transitions from runtime DOM in headed runs.
+3. Re-run deploy verification so `/skills.md` behavior notes are confirmed on production.
 
 ## Known Issues / Risks
 - `gen:maps` still emits clear-zone anchor warnings for several landmarks/open-node anchors.
-- Automated pointer-lock verification is flaky in Playwright and requires manual browser confirmation.
-- Headless Playwright WebGL context unreliable; headed capture remains the dependable path.
+- Playwright could not reliably force `focused=false`/`visibility=hidden` transitions in this environment; OS-level manual validation is still required.
+- Pointer-lock verification remains partially manual in automation contexts.

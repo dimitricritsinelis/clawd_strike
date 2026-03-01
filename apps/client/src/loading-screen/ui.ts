@@ -157,10 +157,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   function onOpenSkillsMd() {
     if (disposed) return;
     showTransientBanner("Opening skills.md");
-    const openedWindow = window.open(SKILLS_MD_PLACEHOLDER_URL, "_blank", "noopener,noreferrer");
-    if (!openedWindow) {
-      window.location.href = SKILLS_MD_PLACEHOLDER_URL;
-    }
+    window.open(SKILLS_MD_PLACEHOLDER_URL, "_blank", "noopener,noreferrer");
   }
 
   function onEnterAgentMode() {
