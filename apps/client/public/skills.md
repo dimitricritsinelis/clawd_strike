@@ -1,25 +1,31 @@
 # skills.md - Clawd Strike (Deployed-First Agent Playbook)
 
 This file is served by the deployed game at `/skills.md`.
+Canonical deployed host: `https://clawd-strike.vercel.app/` (so this file is `https://clawd-strike.vercel.app/skills.md`).
 Use a deployed instance first. Do not run `pnpm install` or `pnpm dev` in the main workflow.
 
 ## 1) Base URL
 
-Set `BASE_URL` to the same origin that served this file.
+Set `BASE_URL` to the same origin that served this file (production: `https://clawd-strike.vercel.app`).
 
 ```js
 const BASE_URL = window.location.origin; // when reading /skills.md in the browser
 // or:
+const SKILLS_MD_URL = "https://clawd-strike.vercel.app/skills.md";
 const BASE_URL = new URL(SKILLS_MD_URL).origin; // when script knows the /skills.md URL
 ```
 
 ## 2) Required Launch Flow (UI, not URL hacks)
 
 1. Open `BASE_URL`.
-2. Click `Agent Mode` (`[data-testid="agent-mode"]`).
-3. Click `Play` (`[data-testid="play"]`).
-4. Enter agent name (`[data-testid="agent-name"]`) using a user-defined value.
-5. Press `Enter` while focused in the agent-name field.
+2. Click `Agent` (`[data-testid="agent-mode"]`).
+3. Click `Enter agent mode` (`[data-testid="play"]`).
+4. Enter agent name (`[data-testid="agent-name"]`, max 15 chars) using a user-defined value.
+5. Press `Enter` while focused in the agent-name field to start.
+
+Automation can consider the game "runtime-ready" when:
+- `JSON.parse(window.render_game_to_text()).mode === "runtime"`
+- `...map.loaded === true`
 
 Agent Mode facts:
 - Pointer lock is not required.
@@ -29,13 +35,18 @@ Agent Mode facts:
 
 ## 3) Automation Contract
 
-Use these runtime globals:
+Use these runtime globals (available once the gameplay runtime is entered):
 
 ```js
 window.render_game_to_text(); // => string (JSON payload)
 window.advanceTime(ms); // => Promise<void>
 window.agent_apply_action(action); // => void
 ```
+
+Cadence notes:
+- Call `agent_apply_action(...)` at ~10-20Hz.
+- `lookYawDelta` / `lookPitchDelta` are degrees per call (start small: ~1-5).
+- `advanceTime(ms)` fast-forwards simulation time in deterministic 60fps slices. It does not stop real-time stepping, so treat it as optional tooling (not required for normal play loops).
 
 Expected `action` shape:
 
@@ -90,7 +101,7 @@ const bestScore = s.score?.best ?? 0;
 ```js
 import { chromium } from "playwright";
 
-const SKILLS_MD_URL = process.env.SKILLS_MD_URL ?? "https://your-deployed-host/skills.md";
+const SKILLS_MD_URL = process.env.SKILLS_MD_URL ?? "https://clawd-strike.vercel.app/skills.md";
 const BASE_URL = new URL(SKILLS_MD_URL).origin;
 const AGENT_NAME = process.env.AGENT_NAME ?? "AgentOne";
 
@@ -112,13 +123,8 @@ await page.waitForFunction(() => {
   return s.mode === "runtime" && s.map?.loaded === true;
 });
 
-const actionInterval = setInterval(() => {
-  void page.evaluate(() => {
-    window.agent_apply_action({ moveZ: 1, sprint: true, fire: true });
-  });
-}, 100);
-
 let bestSeen = 0;
+let stuckTicks = 0;
 while (true) {
   const s = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
   if (typeof s.score?.current !== "number" || typeof s.score?.best !== "number") {
@@ -134,10 +140,24 @@ while (true) {
     break;
   }
 
-  await page.waitForTimeout(250);
+  const speed = typeof s.gameplay?.speedMps === "number" ? s.gameplay.speedMps : 0;
+  stuckTicks = speed < 0.25 ? stuckTicks + 1 : 0;
+
+  // Simple "realistic enough" roam/shoot policy:
+  // - Sprint forward and fire
+  // - Constant slow scan
+  // - If we seem stuck for ~0.6s, do a bigger turn and strafe to break contact with walls/props
+  const action =
+    stuckTicks >= 6
+      ? { moveX: 1, moveZ: 0.25, lookYawDelta: 35, sprint: true, fire: true }
+      : { moveZ: 1, lookYawDelta: 2, sprint: true, fire: true };
+
+  await page.evaluate((a) => window.agent_apply_action(a), action);
+  await page.waitForTimeout(100);
 }
 
-clearInterval(actionInterval);
+// Optional auto-reset (ONLY if explicitly allowed by the human running this):
+// await page.getByTestId("play-again").click();
 ```
 
 ## Optional Appendix: Local Repo Verification Only
