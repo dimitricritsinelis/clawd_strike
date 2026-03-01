@@ -51,6 +51,14 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
       if (disposed) return;
       selectedMode = mode;
       selectedPlayerName = playerName;
+      const runtimeUrl = new URL(window.location.href);
+      runtimeUrl.searchParams.set("mode", mode);
+      if (playerName.trim().length > 0) {
+        runtimeUrl.searchParams.set("name", playerName.trim());
+      } else {
+        runtimeUrl.searchParams.delete("name");
+      }
+      window.history.replaceState(window.history.state, "", `${runtimeUrl.pathname}${runtimeUrl.search}${runtimeUrl.hash}`);
       if (!loadingAmbient.isMuted()) {
         void loadingAmbient.start();
       }
