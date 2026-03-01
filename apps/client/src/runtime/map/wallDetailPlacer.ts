@@ -237,7 +237,8 @@ function pushBox(
 function resolveSegmentWallHeight(
   baseHeight: number,
   zone: RuntimeBlockoutZone | null,
-  rng: DeterministicRng,
+  _rng: DeterministicRng,
+  isInsideWall: boolean,
 ): number {
   const zoneType = zone?.type ?? "main_lane_segment";
 
@@ -250,21 +251,35 @@ function resolveSegmentWallHeight(
     return 3 * STORY_HEIGHT_M; // exactly 9 m
   }
 
-  // Spawn plazas: fixed 2 stories (6 m) — matches the spec wall_height default.
+  // Spawn plazas raised to match main-lane height so building corners at the
+  // spawn-to-lane transition (Z=14 / Z=68) are fully enclosed at all three stories.
+  // At 6 m the south face of the building block was 3 m shorter than the main-lane
+  // side face, leaving a visible 3rd-floor gap at every spawn-entry corner.
   if (zoneType === "spawn_plaza") {
-    return 2 * STORY_HEIGHT_M; // exactly 6 m
+    return 3 * STORY_HEIGHT_M; // 9 m fixed — matches main-lane height
   }
 
-  // Side halls: randomised 1–2 stories, but the seed is zone-scoped (no segment
-  // index) so every wall of the same side-hall zone gets the same height.
-  // Heights are always an exact story multiple — no jitter — so computeFacadeSpec
-  // returns the correct story count and there is no blank wall strip at the top.
+  // Side halls: inner wall (back of main-lane building) → 9 m to match the building.
+  // Outer wall (perimeter alley side) → 1 story (3 m) for visual balance.
+  // Horizontal end-cap walls always pass isInsideWall=false so they stay short.
   if (zoneType === "side_hall") {
-    const stories = 1 + Math.floor(rng.next() * 2); // 1 or 2 stories
-    return stories * STORY_HEIGHT_M; // exactly 3 m or 6 m
+    return isInsideWall ? 3 * STORY_HEIGHT_M : 1 * STORY_HEIGHT_M;
   }
 
-  return baseHeight; // connectors / cuts → spec default
+  // Cut-passage jamb walls (north/south faces of cut zones) raised to 9 m so the
+  // corner where the cut meets the building wall has no upper-story gap.
+  if (zoneType === "cut") {
+    return 3 * STORY_HEIGHT_M; // 9 m fixed
+  }
+
+  // Connector zones sit at building corners between spawn plazas (9 m) and side-hall
+  // inner walls (9 m). Leaving them at the 6 m spec default creates a visible 3 m
+  // rectangular gap at every corner — raise them to flush 9 m.
+  if (zoneType === "connector") {
+    return 3 * STORY_HEIGHT_M; // 9 m — closes corner gap
+  }
+
+  return baseHeight;
 }
 
 // ── Parapet cap ────────────────────────────────────────────────────────────
@@ -915,9 +930,17 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     // Seed is zone-scoped (no segment index) so every wall segment belonging to
     // the same zone resolves to the same story count — eliminating the corner
     // holes and floating slabs caused by per-segment independent height picks.
+    //
+    // Side-hall inner walls use the same spatial test as shouldSkipDoors():
+    // if sign(centerX − mapCenterX) === sign(inwardX), the inward vector points
+    // away from map centre → this wall faces the building block → inner wall.
+    const isInsideWall = isSideHall
+      && Math.abs(frame.inwardX) > 0.5
+      && Math.sign(frame.centerX - mapCenterX) !== 0
+      && Math.sign(frame.centerX - mapCenterX) === Math.sign(frame.inwardX);
     const heightSeed = deriveSubSeed(seed, `height:${zone?.id ?? "none"}`);
     const heightRng = new DeterministicRng(heightSeed);
-    const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng);
+    const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng, isInsideWall);
     segmentHeights.push(segHeight);
 
     if (instances.length >= maxInstances) {

@@ -19,7 +19,7 @@ export type LoadingScreenUI = {
   };
 };
 
-const SKILLS_MD_PLACEHOLDER_URL = "https://www.moltbook.com/skill.md";
+const SKILLS_MD_PLACEHOLDER_URL = "/skills.md";
 
 function getRequiredEl<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
