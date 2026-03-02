@@ -1,6 +1,7 @@
 const AK47_CLOSE_BASENAME = "/assets/audio/weapons/ak47/fire_close_01";
 const AK47_TAIL_BASENAME = "/assets/audio/weapons/ak47/fire_tail_01";
-const AUDIO_EXTENSIONS = [".ogg", ".mp3", ".wav"] as const;
+// Prefer mp3 first: the deployed site ships mp3, and probing for ogg first creates noisy 404s in the console.
+const AUDIO_EXTENSIONS = [".mp3", ".ogg", ".wav"] as const;
 const FALLBACK_NOISE_SECONDS = 0.22;
 const EVENT_NOISE_POOL_SIZE = 4;
 

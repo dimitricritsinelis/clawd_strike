@@ -3,13 +3,11 @@
 ## Current Status (<=10 lines)
 - Design packet root confirmed: `/Users/dimitri/Desktop/clawd-strike/docs/map-design`.
 - Runtime map is generated from `docs/map-design/specs/map_spec.json` into `apps/client/public/maps/bazaar-map/` via `pnpm --filter @clawd-strike/client gen:maps`.
-- Loading-screen handoff now starts visible-asset warmup immediately (`onLoadingReady`) and reuses warmed assets on transition.
-- Warmup covers first-frame-visible assets: PBR floor texture packs (when `floors=pbr`) and AK viewmodel (when `vm=1`/default).
-- Runtime transition now blocks on warmup completion before gameplay appears, with fail-open warnings on warmup errors.
-- Runtime boot reuses warmed assets, preloads floor maps for selected quality, and performs one pre-RAF render so first visible frame is fully populated.
-- Browser tab title now uses `Clawdstrike` (no space) via client HTML `<title>` tag.
-- Timer HUD is now hard-locked to top-center (`14px`) and no longer shifts for pointer-lock/fullscreen banner heuristics.
-- Deterministic compare-shot pair captured for this prompt under `artifacts/screenshots/2026-03-01-timer-lock-top/`.
+- Loading-screen handoff starts visible-asset warmup immediately and runtime blocks on warmup completion (fail-open warnings on warmup errors).
+- Timer HUD is hard-locked to top-center (`14px`) and no longer shifts for pointer-lock/fullscreen banner heuristics.
+- Agent-mode automation is headless-safe and verified in bundled Chromium: runtime reaches `mode:"runtime"` with `map.loaded===true` even when `render.webgl===false`, and agent APIs continue to work.
+- Death/reset transition is verified: `Play Again` no longer causes `gameOver.visible` flicker during respawn transition.
+- `/skills.md` now provides copy/pasteable UI + autostart flows and a headless-safe Playwright harness (Chrome channel fallback to bundled Chromium).
 - Map approval remains pending traversal/readability signoff.
 
 ## Canonical Playtest URL
@@ -27,22 +25,30 @@ BASE_URL=http://127.0.0.1:5174 AGENT_NAME=SmokeRunner pnpm --filter @clawd-strik
 ```
 
 ## Last Completed Prompt
-- Locked in-game timer position so it no longer moves up/down during runtime.
-- Touched files: `apps/client/src/runtime/ui/TimerHud.ts`.
+- Title: Make Agent Mode headless-safe + update /skills.md playbook
+- Implemented:
+  - `Renderer` now runs with a no-WebGL fallback canvas; render calls no-op and perf counters return zeros when WebGL is unavailable; `hasWebGL` is exposed.
+  - Runtime text state now includes `render.webgl`; death-screen re-show is suppressed during respawn transitions to prevent reset flicker.
+  - Weapon audio extension probing now prefers `.mp3` before `.ogg`.
+  - `apps/client/public/skills.md` includes UI selectors flow, autostart URL flow, headless-safe Playwright harness, readiness detection via `render_game_to_text()`, reset guidance, and `s.render.webgl` note.
+- Touched files: `apps/client/src/runtime/render/Renderer.ts`, `apps/client/src/runtime/bootstrap.ts`, `apps/client/src/runtime/audio/WeaponAudio.ts`, `apps/client/public/skills.md`, `progress.md`.
 - Validation completed: `pnpm typecheck` and `pnpm build` passed.
 - Smoke checks completed:
-  - Restarted `pnpm dev` and opened canonical URL.
-  - Headless canonical runtime probe passed (`timer top` remained `14px` over time, map loaded, no console errors).
+  - `BASE_URL=http://127.0.0.1:5174 AGENT_NAME=SmokeRunner pnpm --filter @clawd-strike/client smoke:agent` passed.
+  - Bundled Chromium headless probe passed in both default and forced no-WebGL (`--disable-gpu --disable-webgl`) runs; runtime remained operational and agent loop APIs worked.
+  - Respawn probe passed (`sawDeath=true`, `clickedPlayAgain=true`, `transitionedAlive=true`, `flickerDetected=false`).
+  - Audio probe in Chrome channel reported zero `.ogg` requests and zero `.ogg` 404s.
 - Screenshots:
-  - `artifacts/screenshots/2026-03-01-timer-lock-top/before.png`
-  - `artifacts/screenshots/2026-03-01-timer-lock-top/after.png`
+  - `artifacts/screenshots/2026-03-02-agent-mode-headless-safe/before.png`
+  - `artifacts/screenshots/2026-03-02-agent-mode-headless-safe/after.png`
 
 ## Next 3 Tasks
-1. Manual desktop pointer-lock pass to confirm timer remains visually fixed during lock/unlock and full-screen transitions.
-2. Add optional debug-only warmup timing telemetry (`warmup ms`, `enter->runtime ms`) for regression tracking without UI changes.
-3. Extend warmup coverage to any additional first-frame props/materials that become visible in approved blockout views.
+1. Add a CI-friendly headless agent smoke script that launches bundled Chromium and asserts `render.webgl` + runtime readiness gates.
+2. Run a manual desktop pointer-lock pass (non-headless) to verify movement/look/collision UX and no console noise during normal human play.
+3. Add a small regression test for death->respawn transitions to guard against future `gameOver.visible` flicker reintroduction.
 
 ## Known Issues / Risks
 - `gen:maps` still emits expected clear-zone anchor warnings for several landmarks/open-node anchors.
 - Automated checks cannot fully validate OS/browser pointer-lock UX; manual verification remains required.
 - Warmup is fail-open by design: if an asset preload fails, runtime continues with warning + fallback behavior.
+- Headless automation may run with `s.render.webgl === false`; screenshot-based checks should prefer headed/system Chrome when visuals matter.

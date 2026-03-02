@@ -116,6 +116,9 @@ export type RuntimeTextState = {
       fovDeg: number;
     } | null;
   };
+  render: {
+    webgl: boolean;
+  };
   view: {
     camera: {
       pos: { x: number; y: number; z: number };
@@ -372,6 +375,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let shotActive = false;
   let shotId: string | null = null;
   let inputFrozen = false;
+  let respawnInProgress = false;
 
   let mapAssets: RuntimeMapAssets | null = null;
   try {
@@ -602,6 +606,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   // Death screen respawn handler — fires on both click and auto-countdown
   // Fade to black → teleport → fade back in for a smooth transition
   deathScreen.onRespawn = () => {
+    respawnInProgress = true;
     fadeOverlay.fadeOut(0.18, () => {
       // Teleport happens while screen is black
       game.respawn();
@@ -610,6 +615,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       if (runtimeParams.controlMode === "human") {
         void renderer.canvas.requestPointerLock();
       }
+      respawnInProgress = false;
       // Brief hold at black, then fade back in
       setTimeout(() => {
         fadeOverlay.fadeIn(0.3);
@@ -761,6 +767,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         id: shotId,
         cameraPose: resolvedShot?.cameraPose ?? null,
       },
+      render: {
+        webgl: renderer.hasWebGL,
+      },
       // Include explicit camera data so screenshot review gates can assert framing consistency.
       // This prevents top-down/floor-only compare-shot regressions from passing unnoticed.
       view: {
@@ -908,7 +917,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     }
 
     // ── Death detection ──────────────────────────────────────────────────────
-    if (game.getIsDead() && !deathScreen.isVisible()) {
+    if (game.getIsDead() && !deathScreen.isVisible() && !respawnInProgress) {
       deathScreen.show({
         playerName: runtimeParams.playerName,
         finalScore: scoreHud.getScore(),
