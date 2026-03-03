@@ -24,12 +24,6 @@ const UV_QUARTER_TURNS: 0 | 1 | 2 | 3 = 0;
 const UV_OFFSET_U = 0;
 const UV_OFFSET_V = 0;
 
-// Width (metres) of the dithering band on each side of a zone boundary.
-// Cells whose centre falls within this distance of a zone edge are stochastically
-// assigned to either the current zone's material or the neighbour's, producing an
-// organic interleave rather than a hard seam.
-const TRANSITION_BAND_M = 1.5;
-
 type MaterialBatch = {
   positions: number[];
   normals: number[];
@@ -84,37 +78,6 @@ const FLOOR_MACRO_SETTINGS: Record<
     frequency: 0.025,
   },
 };
-
-// Returns the smallest included zone containing (x, z), or null if none.
-function findFloorZoneAtPoint(
-  x: number,
-  z: number,
-  zones: ReadonlyArray<{ readonly id: string; readonly rect: RuntimeRect }>,
-): { readonly id: string } | null {
-  let winner: { readonly id: string } | null = null;
-  let winnerArea = Number.POSITIVE_INFINITY;
-  for (const zone of zones) {
-    const r = zone.rect;
-    if (x < r.x || x > r.x + r.w || z < r.y || z > r.y + r.h) continue;
-    const area = r.w * r.h;
-    if (area < winnerArea) {
-      winnerArea = area;
-      winner = zone;
-    }
-  }
-  return winner;
-}
-
-// Fast deterministic hash of a cell coordinate pair + seed → float in [0, 1).
-// Uses a multiply-xorshift mix; no string allocation per cell.
-function cellDitherHash(cellX: number, cellZ: number, seed: number): number {
-  let h = ((seed ^ (cellX * 0x9e3779b9)) >>> 0);
-  h = ((h ^ (cellZ * 0x6b43a9b5)) >>> 0);
-  h = ((h ^ (h >>> 16)) * 0x45d9f3b) >>> 0;
-  h = ((h ^ (h >>> 16)) * 0x45d9f3b) >>> 0;
-  h = (h ^ (h >>> 16)) >>> 0;
-  return h / 0x100000000;
-}
 
 function getBatch(map: Map<FloorMaterialId, MaterialBatch>, materialId: FloorMaterialId): MaterialBatch {
   const existing = map.get(materialId);
@@ -262,12 +225,12 @@ export function buildPbrFloors(spec: RuntimeBlockoutSpec, opts: BuildPbrFloorsOp
   const gridOriginX = spec.playable_boundary.x;
   const gridOriginZ = spec.playable_boundary.y;
 
-  // Pre-filter once; reused by boundary neighbour lookups.
-  const includedZones = spec.zones.filter((z) => INCLUDED_ZONE_TYPES.has(z.type));
+  for (const zone of spec.zones) {
+    if (!INCLUDED_ZONE_TYPES.has(zone.type)) continue;
 
-  for (const zone of includedZones) {
     const materialId = resolveFloorMaterialIdForZone(zone.id);
     const tileSizeM = opts.manifest.getTileSizeM(materialId);
+    const batch = getBatch(batches, materialId);
     const rect = zone.rect;
     const cellXStart = Math.floor((rect.x - gridOriginX) / patchSizeM);
     const cellXEnd = Math.ceil((rect.x + rect.w - gridOriginX) / patchSizeM) - 1;
@@ -285,49 +248,11 @@ export function buildPbrFloors(spec: RuntimeBlockoutSpec, opts: BuildPbrFloorsOp
         const patchRect = intersectRect(rect, cellRect);
         if (!patchRect) continue;
 
-        // ── Boundary dithering ──────────────────────────────────────────────
-        // Distance from cell centre to the nearest edge of this zone's AABB.
-        const cellCenterX = gridOriginX + (cellX + 0.5) * patchSizeM;
-        const cellCenterZ = gridOriginZ + (cellZ + 0.5) * patchSizeM;
-        const distLeft   = cellCenterX - rect.x;
-        const distRight  = (rect.x + rect.w) - cellCenterX;
-        const distTop    = cellCenterZ - rect.y;
-        const distBottom = (rect.y + rect.h) - cellCenterZ;
-        const distToEdge = Math.min(distLeft, distRight, distTop, distBottom);
-
-        let activeMaterialId: FloorMaterialId = materialId;
-        let activeTileSizeM = tileSizeM;
-
-        if (distToEdge < TRANSITION_BAND_M) {
-          // Probe just past the nearest edge to find the neighbouring zone.
-          const probeStep = 0.02;
-          let probeX = cellCenterX;
-          let probeZ = cellCenterZ;
-          if      (distToEdge === distLeft)   probeX = rect.x - probeStep;
-          else if (distToEdge === distRight)  probeX = rect.x + rect.w + probeStep;
-          else if (distToEdge === distTop)    probeZ = rect.y - probeStep;
-          else                                probeZ = rect.y + rect.h + probeStep;
-
-          const neighbor = findFloorZoneAtPoint(probeX, probeZ, includedZones);
-          if (neighbor !== null && neighbor.id !== zone.id) {
-            const neighborMat = resolveFloorMaterialIdForZone(neighbor.id);
-            if (neighborMat !== materialId) {
-              // weight → 0 at zone edge (fully neighbour), 1 at full band (own material).
-              const weight = distToEdge / TRANSITION_BAND_M;
-              if (cellDitherHash(cellX, cellZ, opts.seed) > weight) {
-                activeMaterialId = neighborMat;
-                activeTileSizeM = opts.manifest.getTileSizeM(neighborMat);
-              }
-            }
-          }
-        }
-        // ───────────────────────────────────────────────────────────────────
-
         appendPatchQuad(
-          getBatch(batches, activeMaterialId),
+          batch,
           patchRect,
           opts.floorTopY,
-          activeTileSizeM,
+          tileSizeM,
           UV_QUARTER_TURNS,
           UV_OFFSET_U,
           UV_OFFSET_V,
