@@ -325,6 +325,7 @@ function placePlinthStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const plinthHeight = ctx.rng.range(0.28, 0.48);
   const plinthDepth = clamp(ctx.rng.range(0.06, 0.13), 0.04, ctx.maxProtrusionM + 0.06);
+  if (ctx.isSideHall) return; // side halls: no base trim (RNG consumed above for determinism)
   const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
   if (usableLength < 0.3) return;
   pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
@@ -608,7 +609,7 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
       }
       // even distance (≥ 2) → stays blank
     }
-  } else if (!ctx.isConnector && !ctx.isCut) {
+  } else if (!ctx.isConnector && !ctx.isCut && !ctx.isSideHall) {
     // SECONDARY wall (doorless): sparse windows at every 3rd position from center
     const center = Math.floor(bayCount / 2);
     for (let dist = 3; dist <= center; dist += 3) {
