@@ -1,0 +1,109 @@
+{
+  "materials": [
+    {
+      "id": "ph_sandstone_blocks_04",
+      "tileSizeM": 3,
+      "tintHex": "#f5e0b8",
+      "albedoBoost": 1.40,
+      "roughness": 0.94,
+      "normalScale": 0.75,
+      "aoIntensity": 0.45,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_sandstone_blocks_05",
+      "tileSizeM": 2.5,
+      "tintHex": "#e8d0a0",
+      "albedoBoost": 1.30,
+      "roughness": 0.96,
+      "normalScale": 0.80,
+      "aoIntensity": 0.50,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_exterior_wall_cladding",
+      "tileSizeM": 2,
+      "tintHex": "#d4b888",
+      "albedoBoost": 1.20,
+      "roughness": 0.97,
+      "normalScale": 0.85,
+      "aoIntensity": 0.55,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_worn_brick_wall",
+      "tileSizeM": 2,
+      "tintHex": "#c8a878",
+      "albedoBoost": 1.15,
+      "roughness": 0.98,
+      "normalScale": 0.90,
+      "aoIntensity": 0.60,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_whitewashed_brick",
+      "tileSizeM": 2.5,
+      "tintHex": "#f0ece5",
+      "albedoBoost": 1.55,
+      "roughness": 0.88,
+      "normalScale": 0.55,
+      "aoIntensity": 0.35,
+      "textures": {
+        "1k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_1k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_2k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_2k.jpg"
+        }
+      }
+    }
+  ]
+}
