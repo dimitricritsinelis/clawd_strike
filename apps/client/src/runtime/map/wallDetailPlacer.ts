@@ -21,6 +21,52 @@ const INSTANCE_BUDGET = 9800;
 const STORY_HEIGHT_M = 3.0;
 const WINDOW_GLASS_THICKNESS_M = 0.02;
 
+// ── Standardized trim dimensions by story class ────────────────────────────
+// All trim pieces use fixed canonical sizes per story count rather than per-segment
+// RNG, so buildings of the same height class look consistent across the map.
+// RNG calls are still made (and discarded) in each placement function to preserve
+// the deterministic sequence for downstream window/balcony decisions.
+type TrimDims = {
+  plinthH: number;   plinthD: number;
+  courseH: number;   courseD: number;
+  corniceH: number;  corniceD: number;
+  parapetH: number;  parapetD: number;
+  pierW: number;     pierD: number;
+  pilasterD: number; pilasterW: number;
+};
+
+const TRIM_DIMS: Record<number, TrimDims> = {
+  1: { // 3 m — 1-story
+    plinthH: 0.34,   plinthD: 0.08,
+    courseH: 0.13,   courseD: 0.08,
+    corniceH: 0.22,  corniceD: 0.12,
+    parapetH: 0.22,  parapetD: 0.09,
+    pierW: 0.44,     pierD: 0.07,
+    pilasterD: 0.05, pilasterW: 0.16,
+  },
+  2: { // 6 m — 2-story
+    plinthH: 0.38,   plinthD: 0.09,
+    courseH: 0.13,   courseD: 0.08,
+    corniceH: 0.24,  corniceD: 0.14,
+    parapetH: 0.24,  parapetD: 0.10,
+    pierW: 0.50,     pierD: 0.08,
+    pilasterD: 0.06, pilasterW: 0.17,
+  },
+  3: { // 9 m — 3-story
+    plinthH: 0.40,   plinthD: 0.10,
+    courseH: 0.13,   courseD: 0.09,
+    corniceH: 0.26,  corniceD: 0.15,
+    parapetH: 0.26,  parapetD: 0.10,
+    pierW: 0.56,     pierD: 0.08,
+    pilasterD: 0.06, pilasterW: 0.18,
+  },
+};
+
+function getTrimDims(wallHeightM: number): TrimDims {
+  const stories = Math.max(1, Math.round(wallHeightM / STORY_HEIGHT_M));
+  return TRIM_DIMS[stories] ?? TRIM_DIMS[3]!;
+}
+
 // Roof cap constants
 // 4 m depth ensures a solid-looking roofline without slabs floating above shorter adjacent zones.
 const ROOF_DEPTH_M = 4.0;
@@ -60,7 +106,6 @@ type FacadeSpec = {
   columnRoles: ColumnRole[];
   windowW: number;
   windowH: number;
-  sillOffset: number;
   doorW: number;
   doorH: number;
   recessDepth: number;
@@ -89,6 +134,8 @@ type SegmentDecorContext = {
   rng: DeterministicRng;
   instances: WallDetailInstance[];
   maxInstances: number;
+  cornerAtStart: boolean;
+  cornerAtEnd: boolean;
 };
 
 export type BuildWallDetailProfile = "blockout" | "pbr";
@@ -241,6 +288,7 @@ function resolveSegmentWallHeight(
   zone: RuntimeBlockoutZone | null,
   _rng: DeterministicRng,
   isInsideWall: boolean,
+  isSpawnEntryWall: boolean,
 ): number {
   const zoneType = zone?.type ?? "main_lane_segment";
 
@@ -253,12 +301,13 @@ function resolveSegmentWallHeight(
     return 3 * STORY_HEIGHT_M; // exactly 9 m
   }
 
-  // Spawn plazas raised to match main-lane height so building corners at the
-  // spawn-to-lane transition (Z=14 / Z=68) are fully enclosed at all three stories.
-  // At 6 m the south face of the building block was 3 m shorter than the main-lane
-  // side face, leaving a visible 3rd-floor gap at every spawn-entry corner.
+  // Spawn plazas: the entry wall (bazaar-facing side at Z=14/Z=68) stays 3 stories
+  // to keep the spawn-to-main-lane transition corner fully enclosed.  All other
+  // spawn walls (back wall, side walls) are 2 stories — the outer buildings.
   if (zoneType === "spawn_plaza") {
-    return 3 * STORY_HEIGHT_M; // 9 m fixed — matches main-lane height
+    return isSpawnEntryWall
+      ? 3 * STORY_HEIGHT_M  // entry wall — keeps transition at Z=14/Z=68 seamless
+      : 2 * STORY_HEIGHT_M; // outside wall — 2 stories
   }
 
   // Side halls: inner wall (back of main-lane building) → 9 m to match the building.
@@ -288,12 +337,14 @@ function resolveSegmentWallHeight(
 
 function placeParapetCap(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
-  const capHeight = ctx.rng.range(0.18, 0.35);
-  const capDepth = clamp(ctx.rng.range(0.06, 0.14), 0.04, ctx.maxProtrusionM + 0.06);
-  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 0.5;
+  const dims = getTrimDims(ctx.wallHeightM);
+  ctx.rng.range(0.18, 0.35); // consume
+  ctx.rng.range(0.06, 0.14); // consume
+  const capHeight = dims.parapetH;
+  const capDepth = clamp(dims.parapetD, 0.04, ctx.maxProtrusionM + 0.06);
   const y = ctx.wallHeightM + capHeight * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
-    ctx.frame, 0, y, capDepth * 0.5, capDepth, capHeight, usableLength);
+    ctx.frame, 0, y, capDepth * 0.5, capDepth, capHeight, ctx.frame.lengthM);
 }
 
 // ── Roof cap ───────────────────────────────────────────────────────────────
@@ -323,27 +374,29 @@ function placeRoofCap(ctx: SegmentDecorContext): void {
 
 function placePlinthStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
-  const plinthHeight = ctx.rng.range(0.28, 0.48);
-  const plinthDepth = clamp(ctx.rng.range(0.06, 0.13), 0.04, ctx.maxProtrusionM + 0.06);
+  const dims = getTrimDims(ctx.wallHeightM);
+  ctx.rng.range(0.28, 0.48); // consume
+  ctx.rng.range(0.06, 0.13); // consume
+  const plinthHeight = dims.plinthH;
+  const plinthDepth = clamp(dims.plinthD, 0.04, ctx.maxProtrusionM + 0.06);
   if (ctx.isSideHall) return; // side halls: no base trim (RNG consumed above for determinism)
-  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
-  if (usableLength < 0.3) return;
   pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
     ctx.frame, 0, plinthHeight * 0.5, plinthDepth * 0.5,
-    plinthDepth, plinthHeight, usableLength);
+    plinthDepth, plinthHeight, ctx.frame.lengthM);
 }
 
 function placeStringCourses(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.5) return;
-  const courseHeight = ctx.rng.range(0.10, 0.18);
-  const courseDepth = clamp(ctx.rng.range(0.06, 0.11), 0.04, ctx.maxProtrusionM + 0.04);
-  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
-  if (usableLength < 0.5) return;
+  const dims = getTrimDims(ctx.wallHeightM);
+  ctx.rng.range(0.10, 0.18); // consume
+  ctx.rng.range(0.06, 0.11); // consume
+  const courseHeight = dims.courseH;
+  const courseDepth = clamp(dims.courseD, 0.04, ctx.maxProtrusionM + 0.04);
 
   for (let storyY = STORY_HEIGHT_M; storyY < ctx.wallHeightM - 0.5; storyY += STORY_HEIGHT_M) {
     if (!pushBox(ctx.instances, ctx.maxInstances, "string_course_strip", ctx.wallMaterialId,
       ctx.frame, 0, storyY, courseDepth * 0.5,
-      courseDepth, courseHeight, usableLength)) {
+      courseDepth, courseHeight, ctx.frame.lengthM)) {
       return;
     }
   }
@@ -351,14 +404,15 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
 
 function placeCorniceStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
-  const corniceHeight = ctx.rng.range(0.18, 0.30);
-  const corniceDepth = clamp(ctx.rng.range(0.10, 0.19), 0.06, ctx.maxProtrusionM + 0.08);
-  const usableLength = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
-  if (usableLength < 0.5) return;
+  const dims = getTrimDims(ctx.wallHeightM);
+  ctx.rng.range(0.18, 0.30); // consume
+  ctx.rng.range(0.10, 0.19); // consume
+  const corniceHeight = dims.corniceH;
+  const corniceDepth = clamp(dims.corniceD, 0.06, ctx.maxProtrusionM + 0.08);
   const y = ctx.wallHeightM - corniceHeight * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
     ctx.frame, 0, y, corniceDepth * 0.5,
-    corniceDepth, corniceHeight, usableLength);
+    corniceDepth, corniceHeight, ctx.frame.lengthM);
 }
 
 // ── Corner piers ───────────────────────────────────────────────────────────
@@ -366,45 +420,43 @@ function placeCorniceStrip(ctx: SegmentDecorContext): void {
 function placeCornerPiers(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 0.8) return;
 
+  const dims = getTrimDims(ctx.wallHeightM);
   const marginM = ctx.profile === "pbr" ? 0.04 : 0.02;
   const maxWidth = Math.max(0.28, Math.min(1.05, ctx.frame.lengthM * 0.4));
-  const baseWidth = ctx.profile === "pbr"
-    ? ctx.rng.range(0.4, 0.72)
-    : ctx.rng.range(0.42, 0.78);
-  const pierWidth = clamp(baseWidth, 0.3, maxWidth);
-  const baseDepth = ctx.profile === "pbr"
-    ? ctx.rng.range(0.05, 0.1)
-    : ctx.rng.range(0.08, 0.14);
-  const pierDepth = clamp(baseDepth, 0.05, ctx.maxProtrusionM);
-  const heightBias = ctx.isMainLane ? 0.15 : 0;
-  const pierHeight = clamp(ctx.wallHeightM - ctx.rng.range(0.35 - heightBias, 0.75), 3, ctx.wallHeightM);
+  // Consume RNG calls that were previously used for random dims (preserves sequence).
+  ctx.rng.range(0.4, 0.72);   // was baseWidth
+  ctx.rng.range(0.05, 0.1);   // was baseDepth
+  ctx.rng.range(0.35, 0.75);  // was pierHeight offset
+  const pierWidth = clamp(dims.pierW, 0.3, maxWidth);
+  const pierDepth = clamp(dims.pierD, 0.05, ctx.maxProtrusionM);
+  const pierHeight = ctx.wallHeightM; // full height — contiguous with roofline
   const halfLen = ctx.frame.lengthM * 0.5;
 
+  // At corners the pier depth must cover all strip protrusions so it
+  // visually bridges the perpendicular wall faces.
+  const cornerDepth = Math.max(pierDepth, dims.plinthD, dims.courseD, dims.corniceD, dims.parapetD);
+
   for (const side of [-1, 1] as const) {
-    const s = side * Math.max(0.02, halfLen - pierWidth * 0.5 - marginM);
+    const isCorner = (side === -1 && ctx.cornerAtStart) || (side === 1 && ctx.cornerAtEnd);
+    const effectiveMargin = isCorner ? 0 : marginM;
+    const effectiveDepth = isCorner ? cornerDepth : pierDepth;
+    const s = side * Math.max(0.02, halfLen - pierWidth * 0.5 - effectiveMargin);
     if (!pushBox(
       ctx.instances, ctx.maxInstances, "corner_pier", ctx.wallMaterialId,
-      ctx.frame, s, pierHeight * 0.5, pierDepth * 0.5,
-      pierDepth, pierHeight, pierWidth,
+      ctx.frame, s, pierHeight * 0.5, effectiveDepth * 0.5,
+      effectiveDepth, pierHeight, pierWidth,
     )) {
       return;
     }
 
+    // Consume cap RNG to preserve downstream determinism — no cap geometry emitted.
     const capChance = clamp(
       0.22 + (ctx.isShopfrontZone ? 0.08 : 0) - (ctx.isSideHall ? 0.08 : 0) + ctx.density * 0.04,
       0.08, 0.45,
     );
     if (ctx.rng.next() < capChance) {
-      const capDepth = clamp(pierDepth * 0.7, 0.04, ctx.maxProtrusionM);
-      const capHeight = clamp(ctx.rng.range(0.55, 1.05), 0.45, pierHeight * 0.42);
-      const capWidth = clamp(pierWidth * ctx.rng.range(0.4, 0.62), 0.18, pierWidth);
-      if (!pushBox(
-        ctx.instances, ctx.maxInstances, "corner_pier", ctx.wallMaterialId,
-        ctx.frame, s, pierHeight - capHeight * 0.5, capDepth * 0.5,
-        capDepth, capHeight, capWidth,
-      )) {
-        return;
-      }
+      ctx.rng.range(0.55, 1.05); // consume — was capHeight
+      ctx.rng.range(0.4, 0.62);  // consume — was capWidthFrac
     }
   }
 }
@@ -569,7 +621,7 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
   // Uniform opening dimensions for the entire facade
   const windowW = clamp(bayWidth * ctx.rng.range(0.35, 0.50), 0.55, bayWidth * 0.62);
   const windowH = ctx.rng.range(1.05, 1.35);
-  const sillOffset = ctx.rng.range(0.85, 1.05);
+  ctx.rng.range(0.85, 1.05); // consume — sill now computed from trim centering
   const doorW = clamp(bayWidth * ctx.rng.range(0.45, 0.60), 0.75, bayWidth * 0.72);
   const doorH = ctx.rng.range(2.35, 2.65);
   const recessDepth = ctx.rng.range(0.07, 0.12);
@@ -610,9 +662,9 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
       // even distance (≥ 2) → stays blank
     }
   } else if (!ctx.isConnector && !ctx.isCut && !ctx.isSideHall) {
-    // SECONDARY wall (doorless): sparse windows at every 3rd position from center
+    // SECONDARY wall (doorless): windows at every other bay from center
     const center = Math.floor(bayCount / 2);
-    for (let dist = 3; dist <= center; dist += 3) {
+    for (let dist = 1; dist <= center; dist += 2) {
       if (center - dist >= 0) columnRoles[center - dist] = "window";
       if (center + dist < bayCount) columnRoles[center + dist] = "window";
     }
@@ -621,7 +673,7 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
 
   return {
     bayCount, bayWidth, usableLength, stories, columnRoles,
-    windowW, windowH, sillOffset, doorW, doorH,
+    windowW, windowH, doorW, doorH,
     recessDepth, frameThickness, frameDepth, jambDepth,
   };
 }
@@ -637,10 +689,9 @@ function columnCenterS(spec: FacadeSpec, columnIndex: number): number {
 function placeWindowOpening(
   ctx: SegmentDecorContext,
   centerS: number,
-  storyBaseY: number,
+  sillY: number,
   spec: FacadeSpec,
 ): void {
-  const sillY = storyBaseY + spec.sillOffset;
   const centerY = sillY + spec.windowH * 0.5;
 
   // 1. Dark void — flush with wall surface (tiny offset prevents z-fighting)
@@ -783,8 +834,11 @@ function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
   if (spec.bayCount < 2) return;
   if (ctx.frame.lengthM < 3.0) return;
 
-  const pilasterDepth = clamp(ctx.rng.range(0.04, 0.09), 0.03, ctx.maxProtrusionM + 0.02);
-  const pilasterWidth = ctx.rng.range(0.14, 0.24);
+  const dims = getTrimDims(ctx.wallHeightM);
+  ctx.rng.range(0.04, 0.09); // consume
+  ctx.rng.range(0.14, 0.24); // consume
+  const pilasterDepth = clamp(dims.pilasterD, 0.03, ctx.maxProtrusionM + 0.02);
+  const pilasterWidth = dims.pilasterW;
   const pilasterHeight = ctx.wallHeightM;
 
   // Place between bay columns — aligned to the same grid as openings
@@ -904,6 +958,7 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   }
 
   // Walk columns × stories with vertical coherence
+  const trimDims = getTrimDims(ctx.wallHeightM);
   for (let col = 0; col < spec.bayCount; col += 1) {
     const role = spec.columnRoles[col]!;
     const centerS = columnCenterS(spec, col);
@@ -924,7 +979,15 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       } else if (role === "window" && !DISABLE_WINDOWS) {
         // Window column → skip if the adjacent balcony slab covers this slot
         if (!balconyCoveredWindows.has(`${col}:${story}`)) {
-          placeWindowOpening(ctx, centerS, storyBaseY, spec);
+          // Center window vertically between the horizontal trim below and above.
+          const belowTop = story === 0
+            ? (ctx.isSideHall ? 0 : trimDims.plinthH)
+            : storyBaseY + trimDims.courseH * 0.5;
+          const aboveBot = story === spec.stories - 1
+            ? ctx.wallHeightM - trimDims.corniceH
+            : (story + 1) * STORY_HEIGHT_M - trimDims.courseH * 0.5;
+          const sillY = (belowTop + aboveBot) * 0.5 - spec.windowH * 0.5;
+          placeWindowOpening(ctx, centerS, sillY, spec);
         }
         // covered: slab overhead — render blank (no glass poking through floor)
       }
@@ -974,6 +1037,34 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     ? mainLaneZones.reduce((s, z) => s + z.rect.y + z.rect.h * 0.5, 0) / mainLaneZones.length
     : fallbackZ;
 
+  // Build corner set: endpoints where perpendicular segments meet.
+  const cornerKeys = new Set<string>();
+  {
+    const toKey = (x: number, z: number) => `${x.toFixed(3)}:${z.toFixed(3)}`;
+    type Bucket = { hasV: boolean; hasH: boolean };
+    const bkts = new Map<string, Bucket>();
+    const getBkt = (x: number, z: number): Bucket => {
+      const k = toKey(x, z);
+      let b = bkts.get(k);
+      if (!b) { b = { hasV: false, hasH: false }; bkts.set(k, b); }
+      return b;
+    };
+    for (const seg of options.segments) {
+      if (seg.end - seg.start <= 1e-4) continue;
+      if (seg.orientation === "vertical") {
+        getBkt(seg.coord, seg.start).hasV = true;
+        getBkt(seg.coord, seg.end).hasV = true;
+      } else {
+        getBkt(seg.start, seg.coord).hasH = true;
+        getBkt(seg.end, seg.coord).hasH = true;
+      }
+    }
+    for (const [key, b] of bkts) {
+      if (b.hasV && b.hasH) cornerKeys.add(key);
+    }
+  }
+  const toCornerKey = (x: number, z: number) => `${x.toFixed(3)}:${z.toFixed(3)}`;
+
   const rootRng = new DeterministicRng(seed);
   let segmentsDecorated = 0;
 
@@ -1000,9 +1091,16 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       && Math.abs(frame.inwardX) > 0.5
       && Math.sign(frame.centerX - mapCenterX) !== 0
       && Math.sign(frame.centerX - mapCenterX) === Math.sign(frame.inwardX);
+    // Spawn entry wall: the one face of the spawn plaza that looks toward the bazaar.
+    // Detection: wall centerZ is between the spawn's own Z-center and mapCenterZ.
+    let isSpawnEntryWall = false;
+    if (zone?.type === "spawn_plaza") {
+      const spawnCenterZ = zone.rect.y + zone.rect.h / 2;
+      isSpawnEntryWall = (frame.centerZ - spawnCenterZ) * (mapCenterZ - spawnCenterZ) > 0;
+    }
     const heightSeed = deriveSubSeed(seed, `height:${zone?.id ?? "none"}`);
     const heightRng = new DeterministicRng(heightSeed);
-    const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng, isInsideWall);
+    const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng, isInsideWall, isSpawnEntryWall);
     segmentHeights.push(segHeight);
 
     if (instances.length >= maxInstances) {
@@ -1023,6 +1121,17 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     const segSeed = deriveSubSeed(seed, `segment:${index}:${zone?.id ?? "none"}`);
     const segRng = rootRng.fork(String(segSeed));
 
+    // Determine which endpoints are 90° corners (perpendicular segment meets).
+    let cornerAtStart: boolean;
+    let cornerAtEnd: boolean;
+    if (segment.orientation === "vertical") {
+      cornerAtStart = cornerKeys.has(toCornerKey(segment.coord, segment.start));
+      cornerAtEnd   = cornerKeys.has(toCornerKey(segment.coord, segment.end));
+    } else {
+      cornerAtStart = cornerKeys.has(toCornerKey(segment.start, segment.coord));
+      cornerAtEnd   = cornerKeys.has(toCornerKey(segment.end, segment.coord));
+    }
+
     const countBefore = instances.length;
     decorateSegment({
       frame,
@@ -1042,6 +1151,8 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       rng: segRng,
       instances,
       maxInstances,
+      cornerAtStart,
+      cornerAtEnd,
     });
     if (instances.length > countBefore) {
       segmentsDecorated += 1;

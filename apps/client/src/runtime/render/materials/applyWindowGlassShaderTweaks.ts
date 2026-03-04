@@ -21,11 +21,18 @@ varying vec3 vGlassWorldNormal;`,
     );
   }
 
-  if (!shader.vertexShader.includes("vGlassWorldPos = worldPosition.xyz;")) {
+  if (!shader.vertexShader.includes("vGlassWorldPos = glassWp.xyz;")) {
     shader.vertexShader = shader.vertexShader.replace(
       "#include <worldpos_vertex>",
       `#include <worldpos_vertex>
-vGlassWorldPos = worldPosition.xyz;
+{
+  vec4 glassWp = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    glassWp = instanceMatrix * glassWp;
+  #endif
+  glassWp = modelMatrix * glassWp;
+  vGlassWorldPos = glassWp.xyz;
+}
 vec3 glassObjectNormal = normal;
 #ifdef USE_BATCHING
 glassObjectNormal = mat3( batchingMatrix ) * glassObjectNormal;

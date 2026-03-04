@@ -390,8 +390,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const renderer = new Renderer(runtimeRoot, {
     highVis: runtimeParams.highVis,
     lightingPreset: runtimeParams.lightingPreset,
+    ao: runtimeParams.ao,
   });
   let disposed = false;
+  let shadowWarmupFrames = 0;
   const weaponAudio = new WeaponAudio();
   const viewModelEnabled = runtimeParams.vm;
   let viewModel: ViewModelInstance | null = warmupAssets?.viewModel ?? null;
@@ -626,7 +628,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   if (mapAssets) {
     game.setBlockoutSpec(mapAssets.blockout);
     game.setAnchorsSpec(mapAssets.anchors);
-    renderer.requestShadowUpdate();
+    shadowWarmupFrames = 3;
   }
   if (resolvedShot?.cameraPose) {
     game.setCameraPose(resolvedShot.cameraPose);
@@ -638,6 +640,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   // Let any async map assignments resolve before we draw the first visible gameplay frame.
   await Promise.resolve();
+  renderer.requestShadowUpdate();
+
+  // Bake procedural Sky into a static cubemap (one-time cost; eliminates per-frame sky shader).
+  const webgl = renderer.getWebGLRenderer();
+  if (webgl) game.bakeEnvironment(webgl);
 
   const overviewCameraAtBoot = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
   viewModelVisible = Boolean(viewModelEnabled && viewModel && !overviewCameraAtBoot);
@@ -969,6 +976,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       game.setWeaponDebugSnapshot(weaponDebug.loaded, weaponDebug.dot, weaponDebug.angleDeg);
     } else {
       game.setWeaponDebugSnapshot(false, -1, 180);
+    }
+
+    if (shadowWarmupFrames > 0) {
+      renderer.requestShadowUpdate();
+      shadowWarmupFrames -= 1;
     }
 
     renderer.renderWithViewModel(

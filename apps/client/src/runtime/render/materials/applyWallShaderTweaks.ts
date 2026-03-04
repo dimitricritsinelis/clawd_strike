@@ -43,7 +43,14 @@ uniform vec2 uWallUvOffset;`,
     shader.vertexShader = shader.vertexShader.replace(
       "#include <worldpos_vertex>",
       `#include <worldpos_vertex>
-vWallWorldPos = worldPosition.xyz;
+{
+  vec4 wallWp = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    wallWp = instanceMatrix * wallWp;
+  #endif
+  wallWp = modelMatrix * wallWp;
+  vWallWorldPos = wallWp.xyz;
+}
 vec3 wallObjectNormal = normal;
 #ifdef USE_INSTANCING
 wallObjectNormal = mat3(instanceMatrix) * wallObjectNormal;

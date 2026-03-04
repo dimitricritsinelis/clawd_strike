@@ -1,4 +1,5 @@
-import { AmbientLight, Color, DirectionalLight, FogExp2, HemisphereLight, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
+import { AmbientLight, Color, DirectionalLight, FogExp2, HemisphereLight, MathUtils, Object3D, PMREMGenerator, PerspectiveCamera, Scene, Vector3, type WebGLRenderer } from "three";
+import { Sky } from "three/examples/jsm/objects/Sky.js";
 import { AnchorsDebug, type AnchorsDebugState } from "../debug/AnchorsDebug";
 import { Hud } from "../debug/Hud";
 import { EnemyManager, type EnemyHitResult } from "../enemies/EnemyManager";
@@ -110,6 +111,7 @@ export class Game {
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
 
+  private pendingSky: Sky | null = null;
   private controlMode: RuntimeControlMode = "human";
   private readonly pressedKeys = new Set<string>();
   private readonly lookDirection = new Vector3();
@@ -747,32 +749,94 @@ export class Game {
       return;
     }
 
-    this.scene.background = new Color(0xF9E6C4);
-    this.scene.fog = new FogExp2(0xF9E6C4, 0.009);
+    // ── Desert lighting rig (Dust2-style) ──────────────────────────────
+    // Tuning constants kept here for easy adjustment.
+    const FOG_COLOR = 0xEADBC8;       // warm dust
+    const AMBIENT_COLOR = 0xFFEFD4;
+    const AMBIENT_INTENSITY = 0.15;   // low fill → shadows read clearly
+    const HEMI_SKY = 0xCFE3FF;        // cool pale blue
+    const HEMI_GROUND = 0xD7B07A;     // sand bounce
+    const HEMI_INTENSITY = 0.45;
+    const SUN_COLOR = 0xFFD2A1;
+    const SUN_INTENSITY = 2.0;
+    const SUN_POS: [number, number, number] = [-110, 75, -40];
+    const SUN_TARGET: [number, number, number] = [25, 0, 41];
+    const SHADOW_MAP_SIZE = 2048;
+    const SHADOW_BIAS = -0.0002;
+    const SHADOW_NORMAL_BIAS = 0.03;
+    const SHADOW_BOUNDS = 50;         // ±50 ortho frustum (covers 50×82m playable area)
+    const SHADOW_RADIUS = 1;
+    const FILL_COLOR = 0xBFD9FF;      // cool blue counter-fill
+    const FILL_INTENSITY = 0.18;
+    const FILL_POS: [number, number, number] = [90, 35, 70];
+    const FOG_DENSITY = 0.005;
 
-    const ambient = new AmbientLight(0xFFEFD4, 0.52);
-    const hemi = new HemisphereLight(0xFFEBCB, 0xE2B684, 1.0);
+    this.scene.fog = new FogExp2(FOG_COLOR, FOG_DENSITY);
+
+    const ambient = new AmbientLight(AMBIENT_COLOR, AMBIENT_INTENSITY);
+    const hemi = new HemisphereLight(HEMI_SKY, HEMI_GROUND, HEMI_INTENSITY);
     hemi.position.set(0, 50, 0);
 
-    const sun = new DirectionalLight(0xFFD39C, 1.42);
-    sun.position.set(-32, 88, -10);
+    const sun = new DirectionalLight(SUN_COLOR, SUN_INTENSITY);
+    sun.position.set(...SUN_POS);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 200;
-    sun.shadow.camera.left = -70;
-    sun.shadow.camera.right = 70;
-    sun.shadow.camera.top = 70;
-    sun.shadow.camera.bottom = -70;
-    sun.shadow.bias = -0.00015;
-    sun.shadow.normalBias = 0.02;
-    sun.target.position.set(25, 0, 41);
+    sun.shadow.camera.left = -SHADOW_BOUNDS;
+    sun.shadow.camera.right = SHADOW_BOUNDS;
+    sun.shadow.camera.top = SHADOW_BOUNDS;
+    sun.shadow.camera.bottom = -SHADOW_BOUNDS;
+    sun.shadow.bias = SHADOW_BIAS;
+    sun.shadow.normalBias = SHADOW_NORMAL_BIAS;
+    sun.shadow.radius = SHADOW_RADIUS;
+    sun.target.position.set(...SUN_TARGET);
 
-    const fill = new DirectionalLight(0xFFD7A3, 0.52);
-    fill.position.set(54, 38, 28);
+    const fill = new DirectionalLight(FILL_COLOR, FILL_INTENSITY);
+    fill.position.set(...FILL_POS);
     fill.castShadow = false;
 
+    // ── Procedural desert sky ─────────────────────────────────────────
+    const SKY_TURBIDITY = 10;           // desert haze
+    const SKY_RAYLEIGH = 1.0;           // retain some blue at zenith
+    const SKY_MIE_COEFFICIENT = 0.005;
+    const SKY_MIE_DIRECTIONAL_G = 0.85;
+    const SUN_ELEVATION_DEG = 35;       // sun height above horizon
+    const SUN_AZIMUTH_DEG = 120;        // compass bearing
+
+    const sky = new Sky();
+    sky.scale.setScalar(450000);
+    const skyUniforms = sky.material.uniforms;
+    skyUniforms["turbidity"]!.value = SKY_TURBIDITY;
+    skyUniforms["rayleigh"]!.value = SKY_RAYLEIGH;
+    skyUniforms["mieCoefficient"]!.value = SKY_MIE_COEFFICIENT;
+    skyUniforms["mieDirectionalG"]!.value = SKY_MIE_DIRECTIONAL_G;
+
+    const sunDirection = new Vector3();
+    const phi = MathUtils.degToRad(90 - SUN_ELEVATION_DEG);
+    const theta = MathUtils.degToRad(SUN_AZIMUTH_DEG);
+    sunDirection.setFromSphericalCoords(1, phi, theta);
+    skyUniforms["sunPosition"]!.value.copy(sunDirection);
+
     this.scene.add(ambient, hemi, sun, sun.target, fill);
+    this.pendingSky = sky;
+  }
+
+  /** Bake the procedural Sky into a static PMREM cubemap and set as scene background/environment. */
+  bakeEnvironment(renderer: WebGLRenderer): void {
+    const sky = this.pendingSky;
+    if (!sky) return;
+    this.pendingSky = null;
+
+    const pmrem = new PMREMGenerator(renderer);
+    const tempScene = new Scene();
+    tempScene.add(sky);
+    const envTexture = pmrem.fromScene(tempScene, 0, 0.1, 1000);
+    this.scene.background = envTexture.texture;
+
+    sky.geometry.dispose();
+    sky.material.dispose();
+    pmrem.dispose();
   }
 
   private setupInitialView(): void {

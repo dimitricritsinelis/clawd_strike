@@ -96,18 +96,35 @@ function appendSegmentFace(
     appendVertex(batch, segment.start, y1, z, 0, 0, normalZ, u0, v1);
   }
 
-  batch.indices.push(
-    baseIndex,
-    baseIndex + 2,
-    baseIndex + 1,
-    baseIndex,
-    baseIndex + 3,
-    baseIndex + 2,
-  );
+  // Geometric (winding-derived) normal sign = sign(end − start).
+  // Shading normal sign = −outward.
+  // When they disagree the face is back-facing and Three.js culls it.
+  const product = (segment.end - segment.start) * segment.outward;
+  const needsFlip = segment.orientation === "vertical" ? product > 0 : product < 0;
+
+  if (needsFlip) {
+    batch.indices.push(
+      baseIndex,
+      baseIndex + 1,
+      baseIndex + 2,
+      baseIndex,
+      baseIndex + 2,
+      baseIndex + 3,
+    );
+  } else {
+    batch.indices.push(
+      baseIndex,
+      baseIndex + 2,
+      baseIndex + 1,
+      baseIndex,
+      baseIndex + 3,
+      baseIndex + 2,
+    );
+  }
   batch.vertexCount += 4;
 }
 
-type SegmentFrame = {
+export type SegmentFrame = {
   centerX: number;
   centerZ: number;
   inwardX: number;
@@ -119,7 +136,7 @@ function pointInRect2D(zone: RuntimeBlockoutZone, x: number, z: number): boolean
   return x >= rect.x && x <= rect.x + rect.w && z >= rect.y && z <= rect.y + rect.h;
 }
 
-function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
+export function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
   if (segment.orientation === "vertical") {
     return {
       centerX: segment.coord,
@@ -137,7 +154,7 @@ function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
   };
 }
 
-function resolveSegmentZone(frame: SegmentFrame, zones: readonly RuntimeBlockoutZone[]): RuntimeBlockoutZone | null {
+export function resolveSegmentZone(frame: SegmentFrame, zones: readonly RuntimeBlockoutZone[]): RuntimeBlockoutZone | null {
   const probeX = frame.centerX + frame.inwardX * 0.1;
   const probeZ = frame.centerZ + frame.inwardZ * 0.1;
   let winner: RuntimeBlockoutZone | null = null;
