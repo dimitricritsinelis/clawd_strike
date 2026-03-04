@@ -1,5 +1,5 @@
-import { AmbientLight, Color, DirectionalLight, FogExp2, HemisphereLight, MathUtils, Object3D, PMREMGenerator, PerspectiveCamera, Scene, Vector3, type WebGLRenderer } from "three";
-import { Sky } from "three/examples/jsm/objects/Sky.js";
+import { AmbientLight, Color, DirectionalLight, FogExp2, HemisphereLight, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
+import { installDesertSky, type DesertSkyHandle } from "../render/DesertSky";
 import { AnchorsDebug, type AnchorsDebugState } from "../debug/AnchorsDebug";
 import { Hud } from "../debug/Hud";
 import { EnemyManager, type EnemyHitResult } from "../enemies/EnemyManager";
@@ -111,7 +111,7 @@ export class Game {
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
 
-  private pendingSky: Sky | null = null;
+  private desertSky: DesertSkyHandle | null = null;
   private controlMode: RuntimeControlMode = "human";
   private readonly pressedKeys = new Set<string>();
   private readonly lookDirection = new Vector3();
@@ -448,6 +448,7 @@ export class Game {
       }
       this.wasGrounded = nowGrounded;
       this.updateCameraFromPlayer();
+      this.desertSky?.update();
 
       this.camera.getWorldDirection(this.cameraForward);
       const fireResult = this.weapon.update(
@@ -564,6 +565,8 @@ export class Game {
     }
     this.enemyManager?.dispose(this.scene);
     this.enemyManager = null;
+    this.desertSky?.dispose();
+    this.desertSky = null;
     this.clearBlockout();
     this.clearProps();
   }
@@ -796,47 +799,16 @@ export class Game {
     fill.position.set(...FILL_POS);
     fill.castShadow = false;
 
-    // ── Procedural desert sky ─────────────────────────────────────────
-    const SKY_TURBIDITY = 10;           // desert haze
-    const SKY_RAYLEIGH = 1.0;           // retain some blue at zenith
-    const SKY_MIE_COEFFICIENT = 0.005;
-    const SKY_MIE_DIRECTIONAL_G = 0.85;
-    const SUN_ELEVATION_DEG = 35;       // sun height above horizon
-    const SUN_AZIMUTH_DEG = 120;        // compass bearing
-
-    const sky = new Sky();
-    sky.scale.setScalar(450000);
-    const skyUniforms = sky.material.uniforms;
-    skyUniforms["turbidity"]!.value = SKY_TURBIDITY;
-    skyUniforms["rayleigh"]!.value = SKY_RAYLEIGH;
-    skyUniforms["mieCoefficient"]!.value = SKY_MIE_COEFFICIENT;
-    skyUniforms["mieDirectionalG"]!.value = SKY_MIE_DIRECTIONAL_G;
-
-    const sunDirection = new Vector3();
-    const phi = MathUtils.degToRad(90 - SUN_ELEVATION_DEG);
-    const theta = MathUtils.degToRad(SUN_AZIMUTH_DEG);
-    sunDirection.setFromSphericalCoords(1, phi, theta);
-    skyUniforms["sunPosition"]!.value.copy(sunDirection);
-
     this.scene.add(ambient, hemi, sun, sun.target, fill);
-    this.pendingSky = sky;
-  }
 
-  /** Bake the procedural Sky into a static PMREM cubemap and set as scene background/environment. */
-  bakeEnvironment(renderer: WebGLRenderer): void {
-    const sky = this.pendingSky;
-    if (!sky) return;
-    this.pendingSky = null;
-
-    const pmrem = new PMREMGenerator(renderer);
-    const tempScene = new Scene();
-    tempScene.add(sky);
-    const envTexture = pmrem.fromScene(tempScene, 0, 0.1, 1000);
-    this.scene.background = envTexture.texture;
-
-    sky.geometry.dispose();
-    sky.material.dispose();
-    pmrem.dispose();
+    // Live procedural desert skydome (scaled within camera.far, follows camera each frame)
+    this.scene.background = null; // skydome IS the background; clearColor serves as fallback
+    this.desertSky = installDesertSky({
+      scene: this.scene,
+      camera: this.camera,
+      sunLight: sun,
+      preset: "late-afternoon",
+    });
   }
 
   private setupInitialView(): void {

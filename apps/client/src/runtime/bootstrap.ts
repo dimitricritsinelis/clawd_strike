@@ -642,10 +642,6 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   await Promise.resolve();
   renderer.requestShadowUpdate();
 
-  // Bake procedural Sky into a static cubemap (one-time cost; eliminates per-frame sky shader).
-  const webgl = renderer.getWebGLRenderer();
-  if (webgl) game.bakeEnvironment(webgl);
-
   const overviewCameraAtBoot = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
   viewModelVisible = Boolean(viewModelEnabled && viewModel && !overviewCameraAtBoot);
   crosshair.style.display = overviewCameraAtBoot ? "none" : "block";
