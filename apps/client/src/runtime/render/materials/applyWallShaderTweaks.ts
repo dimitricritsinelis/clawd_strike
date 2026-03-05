@@ -184,7 +184,7 @@ uniform float uWallAlbedoBoost;${macroHeader}${worldPosVarying}${dirtHeader}`,
       );
     }
 
-    if (!shader.fragmentShader.includes("diffuseColor.rgb = clamp(diffuseColor.rgb * uWallAlbedoBoost")) {
+    if (!shader.fragmentShader.includes("// wall-soft-boost-applied")) {
       const dirtColorSnippet = dirtEnabled
         ? `
 float wallDirtDist = clamp((vWallWorldPos.y - uWallFloorTopY) / uWallDirtHeightM, 0.0, 1.0);
@@ -193,15 +193,25 @@ wallDirtFactor = wallDirtFactor * wallDirtFactor;
 diffuseColor.rgb *= 1.0 - wallDirtFactor * uWallDirtDarken;`
         : "";
 
+      // Soft-saturation boost: f(x,b) = (x*b) / (1 + (b-1)*x)
+      // Preserves micro-contrast instead of hard-clamping at 1.0
       const mapPatch = macroEnabled
         ? `#include <map_fragment>
+// wall-soft-boost-applied
 vec2 wallMacroUv = vec2(vWallWorldPos.x + vWallWorldPos.z, vWallWorldPos.y);
 float wallMacro = wallMacroNoise(wallMacroUv);
 float wallMacroCentered = (wallMacro - 0.5) * 2.0;
 float wallMacroColor = 1.0 + wallMacroCentered * uWallMacroColorAmplitude;
-diffuseColor.rgb = clamp(diffuseColor.rgb * uWallAlbedoBoost * wallMacroColor, 0.0, 1.0);${dirtColorSnippet}`
+{
+  float wallBoostF = uWallAlbedoBoost * wallMacroColor;
+  diffuseColor.rgb = (diffuseColor.rgb * wallBoostF) / (1.0 + (wallBoostF - 1.0) * diffuseColor.rgb);
+}${dirtColorSnippet}`
         : `#include <map_fragment>
-diffuseColor.rgb = clamp(diffuseColor.rgb * uWallAlbedoBoost, 0.0, 1.0);${dirtColorSnippet}`;
+// wall-soft-boost-applied
+{
+  float wallBoostF = uWallAlbedoBoost;
+  diffuseColor.rgb = (diffuseColor.rgb * wallBoostF) / (1.0 + (wallBoostF - 1.0) * diffuseColor.rgb);
+}${dirtColorSnippet}`;
       shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>", mapPatch);
     }
 

@@ -756,21 +756,21 @@ export class Game {
     // Tuning constants kept here for easy adjustment.
     const FOG_COLOR = 0xEADBC8;       // warm dust
     const AMBIENT_COLOR = 0xFFEFD4;
-    const AMBIENT_INTENSITY = 0.15;   // low fill → shadows read clearly
+    const AMBIENT_INTENSITY = 0.28;   // lifted for shadow readability
     const HEMI_SKY = 0xCFE3FF;        // cool pale blue
     const HEMI_GROUND = 0xD7B07A;     // sand bounce
-    const HEMI_INTENSITY = 0.45;
+    const HEMI_INTENSITY = 0.60;
     const SUN_COLOR = 0xFFD2A1;
     const SUN_INTENSITY = 2.0;
     const SUN_POS: [number, number, number] = [-110, 75, -40];
     const SUN_TARGET: [number, number, number] = [25, 0, 41];
     const SHADOW_MAP_SIZE = 2048;
-    const SHADOW_BIAS = -0.0002;
-    const SHADOW_NORMAL_BIAS = 0.03;
+    const SHADOW_BIAS = 0.0001;        // reduced shadow creep
+    const SHADOW_NORMAL_BIAS = 0.02;
     const SHADOW_BOUNDS = 50;         // ±50 ortho frustum (covers 50×82m playable area)
     const SHADOW_RADIUS = 1;
     const FILL_COLOR = 0xBFD9FF;      // cool blue counter-fill
-    const FILL_INTENSITY = 0.18;
+    const FILL_INTENSITY = 0.28;
     const FILL_POS: [number, number, number] = [90, 35, 70];
     const FOG_DENSITY = 0.005;
 

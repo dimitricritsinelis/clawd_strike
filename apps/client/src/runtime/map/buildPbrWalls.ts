@@ -259,14 +259,17 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
     const uvOffset = resolveMaterialUvOffset(options.seed, materialId);
     applyWallShaderTweaks(material, {
       albedoBoost,
-      macroColorAmplitude: 0.02,
-      macroRoughnessAmplitude: 0.015,
-      macroFrequency: 0.06,
+      macroColorAmplitude: 0.06,
+      macroRoughnessAmplitude: 0.04,
+      macroFrequency: 0.035,
       macroSeed: deriveSubSeed(options.seed, `wall-macro:${materialId}`),
       tileSizeM,
       uvOffset,
       dirtEnabled: true,
       floorTopY: options.floorTopY,
+      dirtHeightM: 1.5,
+      dirtDarken: 0.22,
+      dirtRoughnessBoost: 0.12,
     });
 
     const mesh = new Mesh(geometry, material);
