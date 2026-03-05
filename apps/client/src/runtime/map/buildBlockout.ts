@@ -396,7 +396,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     for (let i = 0; i < wallSegments.length; i++) {
       const seg = wallSegments[i]!;
       const zone = resolveSegmentZone(toSegmentFrame(seg), spec.zones);
-      if (zone?.type === "side_hall") {
+      if (zone?.type === "side_hall" || zone?.type === "main_lane_segment") {
         pbrSegments.push(seg);
         pbrHeights.push(segmentHeights[i] ?? spec.defaults.wall_height);
       } else {

@@ -53,6 +53,7 @@ export type WallDetailInstance = {
   pitchRad?: number;
   rollRad?: number;
   wallMaterialId: string | null;
+  trimMaterialId: string | null;
 };
 
 export type BuildWallDetailMeshesOptions = {
@@ -98,19 +99,22 @@ const DETAIL_IDS: WallDetailMeshId[] = [
   "balcony_railing",
 ];
 
-const WALL_SURFACE_INHERIT_MESH_IDS = new Set<WallDetailMeshId>([
+const HEAVY_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
   "plinth_strip",
   "cornice_strip",
-  "string_course_strip",
   "corner_pier",
-  "vertical_edge_trim",
   "pilaster",
   "recessed_panel_back",
   "balcony_slab",
 ]);
 
+const LIGHT_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
+  "string_course_strip",
+  "vertical_edge_trim",
+]);
+
 function inheritsWallSurface(meshId: WallDetailMeshId): boolean {
-  return WALL_SURFACE_INHERIT_MESH_IDS.has(meshId);
+  return HEAVY_TRIM_MESH_IDS.has(meshId) || LIGHT_TRIM_MESH_IDS.has(meshId);
 }
 
 function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTemplate> {
@@ -321,12 +325,15 @@ function buildPbrDetailMeshes(
   const grouped = new Map<string, DetailBucket>();
   for (const instance of instances) {
     const shouldInheritWallSurface = inheritsWallSurface(instance.meshId);
-    const wallMaterialId = shouldInheritWallSurface
-      ? instance.wallMaterialId && availableMaterialIds.has(instance.wallMaterialId)
-        ? instance.wallMaterialId
-        : fallbackMaterialId
-      : null;
-    const key = shouldInheritWallSurface ? `${instance.meshId}|${wallMaterialId}` : `${instance.meshId}|template`;
+    let resolvedMaterialId: string | null = null;
+    if (shouldInheritWallSurface) {
+      // Prefer trimMaterialId (set by combo system) over wallMaterialId (legacy)
+      const preferred = instance.trimMaterialId ?? instance.wallMaterialId;
+      resolvedMaterialId = preferred && availableMaterialIds.has(preferred)
+        ? preferred
+        : fallbackMaterialId;
+    }
+    const key = shouldInheritWallSurface ? `${instance.meshId}|${resolvedMaterialId}` : `${instance.meshId}|template`;
     const existing = grouped.get(key);
     if (existing) {
       existing.instances.push(instance);
@@ -334,7 +341,7 @@ function buildPbrDetailMeshes(
     }
     grouped.set(key, {
       meshId: instance.meshId,
-      wallMaterialId,
+      wallMaterialId: resolvedMaterialId,
       instances: [instance],
     });
   }

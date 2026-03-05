@@ -2,7 +2,7 @@ import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type { RuntimeAnchorsSpec, RuntimeBlockoutZone } from "./types";
 import type { BoundarySegment } from "./buildBlockout";
 import type { WallDetailInstance } from "./wallDetailKit";
-import { resolveWallMaterialIdForZone } from "./wallMaterialAssignment";
+import { resolveWallComboForZone, resolveWallMaterialIdForZone } from "./wallMaterialAssignment";
 
 const DETAIL_ZONE_TYPES = new Set([
   "main_lane_segment",
@@ -128,6 +128,8 @@ type SegmentDecorContext = {
   mapCenterZ: number;
   profile: BuildWallDetailProfile;
   wallMaterialId: string;
+  trimHeavyMaterialId: string | null;
+  trimLightMaterialId: string | null;
   wallHeightM: number;
   maxProtrusionM: number;
   density: number;
@@ -273,12 +275,19 @@ function pushBox(
     },
     yawRad: frame.yawRad,
     wallMaterialId,
+    trimMaterialId: null,
   };
   if (pitchRad !== undefined) instance.pitchRad = pitchRad;
   if (rollRad !== undefined) instance.rollRad = rollRad;
   instances.push(instance);
 
   return true;
+}
+
+function tagTrim(instances: WallDetailInstance[], trimId: string | null): void {
+  if (trimId != null && instances.length > 0) {
+    instances[instances.length - 1]!.trimMaterialId = trimId;
+  }
 }
 
 // ── Per-segment height variation ───────────────────────────────────────────
@@ -345,6 +354,7 @@ function placeParapetCap(ctx: SegmentDecorContext): void {
   const y = ctx.wallHeightM + capHeight * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
     ctx.frame, 0, y, capDepth * 0.5, capDepth, capHeight, ctx.frame.lengthM);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
 }
 
 // ── Roof cap ───────────────────────────────────────────────────────────────
@@ -368,6 +378,7 @@ function placeRoofCap(ctx: SegmentDecorContext): void {
     ROOF_THICKNESS_M,
     roofLength,
   );
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
 }
 
 // ── Horizontal banding ─────────────────────────────────────────────────────
@@ -383,6 +394,7 @@ function placePlinthStrip(ctx: SegmentDecorContext): void {
   pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
     ctx.frame, 0, plinthHeight * 0.5, plinthDepth * 0.5,
     plinthDepth, plinthHeight, ctx.frame.lengthM);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
 }
 
 function placeStringCourses(ctx: SegmentDecorContext): void {
@@ -399,6 +411,7 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
       courseDepth, courseHeight, ctx.frame.lengthM)) {
       return;
     }
+    tagTrim(ctx.instances, ctx.trimLightMaterialId);
   }
 }
 
@@ -413,6 +426,7 @@ function placeCorniceStrip(ctx: SegmentDecorContext): void {
   pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
     ctx.frame, 0, y, corniceDepth * 0.5,
     corniceDepth, corniceHeight, ctx.frame.lengthM);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
 }
 
 // ── Corner piers ───────────────────────────────────────────────────────────
@@ -448,6 +462,7 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
     )) {
       return;
     }
+    tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
 
     // Consume cap RNG to preserve downstream determinism — no cap geometry emitted.
     const capChance = clamp(
@@ -772,6 +787,7 @@ function placeBalcony(
   pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
     ctx.frame, slabCenterS, slabY, BALCONY_DEPTH_M * 0.5,
     BALCONY_DEPTH_M, BALCONY_SLAB_THICKNESS_M, balconyW);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
 
   // 2. French door opening — taller & wider than regular window, starts near floor
   const doorW = clamp(balconyW * 0.70, spec.bayWidth * 0.52, balconyW * 0.78);
@@ -810,12 +826,14 @@ function placeBalcony(
   pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
     ctx.frame, slabCenterS, wallY, BALCONY_DEPTH_M,
     BALCONY_WALL_THICKNESS_M, BALCONY_WALL_H, balconyW);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
 
   // 4. Stone balustrade — side walls
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
       ctx.frame, slabCenterS + side * balconyW * 0.5, wallY, BALCONY_DEPTH_M * 0.5,
       BALCONY_DEPTH_M, BALCONY_WALL_H, BALCONY_WALL_THICKNESS_M);
+    tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
   }
 
   // 5. Support brackets — small stone corbels under slab
@@ -825,6 +843,7 @@ function placeBalcony(
     pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
       ctx.frame, slabCenterS + side * (balconyW * 0.35), storyBaseY - bracketH * 0.5, bracketD * 0.5,
       bracketD, bracketH, 0.12);
+    tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
   }
 }
 
@@ -849,6 +868,7 @@ function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
       pilasterDepth, pilasterHeight, pilasterWidth)) {
       return;
     }
+    tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
   }
 }
 
@@ -1078,6 +1098,9 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     const isConnector = zone?.type === "connector";
     const isCut = zone?.type === "cut";
     const wallMaterialId = resolveWallMaterialIdForZone(zone?.id ?? null);
+    const combo = resolveWallComboForZone(zone?.id ?? null);
+    const trimHeavyMaterialId = combo?.trimHeavy ?? null;
+    const trimLightMaterialId = combo?.trimLight ?? null;
 
     // Compute per-segment height.
     // Seed is zone-scoped (no segment index) so every wall segment belonging to
@@ -1145,6 +1168,8 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       mapCenterZ,
       profile: options.profile,
       wallMaterialId,
+      trimHeavyMaterialId,
+      trimLightMaterialId,
       wallHeightM: segHeight,
       maxProtrusionM: segmentMaxProtrusion,
       density: segmentDensity,
