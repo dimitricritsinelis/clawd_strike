@@ -42,6 +42,7 @@ export type RuntimeUrlParams = {
   propVisuals: RuntimePropVisualMode;
   propChaos: RuntimePropChaosOptions;
   unlimitedHealth: boolean;
+  ao: boolean;
 };
 
 function parseBooleanFlag(value: string | null): boolean {
@@ -185,6 +186,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
   const rawPropCluster = getParam(params, "prop-cluster", "propCluster");
   const rawPropDensity = getParam(params, "prop-density", "propDensity");
   const rawUnlimitedHealth = getParam(params, "unlimitedHealth", "god", "godMode");
+  const rawAo = getParam(params, "ao");
 
   const mapId = rawMapId && rawMapId.trim().length > 0 ? rawMapId.trim() : DEFAULT_MAP_ID;
   const controlMode = parseControlMode(rawControlMode, rawAutostart);
@@ -214,6 +216,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     density: parseUnitFloat(rawPropDensity),
   };
   const unlimitedHealth = parseBooleanFlag(rawUnlimitedHealth);
+  const ao = parseBooleanFlagWithDefault(rawAo, true); // default ON for golden preset
 
   return {
     mapId,
@@ -239,5 +242,6 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
     propVisuals,
     propChaos,
     unlimitedHealth,
+    ao,
   };
 }

@@ -116,9 +116,10 @@ Anchors are embedded in `map_spec.json` — do not maintain a separate anchors f
 
 Every task must end with:
 1. `pnpm typecheck` + `pnpm build` passing
-2. Smoke test at canonical URL (spawn, pointer lock, move, collide, no console spam)
-3. `before.png` / `after.png` at `artifacts/screenshots/<PROMPT_ID>/`
-4. `progress.md` updated (tight bullets only — not a transcript)
+2. `pnpm qa:completion` passing headless, with the latest multi-angle screenshots and runtime summary reviewed before the task is called complete
+3. Human smoke at the canonical URL only when input flow, pointer lock, fullscreen, or menu UX changed
+4. `before.png` / `after.png` at `artifacts/screenshots/<PROMPT_ID>/`
+5. `progress.md` updated (tight bullets only — not a transcript)
 
 ---
 
@@ -128,10 +129,12 @@ Do **not** implement:
 - Texture/LUT/decal ingestion pipelines
 - Netcode or multiplayer
 - Final performance budgets
-- Heavy Playwright automation suites
+- Heavy Playwright automation suites or brittle golden screenshot matrices
 - Final lookdev or art passes
 
 See `AGENTS.md §1.3` and map approval definition in `AGENTS.md §10`.
+
+Lightweight autonomous Playwright capture/review is allowed when it stays deterministic, artifact-driven, and focused on map iteration.
 
 ---
 
@@ -146,6 +149,6 @@ window.advanceTime(ms): Promise<void>  // Advance sim time deterministically
 
 ## 12) Known environment issues
 
-- Headless Playwright WebGL context is unreliable — use headed browser for screenshots
+- Headless Playwright is the default for completion-gate screenshots so automation does not take over the desktop; use headed mode only when debugging capture issues or verifying human pointer-lock behavior
 - `gen:maps` emits expected clear-zone anchor warnings — not a bug
 - Pointer-lock assertions are limited in CI (smoke script may report blocked pointer lock)

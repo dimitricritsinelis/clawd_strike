@@ -33,7 +33,49 @@
     "enabled": true,
     "style": "bazaar",
     "density": 0.38,
-    "maxProtrusion": 0.15
+    "maxProtrusion": 0.15,
+    "facade_overrides": [
+      {
+        "zoneId": "BZ_M1",
+        "face": "west",
+        "preset": "merchant_rhythm"
+      },
+      {
+        "zoneId": "BZ_M1",
+        "face": "east",
+        "preset": "residential_quiet"
+      },
+      {
+        "zoneId": "BZ_M2_JOG",
+        "face": "west",
+        "preset": "service_blank"
+      },
+      {
+        "zoneId": "BZ_M2_JOG",
+        "face": "east",
+        "preset": "merchant_hero_stack"
+      },
+      {
+        "zoneId": "BZ_M3",
+        "face": "west",
+        "preset": "residential_balcony_stack"
+      },
+      {
+        "zoneId": "BZ_M3",
+        "face": "east",
+        "preset": "merchant_rhythm"
+      },
+      {
+        "zoneId": "SPAWN_A_COURTYARD",
+        "face": "north",
+        "preset": "spawn_courtyard_landmark"
+      },
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "south",
+        "preset": "spawn_courtyard_landmark"
+      }
+    ]
   },
   "lanes": {
     "main_bazaar_lane": {

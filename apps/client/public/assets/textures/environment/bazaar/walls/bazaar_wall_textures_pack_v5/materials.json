@@ -1,0 +1,445 @@
+{
+  "materials": [
+    {
+      "id": "ph_sandstone_blocks_04",
+      "tileSizeM": 2.5,
+      "tintHex": "#f0dbb5",
+      "albedoBoost": 1.08,
+      "roughness": 0.94,
+      "normalScale": 0.50,
+      "aoIntensity": 0.45,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_sandstone_blocks_05",
+      "tileSizeM": 2.5,
+      "tintHex": "#e5cca0",
+      "albedoBoost": 1.05,
+      "roughness": 0.96,
+      "normalScale": 0.55,
+      "aoIntensity": 0.50,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_exterior_wall_cladding",
+      "tileSizeM": 2,
+      "tintHex": "#d8c098",
+      "albedoBoost": 1.05,
+      "roughness": 0.97,
+      "normalScale": 0.55,
+      "aoIntensity": 0.55,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_worn_brick_wall",
+      "tileSizeM": 2,
+      "tintHex": "#cca878",
+      "albedoBoost": 1.05,
+      "roughness": 0.98,
+      "normalScale": 0.60,
+      "aoIntensity": 0.60,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_whitewashed_brick",
+      "tileSizeM": 2.0,
+      "tintHex": "#f5f0e8",
+      "albedoBoost": 1.12,
+      "roughness": 0.88,
+      "normalScale": 0.55,
+      "aoIntensity": 0.35,
+      "textures": {
+        "1k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_1k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_2k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_beige_wall_001",
+      "tileSizeM": 2.0,
+      "tintHex": "#f0e4d0",
+      "albedoBoost": 1.08,
+      "roughness": 0.90,
+      "normalScale": 0.35,
+      "aoIntensity": 0.35,
+      "textures": {
+        "1k": {
+          "albedo": "./beige_wall_001/beige_wall_001_diff_1k.jpg",
+          "normal": "./beige_wall_001/beige_wall_001_nor_gl_1k.jpg",
+          "arm": "./beige_wall_001/beige_wall_001_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./beige_wall_001/beige_wall_001_diff_2k.jpg",
+          "normal": "./beige_wall_001/beige_wall_001_nor_gl_2k.jpg",
+          "arm": "./beige_wall_001/beige_wall_001_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_beige_wall_002",
+      "tileSizeM": 2.0,
+      "tintHex": "#dccca8",
+      "albedoBoost": 1.05,
+      "roughness": 0.92,
+      "normalScale": 0.40,
+      "aoIntensity": 0.40,
+      "textures": {
+        "1k": {
+          "albedo": "./beige_wall_002/beige_wall_002_diff_1k.jpg",
+          "normal": "./beige_wall_002/beige_wall_002_nor_gl_1k.jpg",
+          "arm": "./beige_wall_002/beige_wall_002_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./beige_wall_002/beige_wall_002_diff_2k.jpg",
+          "normal": "./beige_wall_002/beige_wall_002_nor_gl_2k.jpg",
+          "arm": "./beige_wall_002/beige_wall_002_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_plastered_wall",
+      "tileSizeM": 2.0,
+      "tintHex": "#f5ece0",
+      "albedoBoost": 1.10,
+      "roughness": 0.88,
+      "normalScale": 0.30,
+      "aoIntensity": 0.30,
+      "textures": {
+        "1k": {
+          "albedo": "./plastered_wall/plastered_wall_diff_1k.jpg",
+          "normal": "./plastered_wall/plastered_wall_nor_gl_1k.jpg",
+          "arm": "./plastered_wall/plastered_wall_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./plastered_wall/plastered_wall_diff_2k.jpg",
+          "normal": "./plastered_wall/plastered_wall_nor_gl_2k.jpg",
+          "arm": "./plastered_wall/plastered_wall_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_stone_trim_sandstone",
+      "tileSizeM": 2.0,
+      "tintHex": "#e0cc9c",
+      "albedoBoost": 1.05,
+      "roughness": 0.96,
+      "normalScale": 0.55,
+      "aoIntensity": 0.55,
+      "textures": {
+        "1k": {
+          "albedo": "./sandstone_blocks_05/sandstone_blocks_05_diff_1k.jpg",
+          "normal": "./sandstone_blocks_05/sandstone_blocks_05_nor_gl_1k.jpg",
+          "arm": "./sandstone_blocks_05/sandstone_blocks_05_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./sandstone_blocks_05/sandstone_blocks_05_diff_2k.jpg",
+          "normal": "./sandstone_blocks_05/sandstone_blocks_05_nor_gl_2k.jpg",
+          "arm": "./sandstone_blocks_05/sandstone_blocks_05_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_stone_trim_white",
+      "tileSizeM": 2.0,
+      "tintHex": "#f0e8d8",
+      "albedoBoost": 1.05,
+      "roughness": 0.92,
+      "normalScale": 0.55,
+      "aoIntensity": 0.45,
+      "textures": {
+        "1k": {
+          "albedo": "./white_sandstone_blocks_02/white_sandstone_blocks_02_diff_1k.jpg",
+          "normal": "./white_sandstone_blocks_02/white_sandstone_blocks_02_nor_gl_1k.jpg",
+          "arm": "./white_sandstone_blocks_02/white_sandstone_blocks_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_sandstone_blocks_02/white_sandstone_blocks_02_diff_2k.jpg",
+          "normal": "./white_sandstone_blocks_02/white_sandstone_blocks_02_nor_gl_2k.jpg",
+          "arm": "./white_sandstone_blocks_02/white_sandstone_blocks_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_band_beige_001",
+      "tileSizeM": 2.0,
+      "tintHex": "#ccb898",
+      "albedoBoost": 1.03,
+      "roughness": 0.92,
+      "normalScale": 0.35,
+      "aoIntensity": 0.45,
+      "textures": {
+        "1k": {
+          "albedo": "./beige_wall_001/beige_wall_001_diff_1k.jpg",
+          "normal": "./beige_wall_001/beige_wall_001_nor_gl_1k.jpg",
+          "arm": "./beige_wall_001/beige_wall_001_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./beige_wall_001/beige_wall_001_diff_2k.jpg",
+          "normal": "./beige_wall_001/beige_wall_001_nor_gl_2k.jpg",
+          "arm": "./beige_wall_001/beige_wall_001_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_band_beige_002",
+      "tileSizeM": 2.0,
+      "tintHex": "#b8a888",
+      "albedoBoost": 1.00,
+      "roughness": 0.94,
+      "normalScale": 0.40,
+      "aoIntensity": 0.50,
+      "textures": {
+        "1k": {
+          "albedo": "./beige_wall_002/beige_wall_002_diff_1k.jpg",
+          "normal": "./beige_wall_002/beige_wall_002_nor_gl_1k.jpg",
+          "arm": "./beige_wall_002/beige_wall_002_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./beige_wall_002/beige_wall_002_diff_2k.jpg",
+          "normal": "./beige_wall_002/beige_wall_002_nor_gl_2k.jpg",
+          "arm": "./beige_wall_002/beige_wall_002_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_band_plastered",
+      "tileSizeM": 2.0,
+      "tintHex": "#d8d0c0",
+      "albedoBoost": 1.05,
+      "roughness": 0.90,
+      "normalScale": 0.30,
+      "aoIntensity": 0.40,
+      "textures": {
+        "1k": {
+          "albedo": "./plastered_wall/plastered_wall_diff_1k.jpg",
+          "normal": "./plastered_wall/plastered_wall_nor_gl_1k.jpg",
+          "arm": "./plastered_wall/plastered_wall_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./plastered_wall/plastered_wall_diff_2k.jpg",
+          "normal": "./plastered_wall/plastered_wall_nor_gl_2k.jpg",
+          "arm": "./plastered_wall/plastered_wall_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_whitewashed_brick_cool",
+      "tileSizeM": 2.5,
+      "tintHex": "#ece8e0",
+      "albedoBoost": 1.10,
+      "roughness": 0.90,
+      "normalScale": 0.50,
+      "aoIntensity": 0.38,
+      "textures": {
+        "1k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_1k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_2k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_whitewashed_brick_warm",
+      "tileSizeM": 2.0,
+      "tintHex": "#f5e4cc",
+      "albedoBoost": 1.12,
+      "roughness": 0.88,
+      "normalScale": 0.55,
+      "aoIntensity": 0.35,
+      "textures": {
+        "1k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_1k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_2k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_whitewashed_brick_dusty",
+      "tileSizeM": 2.0,
+      "tintHex": "#e8dccb",
+      "albedoBoost": 1.08,
+      "roughness": 0.9,
+      "normalScale": 0.5,
+      "aoIntensity": 0.36,
+      "textures": {
+        "1k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_1k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_2k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_sandstone_blocks_06",
+      "tileSizeM": 1.8,
+      "tintHex": "#c0a080",
+      "albedoBoost": 1.05,
+      "roughness": 0.98,
+      "normalScale": 0.55,
+      "aoIntensity": 0.60,
+      "textures": {
+        "1k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_1k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_1k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./rustic_stone_wall_02/rustic_stone_wall_02_diff_2k.jpg",
+          "normal": "./rustic_stone_wall_02/rustic_stone_wall_02_nor_gl_2k.jpg",
+          "arm": "./rustic_stone_wall_02/rustic_stone_wall_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_lime_plaster_sun",
+      "tileSizeM": 2.0,
+      "tintHex": "#efd6af",
+      "albedoBoost": 1.08,
+      "roughness": 0.86,
+      "normalScale": 0.50,
+      "aoIntensity": 0.34,
+      "textures": {
+        "1k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_1k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_2k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_aged_plaster_ochre",
+      "tileSizeM": 2.0,
+      "tintHex": "#d4bc97",
+      "albedoBoost": 1.04,
+      "roughness": 0.92,
+      "normalScale": 0.36,
+      "aoIntensity": 0.42,
+      "textures": {
+        "1k": {
+          "albedo": "./plastered_wall/plastered_wall_diff_1k.jpg",
+          "normal": "./plastered_wall/plastered_wall_nor_gl_1k.jpg",
+          "arm": "./plastered_wall/plastered_wall_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./plastered_wall/plastered_wall_diff_2k.jpg",
+          "normal": "./plastered_wall/plastered_wall_nor_gl_2k.jpg",
+          "arm": "./plastered_wall/plastered_wall_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_trim_sanded_01",
+      "tileSizeM": 1.8,
+      "tintHex": "#dbc49c",
+      "albedoBoost": 1.02,
+      "roughness": 0.94,
+      "normalScale": 0.42,
+      "aoIntensity": 0.46,
+      "textures": {
+        "1k": {
+          "albedo": "./white_sandstone_blocks_02/white_sandstone_blocks_02_diff_1k.jpg",
+          "normal": "./white_sandstone_blocks_02/white_sandstone_blocks_02_nor_gl_1k.jpg",
+          "arm": "./white_sandstone_blocks_02/white_sandstone_blocks_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_sandstone_blocks_02/white_sandstone_blocks_02_diff_2k.jpg",
+          "normal": "./white_sandstone_blocks_02/white_sandstone_blocks_02_nor_gl_2k.jpg",
+          "arm": "./white_sandstone_blocks_02/white_sandstone_blocks_02_arm_2k.jpg"
+        }
+      }
+    },
+    {
+      "id": "ph_band_lime_soft",
+      "tileSizeM": 2.0,
+      "tintHex": "#c9b28c",
+      "albedoBoost": 0.98,
+      "roughness": 0.90,
+      "normalScale": 0.34,
+      "aoIntensity": 0.40,
+      "textures": {
+        "1k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_1k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_1k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./white_plaster_02/white_plaster_02_diff_2k.jpg",
+          "normal": "./white_plaster_02/white_plaster_02_nor_gl_2k.jpg",
+          "arm": "./white_plaster_02/white_plaster_02_arm_2k.jpg"
+        }
+      }
+    }
+  ]
+}

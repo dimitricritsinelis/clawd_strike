@@ -43,7 +43,11 @@ Run:
 ```bash
 pnpm typecheck
 pnpm build
+pnpm test:playwright
+pnpm qa:completion
 ```
 
 Canonical playtest URL:
 - `http://127.0.0.1:5174/?map=bazaar-map&shot=compare`
+
+Lightweight autonomous Playwright capture/review is allowed for local map iteration when it stays deterministic and artifact-driven. `pnpm qa:completion` is the default end-of-task gate for map/visual work: it runs headless, captures multiple fixed angles, and writes a review summary that must be inspected before the task is called complete. Avoid large brittle screenshot suites or broad browser matrices.

@@ -43,12 +43,29 @@ export type RuntimeBlockoutSpec = {
 
 export type RuntimeWallDetailStyle = "bazaar";
 
+export type RuntimeFacadeFace = "north" | "south" | "east" | "west";
+
+export type RuntimeFacadeOverridePreset =
+  | "merchant_rhythm"
+  | "merchant_hero_stack"
+  | "residential_quiet"
+  | "residential_balcony_stack"
+  | "spawn_courtyard_landmark"
+  | "service_blank";
+
+export type RuntimeFacadeOverride = {
+  zoneId: string;
+  face: RuntimeFacadeFace;
+  preset: RuntimeFacadeOverridePreset;
+};
+
 export type RuntimeWallDetailOptions = {
   enabled: boolean;
   seed?: number;
   style: RuntimeWallDetailStyle;
   density: number;
   maxProtrusion: number;
+  facadeOverrides: RuntimeFacadeOverride[];
 };
 
 export type RuntimeAnchor = {
@@ -188,6 +205,7 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
       style: "bazaar",
       density: DEFAULT_WALL_DETAIL_DENSITY,
       maxProtrusion: DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M,
+      facadeOverrides: [],
     };
   }
 
@@ -213,10 +231,46 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
     style,
     density,
     maxProtrusion,
+    facadeOverrides: [],
   };
 
   if (typeof obj.seed !== "undefined") {
     resolved.seed = asNumber(obj.seed, `${source}.seed`);
+  }
+
+  if (typeof obj.facade_overrides !== "undefined") {
+    if (!Array.isArray(obj.facade_overrides)) {
+      failParse(`${source}.facade_overrides`, "expected array");
+    }
+
+    resolved.facadeOverrides = obj.facade_overrides.map((rawOverride, index) => {
+      const override = asObject(rawOverride, `${source}.facade_overrides[${index}]`);
+      const zoneId = asString(override.zoneId, `${source}.facade_overrides[${index}].zoneId`);
+      const face = asString(override.face, `${source}.facade_overrides[${index}].face`);
+      if (face !== "north" && face !== "south" && face !== "east" && face !== "west") {
+        failParse(`${source}.facade_overrides[${index}].face`, "expected 'north', 'south', 'east', or 'west'");
+      }
+      const preset = asString(override.preset, `${source}.facade_overrides[${index}].preset`);
+      if (
+        preset !== "merchant_rhythm"
+        && preset !== "merchant_hero_stack"
+        && preset !== "residential_quiet"
+        && preset !== "residential_balcony_stack"
+        && preset !== "spawn_courtyard_landmark"
+        && preset !== "service_blank"
+      ) {
+        failParse(
+          `${source}.facade_overrides[${index}].preset`,
+          "expected known facade preset",
+        );
+      }
+
+      return {
+        zoneId,
+        face,
+        preset,
+      };
+    });
   }
 
   return resolved;

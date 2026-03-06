@@ -303,6 +303,46 @@ function deriveBlockoutSpec(spec, zones) {
     wallDetailsRaw && typeof wallDetailsRaw.enabled !== "undefined"
       ? optionalBoolean(wallDetailsRaw.enabled, "wall_details.enabled")
       : undefined;
+  const facadeOverrides =
+    wallDetailsRaw && typeof wallDetailsRaw.facade_overrides !== "undefined"
+      ? (() => {
+          if (!Array.isArray(wallDetailsRaw.facade_overrides)) {
+            fail("wall_details.facade_overrides must be an array when provided");
+          }
+
+          return wallDetailsRaw.facade_overrides.map((override, index) => {
+            if (!override || typeof override !== "object") {
+              fail(`wall_details.facade_overrides[${index}] must be an object`);
+            }
+
+            const zoneId = ensureString(override.zoneId, `wall_details.facade_overrides[${index}].zoneId`);
+            if (!zones.some((zone) => zone.id === zoneId)) {
+              fail(`wall_details.facade_overrides[${index}].zoneId '${zoneId}' does not match a known zone`);
+            }
+
+            const face = ensureString(override.face, `wall_details.facade_overrides[${index}].face`);
+            if (!["north", "south", "east", "west"].includes(face)) {
+              fail(`wall_details.facade_overrides[${index}].face must be one of north/south/east/west`);
+            }
+
+            const preset = ensureString(override.preset, `wall_details.facade_overrides[${index}].preset`);
+            if (
+              ![
+                "merchant_rhythm",
+                "merchant_hero_stack",
+                "residential_quiet",
+                "residential_balcony_stack",
+                "spawn_courtyard_landmark",
+                "service_blank",
+              ].includes(preset)
+            ) {
+              fail(`wall_details.facade_overrides[${index}].preset '${preset}' is not supported`);
+            }
+
+            return { zoneId, face, preset };
+          });
+        })()
+      : [];
 
   return {
     mapId: MAP_ID,
@@ -318,6 +358,7 @@ function deriveBlockoutSpec(spec, zones) {
       style: wallDetailsStyle,
       density: Math.max(0, Math.min(1.25, wallDetailDensity)),
       maxProtrusion: Math.max(0.02, Math.min(0.2, wallDetailMaxProtrusion)),
+      facade_overrides: facadeOverrides,
       ...(typeof wallDetailSeed === "number" ? { seed: Math.trunc(wallDetailSeed) } : {}),
     },
     zones,

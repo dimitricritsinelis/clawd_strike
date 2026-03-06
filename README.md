@@ -41,6 +41,11 @@ Legacy aliases are still accepted (`highvis`, `vmDebug`, `anchorTypes`, `propPro
 ```bash
 pnpm typecheck
 pnpm build
+pnpm test:playwright
+pnpm qa:completion
+pnpm --filter @clawd-strike/client smoke:agent
+pnpm --filter @clawd-strike/client capture:shots
+pnpm qa:autonomous
 ```
 
 ## Repo Layout
@@ -60,27 +65,32 @@ pnpm --filter @clawd-strike/client gen:maps
 - The runtime loads these via `?map=<mapId>` URL params.
 
 ## Automation Hooks
+- `window.agent_observe(): string`
+  - Public browser-only agent contract. Returns the fair `public-agent-v1` payload used by `/skills.md`.
 - `window.render_game_to_text(): string`
-  - Returns a concise JSON snapshot of current loading/runtime state for automation checks (includes `apiVersion`, `agent`, `gameplay.alive/focused/visibility`, `score`, and `player` fields).
+  - Richer localhost/internal automation snapshot for QA. On production hosts it aliases the same public payload as `agent_observe()` so no-context agents can fall back safely.
 - `window.agent_apply_action(action): void`
   - Agent-mode action API (`moveX`, `moveZ`, `lookYawDelta`, `lookPitchDelta`, `jump`, `fire`, `reload`, `sprint`) applied deterministically at tick boundaries.
 - `window.advanceTime(ms): Promise<void>`
   - Advances simulation time in deterministic frame steps for automation clients.
 
-## Optional Agent Smoke Runner
+## Autonomous QA Workflow
 
-Runs a headed Chrome Playwright session that drives the loading screen + runtime using only Playwright clicks and `page.evaluate(...)` calls.
+Runs a small, repo-native Playwright loop for local map iteration. This is intentionally lightweight: a few stable specs, deterministic traversal routes, fixed multi-angle screenshots, and artifact-based review. The default completion gate is headless so it does not take over the desktop.
 
 ```bash
-BASE_URL=http://127.0.0.1:5174 AGENT_NAME=SmokeRunner pnpm --filter @clawd-strike/client smoke:agent
+BASE_URL=http://127.0.0.1:5174 pnpm qa:completion
+BASE_URL=http://127.0.0.1:5174 AGENT_NAME=NoContextProbe pnpm smoke:no-context
+BASE_URL=http://127.0.0.1:5174 pnpm verify:skills-contract
+pnpm test:playwright
 ```
 
 - `BASE_URL` is optional (default: `http://127.0.0.1:5174`).
 - `AGENT_NAME` is optional (default: `SmokeRunner`; trimmed to 15 chars to match UI limit).
-- The script:
-  - opens `BASE_URL`
-  - clicks `agent-mode` -> `play`
-  - fills `agent-name` and clicks `start`
-  - waits for runtime-ready using `window.render_game_to_text()`
-  - drives ~10s of simple agent actions via `window.agent_apply_action(...)`
-  - asserts camera position changed and `score.current` is numeric
+- `qa:completion` is the required end-of-task gate for map and visual work. It runs deterministic traversal, captures 5-8 fixed shots, scores the results, and writes `summary.json` plus `review.md` under `artifacts/playwright/completion-gate/`.
+- `smoke:agent` captures per-route `start/final` screenshots, state JSON, console JSON, and a Playwright trace under `artifacts/playwright/agent-smoke/`.
+- `smoke:no-context` starts from `/skills.md`, uses only documented selectors/public APIs, intentionally reaches death, and verifies repeated post-death continuation.
+- `capture:shots` captures a fixed review set from runtime `shots.json` under `artifacts/playwright/map-shots/` and emits a summary with brightness/contrast/landmark findings.
+- `verify:skills-contract` fetches a served `/skills.md` and checks that it exactly matches the built contract file.
+- `test:playwright` includes the public agent contract checks alongside runtime boot, compare-shot load, and deterministic traversal. Manual pointer-lock smoke exists but is skipped unless explicitly enabled.
+- `qa:autonomous` now aliases the completion gate so agents have one default headless command before they call work complete.

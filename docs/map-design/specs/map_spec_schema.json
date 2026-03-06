@@ -41,6 +41,42 @@
         "maxProtrusion": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "facade_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "zoneId",
+              "face",
+              "preset"
+            ],
+            "properties": {
+              "zoneId": {
+                "type": "string"
+              },
+              "face": {
+                "type": "string",
+                "enum": [
+                  "north",
+                  "south",
+                  "east",
+                  "west"
+                ]
+              },
+              "preset": {
+                "type": "string",
+                "enum": [
+                  "merchant_rhythm",
+                  "merchant_hero_stack",
+                  "residential_quiet",
+                  "residential_balcony_stack",
+                  "spawn_courtyard_landmark",
+                  "service_blank"
+                ]
+              }
+            }
+          }
         }
       },
       "additionalProperties": true

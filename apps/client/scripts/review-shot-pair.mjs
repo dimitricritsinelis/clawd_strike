@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
+import { comparePngMetrics, readPngMetrics } from "./lib/imageMetrics.mjs";
 
 const DEFAULT_EXPECTED_SHOT = "SHOT_BLOCKOUT_COMPARE";
 const MAX_ABS_PITCH_DEG = 35;
@@ -19,16 +19,15 @@ function parseArgs(argv) {
     afterImage: "",
     beforeState: "",
     afterState: "",
+    beforeConsole: "",
+    afterConsole: "",
     expectedShot: DEFAULT_EXPECTED_SHOT,
     reviewNote: "",
     legacyBeforeStateOk: false,
   };
 
-  for (let i = 2; i < argv.length; i += 1) {
-    const key = argv[i];
-    if (key === "--") {
-      continue;
-    }
+  for (let index = 2; index < argv.length; index += 1) {
+    const key = argv[index];
     switch (key) {
       case "--legacy-before-state-ok":
         args.legacyBeforeStateOk = true;
@@ -37,19 +36,23 @@ function parseArgs(argv) {
       case "--after-image":
       case "--before-state":
       case "--after-state":
+      case "--before-console":
+      case "--after-console":
       case "--expected-shot":
       case "--review-note": {
-        const value = argv[i + 1];
+        const value = argv[index + 1];
         if (!value || value.startsWith("--")) {
           fail(`Missing value for ${key}`);
         }
-        i += 1;
+        index += 1;
         if (key === "--before-image") args.beforeImage = value;
         if (key === "--after-image") args.afterImage = value;
         if (key === "--before-state") args.beforeState = value;
         if (key === "--after-state") args.afterState = value;
+        if (key === "--before-console") args.beforeConsole = value;
+        if (key === "--after-console") args.afterConsole = value;
         if (key === "--expected-shot") args.expectedShot = value;
-        if (key === "--review-note") args.reviewNote = value;
+        if (key === "--review-note") args.reviewNote = value.trim();
         break;
       }
       default:
@@ -59,19 +62,11 @@ function parseArgs(argv) {
 
   if (!args.beforeImage || !args.afterImage || !args.beforeState || !args.afterState) {
     fail(
-      "Usage: node scripts/review-shot-pair.mjs --before-image <path> --after-image <path> --before-state <path> --after-state <path> --review-note \"<manual review note>\" [--expected-shot SHOT_BLOCKOUT_COMPARE]",
+      "Usage: node scripts/review-shot-pair.mjs --before-image <path> --after-image <path> --before-state <path> --after-state <path> [--before-console <path>] [--after-console <path>] [--review-note \"optional note\"] [--expected-shot SHOT_BLOCKOUT_COMPARE]",
     );
   }
 
-  const trimmedNote = args.reviewNote.trim();
-  if (trimmedNote.length < 20) {
-    fail("--review-note is required and must be at least 20 characters describing your before/after visual review");
-  }
-
-  return {
-    ...args,
-    reviewNote: trimmedNote,
-  };
+  return args;
 }
 
 function ensureFile(filePath) {
@@ -80,25 +75,11 @@ function ensureFile(filePath) {
   }
 }
 
-function readPngSize(filePath) {
-  const buffer = readFileSync(filePath);
-  const pngSignature = "89504e470d0a1a0a";
-  if (buffer.length < 24 || buffer.subarray(0, 8).toString("hex") !== pngSignature) {
-    fail(`Expected PNG file at ${filePath}`);
-  }
-  const width = buffer.readUInt32BE(16);
-  const height = buffer.readUInt32BE(20);
-  if (width <= 0 || height <= 0) {
-    fail(`Invalid PNG dimensions for ${filePath}`);
-  }
-  return { width, height, hash: crypto.createHash("sha256").update(buffer).digest("hex") };
-}
-
-function readJson(filePath) {
+function readJson(filePath, label) {
   try {
     return JSON.parse(readFileSync(filePath, "utf8"));
   } catch (error) {
-    fail(`Failed to parse JSON at ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    fail(`Failed to parse ${label} JSON at ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -120,9 +101,7 @@ function absAngleDeltaDeg(a, b) {
 function readViewCamera(state, label, allowMissing) {
   const camera = state?.view?.camera;
   if (!camera || typeof camera !== "object") {
-    if (allowMissing) {
-      return null;
-    }
+    if (allowMissing) return null;
     fail(`${label}.view.camera missing; update runtime text state before running screenshot review`);
   }
 
@@ -171,9 +150,8 @@ function readShot(state, label, allowMissingPose) {
 }
 
 function validateFraming(camera, shot, label) {
-  if (!camera) {
-    return;
-  }
+  if (!camera) return;
+
   if (Math.abs(camera.pitchDeg) > MAX_ABS_PITCH_DEG) {
     fail(`${label} camera pitch ${camera.pitchDeg.toFixed(2)}deg is too steep; likely floor-only framing`);
   }
@@ -189,25 +167,94 @@ function validateFraming(camera, shot, label) {
   }
 }
 
-function run() {
-  const args = parseArgs(process.argv);
+function readConsoleCounts(filePath) {
+  if (!filePath) {
+    return { errorCount: 0, warningCount: 0, total: 0 };
+  }
+  ensureFile(filePath);
+  const payload = readJson(filePath, "console");
+  return payload?.counts ?? { errorCount: 0, warningCount: 0, total: 0 };
+}
 
+function buildFindings(context) {
+  const findings = [];
+
+  if (context.afterConsole.errorCount > 0) {
+    findings.push({
+      severity: "error",
+      message: `After capture includes ${context.afterConsole.errorCount} console/page errors.`,
+    });
+  }
+  if ((context.afterState.render?.warnings?.length ?? 0) > 0) {
+    findings.push({
+      severity: "warn",
+      message: `Runtime warnings present after capture: ${context.afterState.render.warnings.join(" | ")}`,
+    });
+  }
+  if (context.afterImage.meanLuminance < 0.16) {
+    findings.push({
+      severity: "warn",
+      message: "After image is very dark; landmark readability may be compromised.",
+    });
+  }
+  if (context.afterImage.contrast < 0.09) {
+    findings.push({
+      severity: "warn",
+      message: "After image contrast is low; forms may read as flat.",
+    });
+  }
+  if ((context.afterState.landmarks?.visible?.length ?? 0) === 0) {
+    findings.push({
+      severity: "warn",
+      message: "No landmark anchors are visible in the after frame.",
+    });
+  }
+  if (context.afterState.assets?.wall?.requestedMode === "pbr" && context.afterState.assets?.wall?.activeMode !== "pbr") {
+    findings.push({
+      severity: "warn",
+      message: "Wall materials fell back from requested PBR mode in the after capture.",
+    });
+  }
+  if (context.afterState.assets?.floor?.requestedMode === "pbr" && context.afterState.assets?.floor?.activeMode !== "pbr") {
+    findings.push({
+      severity: "warn",
+      message: "Floor materials fell back from requested PBR mode in the after capture.",
+    });
+  }
+  if (context.diff.changedPixelRatio > 0.55) {
+    findings.push({
+      severity: "warn",
+      message: `Large image delta detected (${(context.diff.changedPixelRatio * 100).toFixed(1)}% of pixels changed). Verify this was intentional.`,
+    });
+  }
+
+  const propDelta = (context.afterState.props?.collidersPlaced ?? 0) - (context.beforeState.props?.collidersPlaced ?? 0);
+  if (Math.abs(propDelta) >= 25) {
+    findings.push({
+      severity: "warn",
+      message: `Prop collider count changed by ${propDelta}; review whether density shifted more than intended.`,
+    });
+  }
+
+  return findings;
+}
+
+function computeScore(findings) {
+  let score = 100;
+  for (const finding of findings) {
+    score -= finding.severity === "error" ? 35 : 10;
+  }
+  return Math.max(0, score);
+}
+
+async function run() {
+  const args = parseArgs(process.argv);
   for (const filePath of [args.beforeImage, args.afterImage, args.beforeState, args.afterState]) {
     ensureFile(filePath);
   }
 
-  const beforeImage = readPngSize(args.beforeImage);
-  const afterImage = readPngSize(args.afterImage);
-  if (beforeImage.width !== afterImage.width || beforeImage.height !== afterImage.height) {
-    fail(
-      `Before/after resolution mismatch: ${beforeImage.width}x${beforeImage.height} vs ${afterImage.width}x${afterImage.height}`,
-    );
-  }
-
-  const beforeState = readJson(args.beforeState);
-  const afterState = readJson(args.afterState);
-
-  const warnings = [];
+  const beforeState = readJson(args.beforeState, "before state");
+  const afterState = readJson(args.afterState, "after state");
 
   if (!beforeState?.map?.loaded || !afterState?.map?.loaded) {
     fail("Both before/after state files must report map.loaded=true");
@@ -215,27 +262,23 @@ function run() {
 
   const beforeShot = readShot(beforeState, "before", args.legacyBeforeStateOk);
   const afterShot = readShot(afterState, "after", false);
-
   if (beforeShot.id !== afterShot.id) {
     fail(`Shot mismatch: before=${beforeShot.id}, after=${afterShot.id}`);
   }
-
   if (beforeShot.id !== args.expectedShot) {
     fail(`Expected shot '${args.expectedShot}' but got '${beforeShot.id}'`);
   }
 
   const beforeCamera = readViewCamera(beforeState, "before", args.legacyBeforeStateOk);
   const afterCamera = readViewCamera(afterState, "after", false);
-  if (!beforeCamera || !beforeShot.cameraPose) {
-    warnings.push("before state missing camera metadata; legacy fallback enabled");
-  }
-
   validateFraming(beforeCamera, beforeShot, "before");
   validateFraming(afterCamera, afterShot, "after");
+
   let posDeltaM = 0;
   let yawDeltaDeg = 0;
   let pitchDeltaDeg = 0;
   let fovDeltaDeg = 0;
+  const warnings = [];
 
   if (beforeCamera && afterCamera) {
     posDeltaM = Math.hypot(
@@ -256,13 +299,28 @@ function run() {
       );
     }
   } else {
-    warnings.push("camera-drift check skipped because one state lacked view.camera");
+    warnings.push("camera drift check skipped because one state lacked camera metadata");
   }
 
-  const identicalImages = beforeImage.hash === afterImage.hash;
+  const beforeImage = await readPngMetrics(args.beforeImage);
+  const afterImage = await readPngMetrics(args.afterImage);
+  const diff = await comparePngMetrics(args.beforeImage, args.afterImage);
+  const beforeConsole = readConsoleCounts(args.beforeConsole);
+  const afterConsole = readConsoleCounts(args.afterConsole);
+
+  const findings = buildFindings({
+    beforeState,
+    afterState,
+    beforeImage,
+    afterImage,
+    beforeConsole,
+    afterConsole,
+    diff,
+  });
+  const score = computeScore(findings);
 
   const summary = {
-    passed: true,
+    passed: findings.every((finding) => finding.severity !== "error"),
     reviewedAt: new Date().toISOString(),
     expectedShot: args.expectedShot,
     resolution: `${beforeImage.width}x${beforeImage.height}`,
@@ -272,16 +330,37 @@ function run() {
       pitchDeltaDeg,
       fovDeltaDeg,
     },
-    identicalImages,
+    images: {
+      identical: beforeImage.hash === afterImage.hash,
+      before: beforeImage,
+      after: afterImage,
+      diff,
+    },
+    console: {
+      before: beforeConsole,
+      after: afterConsole,
+    },
+    deltas: {
+      propsPlaced:
+        (afterState.props?.collidersPlaced ?? 0) - (beforeState.props?.collidersPlaced ?? 0),
+      visibleLandmarks:
+        (afterState.landmarks?.visible?.length ?? 0) - (beforeState.landmarks?.visible?.length ?? 0),
+      warnings:
+        (afterState.render?.warnings?.length ?? 0) - (beforeState.render?.warnings?.length ?? 0),
+    },
+    score,
+    findings,
     warnings,
-    reviewNote: args.reviewNote,
+    reviewNote: args.reviewNote || null,
     beforeImage: path.resolve(args.beforeImage),
     afterImage: path.resolve(args.afterImage),
     beforeState: path.resolve(args.beforeState),
     afterState: path.resolve(args.afterState),
+    ...(args.beforeConsole ? { beforeConsole: path.resolve(args.beforeConsole) } : {}),
+    ...(args.afterConsole ? { afterConsole: path.resolve(args.afterConsole) } : {}),
   };
 
   console.log(JSON.stringify(summary, null, 2));
 }
 
-run();
+await run();

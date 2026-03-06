@@ -13,6 +13,7 @@ import type { WallMaterialLibrary, WallTextureQuality } from "../render/material
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type { RuntimeWallMode } from "../utils/UrlParams";
+import { resolveWallShaderProfile } from "./wallShaderProfiles";
 
 export type WallDetailMeshId =
   | "plinth_strip"
@@ -35,7 +36,11 @@ export type WallDetailMeshId =
   | "window_shutter"
   | "window_glass"
   | "balcony_slab"
-  | "balcony_railing";
+  | "balcony_parapet"
+  | "balcony_railing"
+  | "balcony_end_cap"
+  | "balcony_bracket"
+  | "roof_slab";
 
 export type WallDetailInstance = {
   meshId: WallDetailMeshId;
@@ -53,6 +58,8 @@ export type WallDetailInstance = {
   pitchRad?: number;
   rollRad?: number;
   wallMaterialId: string | null;
+  trimMaterialId: string | null;
+  detailMaterialId?: string | null;
 };
 
 export type BuildWallDetailMeshesOptions = {
@@ -70,7 +77,8 @@ type DetailTemplate = {
 
 type DetailBucket = {
   meshId: WallDetailMeshId;
-  wallMaterialId: string | null;
+  materialId: string | null;
+  materialSource: "manifest" | "template" | "mesh-template";
   instances: WallDetailInstance[];
 };
 
@@ -95,22 +103,123 @@ const DETAIL_IDS: WallDetailMeshId[] = [
   "window_shutter",
   "window_glass",
   "balcony_slab",
+  "balcony_parapet",
   "balcony_railing",
+  "balcony_end_cap",
+  "balcony_bracket",
+  "roof_slab",
 ];
 
-const WALL_SURFACE_INHERIT_MESH_IDS = new Set<WallDetailMeshId>([
+const HEAVY_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
   "plinth_strip",
   "cornice_strip",
-  "string_course_strip",
   "corner_pier",
-  "vertical_edge_trim",
   "pilaster",
   "recessed_panel_back",
   "balcony_slab",
+  "balcony_parapet",
+  "balcony_end_cap",
+  "balcony_bracket",
+]);
+
+const LIGHT_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
+  "string_course_strip",
+  "vertical_edge_trim",
 ]);
 
 function inheritsWallSurface(meshId: WallDetailMeshId): boolean {
-  return WALL_SURFACE_INHERIT_MESH_IDS.has(meshId);
+  return HEAVY_TRIM_MESH_IDS.has(meshId) || LIGHT_TRIM_MESH_IDS.has(meshId);
+}
+
+type RoofMaterialShader = Parameters<NonNullable<MeshStandardMaterial["onBeforeCompile"]>>[0];
+type TemplateMaterialOverrideId = "tm_balcony_wood_dark" | "tm_balcony_painted_metal";
+
+function applyRoofDustShader(material: MeshStandardMaterial): void {
+  const previousOnBeforeCompile = material.onBeforeCompile;
+  material.onBeforeCompile = (shader: RoofMaterialShader, renderer): void => {
+    previousOnBeforeCompile.call(material, shader, renderer);
+
+    if (!shader.vertexShader.includes("varying vec3 vRoofWorldPos;")) {
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <common>",
+        `#include <common>
+varying vec3 vRoofWorldPos;
+varying vec3 vRoofWorldNormal;`,
+      );
+      shader.vertexShader = shader.vertexShader.replace(
+        "#include <worldpos_vertex>",
+        `#include <worldpos_vertex>
+{
+  vec4 roofWp = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    roofWp = instanceMatrix * roofWp;
+  #endif
+  roofWp = modelMatrix * roofWp;
+  vRoofWorldPos = roofWp.xyz;
+}
+vec3 roofObjN = normal;
+#ifdef USE_INSTANCING
+roofObjN = mat3(instanceMatrix) * roofObjN;
+#endif
+vRoofWorldNormal = normalize(mat3(modelMatrix) * roofObjN);`,
+      );
+    }
+
+    if (!shader.fragmentShader.includes("varying vec3 vRoofWorldPos;")) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <common>",
+        `#include <common>
+varying vec3 vRoofWorldPos;
+varying vec3 vRoofWorldNormal;
+
+float roofHash12(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float roofValueNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = roofHash12(i);
+  float b = roofHash12(i + vec2(1.0, 0.0));
+  float c = roofHash12(i + vec2(0.0, 1.0));
+  float d = roofHash12(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}`,
+      );
+    }
+
+    if (!shader.fragmentShader.includes("// roof-dust-applied")) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+// roof-dust-applied
+{
+  float upFacing = clamp(vRoofWorldNormal.y, 0.0, 1.0);
+  float dustNoise = roofValueNoise(vRoofWorldPos.xz * 0.22);
+  float dustNoise2 = roofValueNoise(vRoofWorldPos.xz * 0.08 + vec2(17.3, -9.1));
+  float dustMask = upFacing * mix(dustNoise, dustNoise2, 0.4);
+  dustMask = smoothstep(0.15, 0.65, dustMask);
+  vec3 dustColor = vec3(0.85, 0.78, 0.65);
+  diffuseColor.rgb = mix(diffuseColor.rgb, dustColor, dustMask * 0.55);
+}`,
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>
+{
+  float roofUpFacing = clamp(vRoofWorldNormal.y, 0.0, 1.0);
+  roughnessFactor = clamp(roughnessFactor + roofUpFacing * 0.05, 0.04, 1.0);
+}`,
+      );
+    }
+  };
+
+  const previousProgramCacheKey = material.customProgramCacheKey.bind(material);
+  material.customProgramCacheKey = (): string => `${previousProgramCacheKey()}|roof-dust`;
+  material.needsUpdate = true;
 }
 
 function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTemplate> {
@@ -147,26 +256,33 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
     metalness: 0.34,
   });
   const frameTrim = new MeshStandardMaterial({
-    color: highVis ? 0x9a8068 : 0x8a7058,
-    roughness: 0.78,
+    color: highVis ? 0xb59a7c : 0x9d8367,
+    roughness: 0.76,
     metalness: 0.04,
   });
   const woodShutter = new MeshStandardMaterial({
-    color: highVis ? 0x5a8a62 : 0x4a6e52,
-    roughness: 0.75,
+    color: highVis ? 0x6c8d78 : 0x556f60,
+    roughness: 0.8,
     metalness: 0.02,
   });
   const windowGlass = new MeshPhysicalMaterial({
-    color: highVis ? 0x4a7a9a : 0x2e5472,
-    roughness: 0.12,
+    color: highVis ? 0x6b767d : 0x505c64,
+    roughness: 0.22,
     metalness: 0,
     clearcoat: 1,
-    clearcoatRoughness: 0.08,
+    clearcoatRoughness: 0.12,
     ior: 1.5,
-    specularIntensity: 0.7,
-    specularColor: 0xc8e4ff,
+    specularIntensity: 0.5,
+    specularColor: 0xd0d7dd,
   });
   applyWindowGlassShaderTweaks(windowGlass, { highVis });
+
+  const roofBitumen = new MeshStandardMaterial({
+    color: highVis ? 0x4a4540 : 0x3a3530,
+    roughness: 0.92,
+    metalness: 0,
+  });
+  applyRoofDustShader(roofBitumen);
 
   return {
     plinth_strip: {
@@ -249,10 +365,43 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
       geometry: new BoxGeometry(1, 1, 1),
       material: stoneTrim,
     },
+    balcony_parapet: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stoneTrim,
+    },
     balcony_railing: {
       geometry: new BoxGeometry(1, 1, 1),
       material: bracketMetal,
     },
+    balcony_end_cap: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stoneTrim,
+    },
+    balcony_bracket: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: stoneTrim,
+    },
+    roof_slab: {
+      geometry: new BoxGeometry(1, 1, 1),
+      material: roofBitumen,
+    },
+  };
+}
+
+function createTemplateMaterialOverrides(
+  highVis: boolean,
+): Record<TemplateMaterialOverrideId, MeshStandardMaterial> {
+  return {
+    tm_balcony_wood_dark: new MeshStandardMaterial({
+      color: highVis ? 0x98714a : 0x7b5b3d,
+      roughness: 0.8,
+      metalness: 0.02,
+    }),
+    tm_balcony_painted_metal: new MeshStandardMaterial({
+      color: highVis ? 0x7d868d : 0x626a72,
+      roughness: 0.56,
+      metalness: 0.4,
+    }),
   };
 }
 
@@ -317,16 +466,28 @@ function buildPbrDetailMeshes(
   if (materialIds.length === 0) return;
   const fallbackMaterialId = materialIds[0]!;
   const availableMaterialIds = new Set(materialIds);
+  const templateMaterialOverrides = createTemplateMaterialOverrides(options.highVis);
+  const availableTemplateMaterialIds = new Set<string>(Object.keys(templateMaterialOverrides));
 
   const grouped = new Map<string, DetailBucket>();
   for (const instance of instances) {
     const shouldInheritWallSurface = inheritsWallSurface(instance.meshId);
-    const wallMaterialId = shouldInheritWallSurface
-      ? instance.wallMaterialId && availableMaterialIds.has(instance.wallMaterialId)
-        ? instance.wallMaterialId
-        : fallbackMaterialId
-      : null;
-    const key = shouldInheritWallSurface ? `${instance.meshId}|${wallMaterialId}` : `${instance.meshId}|template`;
+    const preferred = instance.detailMaterialId ?? (instance.trimMaterialId ?? instance.wallMaterialId);
+
+    let materialSource: DetailBucket["materialSource"] = "mesh-template";
+    let resolvedMaterialId: string | null = null;
+    if (preferred && availableMaterialIds.has(preferred)) {
+      materialSource = "manifest";
+      resolvedMaterialId = preferred;
+    } else if (preferred && availableTemplateMaterialIds.has(preferred)) {
+      materialSource = "template";
+      resolvedMaterialId = preferred;
+    } else if (shouldInheritWallSurface) {
+      materialSource = "manifest";
+      resolvedMaterialId = fallbackMaterialId;
+    }
+
+    const key = `${instance.meshId}|${materialSource}|${resolvedMaterialId ?? "template"}`;
     const existing = grouped.get(key);
     if (existing) {
       existing.instances.push(instance);
@@ -334,14 +495,19 @@ function buildPbrDetailMeshes(
     }
     grouped.set(key, {
       meshId: instance.meshId,
-      wallMaterialId,
+      materialId: resolvedMaterialId,
+      materialSource,
       instances: [instance],
     });
   }
 
   const surfaceMaterialCache = new Map<string, MeshStandardMaterial>();
-  const getSurfaceMaterial = (materialId: string): MeshStandardMaterial => {
-    const cached = surfaceMaterialCache.get(materialId);
+  const getSurfaceMaterial = (
+    materialId: string,
+    surfaceKind: "detail" | "balcony",
+  ): MeshStandardMaterial => {
+    const cacheKey = `${materialId}|${surfaceKind}`;
+    const cached = surfaceMaterialCache.get(cacheKey);
     if (cached) return cached;
 
     const material = wallMaterials.createStandardMaterial(materialId, options.quality);
@@ -353,24 +519,36 @@ function buildPbrDetailMeshes(
     const uvOffset = resolveMaterialUvOffset(options.seed, materialId);
     applyWallShaderTweaks(material, {
       albedoBoost,
-      macroColorAmplitude: 0.02,
-      macroRoughnessAmplitude: 0.015,
-      macroFrequency: 0.06,
+      macroColorAmplitude: 0.08,
+      macroRoughnessAmplitude: 0.05,
+      macroFrequency: 0.18,
       macroSeed: deriveSubSeed(options.seed, `wall-macro:${materialId}`),
       tileSizeM,
       uvOffset,
+      dirtEnabled: true,
+      floorTopY: 0,
+      dirtHeightM: 1.5,
+      dirtDarken: 0.22,
+      dirtRoughnessBoost: 0.12,
+      ...resolveWallShaderProfile(materialId, surfaceKind),
     });
-    surfaceMaterialCache.set(materialId, material);
+    surfaceMaterialCache.set(cacheKey, material);
     return material;
   };
 
   const dummy = new Object3D();
   for (const bucket of grouped.values()) {
     const template = templates[bucket.meshId];
-    const material = bucket.wallMaterialId ? getSurfaceMaterial(bucket.wallMaterialId) : template.material;
+    const isBalconySurface = bucket.meshId.startsWith("balcony_");
+    const material =
+      bucket.materialSource === "manifest" && bucket.materialId
+        ? getSurfaceMaterial(bucket.materialId, isBalconySurface ? "balcony" : "detail")
+        : bucket.materialSource === "template" && bucket.materialId
+          ? templateMaterialOverrides[bucket.materialId as TemplateMaterialOverrideId]
+          : template.material;
     const mesh = new InstancedMesh(template.geometry, material, bucket.instances.length);
-    mesh.name = bucket.wallMaterialId
-      ? `wall-detail-${bucket.meshId}-${bucket.wallMaterialId}`
+    mesh.name = bucket.materialId
+      ? `wall-detail-${bucket.meshId}-${bucket.materialSource}-${bucket.materialId}`
       : `wall-detail-${bucket.meshId}-template`;
     mesh.castShadow = true;
     mesh.receiveShadow = true;

@@ -4,7 +4,8 @@ import { applyWallShaderTweaks } from "../render/materials/applyWallShaderTweaks
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type { BoundarySegment } from "./buildBlockout";
 import type { RuntimeBlockoutZone } from "./types";
-import { resolveWallMaterialIdForZone } from "./wallMaterialAssignment";
+import { resolveFacadeStyleForSegment } from "./wallMaterialAssignment";
+import { resolveWallShaderProfile } from "./wallShaderProfiles";
 
 const WALL_ZONE_TYPES = new Set([
   "spawn_plaza",
@@ -96,18 +97,35 @@ function appendSegmentFace(
     appendVertex(batch, segment.start, y1, z, 0, 0, normalZ, u0, v1);
   }
 
-  batch.indices.push(
-    baseIndex,
-    baseIndex + 2,
-    baseIndex + 1,
-    baseIndex,
-    baseIndex + 3,
-    baseIndex + 2,
-  );
+  // Geometric (winding-derived) normal sign = sign(end − start).
+  // Shading normal sign = −outward.
+  // When they disagree the face is back-facing and Three.js culls it.
+  const product = (segment.end - segment.start) * segment.outward;
+  const needsFlip = segment.orientation === "vertical" ? product > 0 : product < 0;
+
+  if (needsFlip) {
+    batch.indices.push(
+      baseIndex,
+      baseIndex + 1,
+      baseIndex + 2,
+      baseIndex,
+      baseIndex + 2,
+      baseIndex + 3,
+    );
+  } else {
+    batch.indices.push(
+      baseIndex,
+      baseIndex + 2,
+      baseIndex + 1,
+      baseIndex,
+      baseIndex + 3,
+      baseIndex + 2,
+    );
+  }
   batch.vertexCount += 4;
 }
 
-type SegmentFrame = {
+export type SegmentFrame = {
   centerX: number;
   centerZ: number;
   inwardX: number;
@@ -119,7 +137,7 @@ function pointInRect2D(zone: RuntimeBlockoutZone, x: number, z: number): boolean
   return x >= rect.x && x <= rect.x + rect.w && z >= rect.y && z <= rect.y + rect.h;
 }
 
-function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
+export function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
   if (segment.orientation === "vertical") {
     return {
       centerX: segment.coord,
@@ -137,7 +155,7 @@ function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
   };
 }
 
-function resolveSegmentZone(frame: SegmentFrame, zones: readonly RuntimeBlockoutZone[]): RuntimeBlockoutZone | null {
+export function resolveSegmentZone(frame: SegmentFrame, zones: readonly RuntimeBlockoutZone[]): RuntimeBlockoutZone | null {
   const probeX = frame.centerX + frame.inwardX * 0.1;
   const probeZ = frame.centerZ + frame.inwardZ * 0.1;
   let winner: RuntimeBlockoutZone | null = null;
@@ -157,7 +175,16 @@ function resolveSegmentZone(frame: SegmentFrame, zones: readonly RuntimeBlockout
 }
 
 function resolveZoneMaterialId(zone: RuntimeBlockoutZone | null): string {
-  return resolveWallMaterialIdForZone(zone?.id ?? null);
+  if (!zone) {
+    return "ph_whitewashed_brick";
+  }
+  const style = resolveFacadeStyleForSegment(zone, {
+    centerX: zone.rect.x + zone.rect.w * 0.5,
+    centerZ: zone.rect.y + zone.rect.h * 0.5,
+    inwardX: 0,
+    inwardZ: 0,
+  });
+  return style.materials.wall;
 }
 
 function resolveManifestMaterialId(
@@ -207,10 +234,13 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
     const segment = options.segments[index]!;
     const frame = toSegmentFrame(segment);
     const zone = resolveSegmentZone(frame, options.zones);
+    const zoneMaterialId = zone
+      ? resolveFacadeStyleForSegment(zone, frame).materials.wall
+      : resolveZoneMaterialId(zone);
     const materialId = resolveManifestMaterialId(
       materialIds,
       availableMaterialIds,
-      resolveZoneMaterialId(zone),
+      zoneMaterialId,
     );
     const uvSeed = deriveSubSeed(options.seed, `wall-uv:${index}:${materialId}`);
     const uvRng = new DeterministicRng(uvSeed);
@@ -242,12 +272,18 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
     const uvOffset = resolveMaterialUvOffset(options.seed, materialId);
     applyWallShaderTweaks(material, {
       albedoBoost,
-      macroColorAmplitude: 0.02,
-      macroRoughnessAmplitude: 0.015,
-      macroFrequency: 0.06,
+      macroColorAmplitude: 0.08,
+      macroRoughnessAmplitude: 0.05,
+      macroFrequency: 0.18,
       macroSeed: deriveSubSeed(options.seed, `wall-macro:${materialId}`),
       tileSizeM,
       uvOffset,
+      dirtEnabled: true,
+      floorTopY: options.floorTopY,
+      dirtHeightM: 1.5,
+      dirtDarken: 0.22,
+      dirtRoughnessBoost: 0.12,
+      ...resolveWallShaderProfile(materialId, "wall"),
     });
 
     const mesh = new Mesh(geometry, material);

@@ -7,6 +7,11 @@
     "dev": "pnpm --filter @clawd-strike/client dev -- --port 5174",
     "build": "pnpm --filter @clawd-strike/client build",
     "preview": "pnpm --filter @clawd-strike/client preview",
-    "typecheck": "pnpm --filter @clawd-strike/client typecheck"
+    "typecheck": "pnpm --filter @clawd-strike/client typecheck",
+    "test:playwright": "pnpm --filter @clawd-strike/client test:playwright",
+    "smoke:no-context": "pnpm --filter @clawd-strike/client smoke:no-context",
+    "verify:skills-contract": "pnpm --filter @clawd-strike/client verify:skills-contract",
+    "qa:completion": "pnpm --filter @clawd-strike/client qa:completion",
+    "qa:autonomous": "pnpm --filter @clawd-strike/client qa:autonomous"
   }
 }

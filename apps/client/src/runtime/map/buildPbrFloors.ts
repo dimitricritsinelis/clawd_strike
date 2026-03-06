@@ -1,7 +1,8 @@
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh } from "three";
 import type { FloorMaterialLibrary, FloorTextureQuality } from "../render/materials/FloorMaterialLibrary";
 import { applyFloorShaderTweaks } from "../render/materials/applyFloorShaderTweaks";
-import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
+import { deriveSubSeed } from "../utils/Rng";
+import { resolveFloorMaterialIdForZone } from "./floorMaterialAssignment";
 import type { RuntimeBlockoutSpec, RuntimeRect } from "./types";
 
 const INCLUDED_ZONE_TYPES = new Set([
@@ -12,34 +13,16 @@ const INCLUDED_ZONE_TYPES = new Set([
   "connector",
 ]);
 
-type FloorMaterialId =
+export type FloorMaterialId =
   | "large_sandstone_blocks_01"
   | "grey_tiles"
   | "cobblestone_pavement"
   | "cobblestone_color"
   | "sand_01";
 
-type IncludedZoneType =
-  | "spawn_plaza"
-  | "main_lane_segment"
-  | "side_hall"
-  | "cut"
-  | "connector";
-
-const BASE_FLOOR_MATERIAL: FloorMaterialId = "cobblestone_color";
 const UV_QUARTER_TURNS: 0 | 1 | 2 | 3 = 0;
 const UV_OFFSET_U = 0;
 const UV_OFFSET_V = 0;
-const PATCH_INTERIOR_MARGIN_M = 1.0;
-const GEOMETRY_EPSILON_M = 1e-6;
-
-const PATCH_PROBABILITY_BY_ZONE: Record<IncludedZoneType, number> = {
-  main_lane_segment: 0,
-  spawn_plaza: 0,
-  connector: 0,
-  cut: 0,
-  side_hall: 0,
-};
 
 type MaterialBatch = {
   positions: number[];
@@ -70,29 +53,29 @@ const FLOOR_MACRO_SETTINGS: Record<
   { colorAmplitude: number; roughnessAmplitude: number; frequency: number }
 > = {
   large_sandstone_blocks_01: {
-    colorAmplitude: 0.006,
-    roughnessAmplitude: 0.006,
-    frequency: 0.06,
+    colorAmplitude: 0.04,
+    roughnessAmplitude: 0.035,
+    frequency: 0.035,
   },
   grey_tiles: {
-    colorAmplitude: 0.004,
-    roughnessAmplitude: 0.004,
-    frequency: 0.075,
+    colorAmplitude: 0.03,
+    roughnessAmplitude: 0.025,
+    frequency: 0.045,
   },
   cobblestone_pavement: {
-    colorAmplitude: 0.005,
-    roughnessAmplitude: 0.005,
-    frequency: 0.07,
+    colorAmplitude: 0.04,
+    roughnessAmplitude: 0.03,
+    frequency: 0.04,
   },
   cobblestone_color: {
-    colorAmplitude: 0.005,
-    roughnessAmplitude: 0.005,
-    frequency: 0.07,
+    colorAmplitude: 0.035,
+    roughnessAmplitude: 0.03,
+    frequency: 0.04,
   },
   sand_01: {
-    colorAmplitude: 0.006,
-    roughnessAmplitude: 0.008,
-    frequency: 0.05,
+    colorAmplitude: 0.06,
+    roughnessAmplitude: 0.05,
+    frequency: 0.025,
   },
 };
 
@@ -193,74 +176,6 @@ function intersectRect(a: RuntimeRect, b: RuntimeRect): RuntimeRect | null {
   };
 }
 
-function asIncludedZoneType(zoneType: string): IncludedZoneType | null {
-  if (
-    zoneType === "spawn_plaza" ||
-    zoneType === "main_lane_segment" ||
-    zoneType === "side_hall" ||
-    zoneType === "cut" ||
-    zoneType === "connector"
-  ) {
-    return zoneType;
-  }
-  return null;
-}
-
-function isFullyCoveredCellRect(cellRect: RuntimeRect, patchRect: RuntimeRect): boolean {
-  return (
-    Math.abs(patchRect.x - cellRect.x) <= GEOMETRY_EPSILON_M &&
-    Math.abs(patchRect.y - cellRect.y) <= GEOMETRY_EPSILON_M &&
-    Math.abs(patchRect.w - cellRect.w) <= GEOMETRY_EPSILON_M &&
-    Math.abs(patchRect.h - cellRect.h) <= GEOMETRY_EPSILON_M
-  );
-}
-
-function isInsideZoneInteriorMargin(cellRect: RuntimeRect, zoneRect: RuntimeRect, marginM: number): boolean {
-  const minX = zoneRect.x + marginM;
-  const maxX = zoneRect.x + zoneRect.w - marginM;
-  const minZ = zoneRect.y + marginM;
-  const maxZ = zoneRect.y + zoneRect.h - marginM;
-  if (maxX <= minX + GEOMETRY_EPSILON_M || maxZ <= minZ + GEOMETRY_EPSILON_M) return false;
-  return (
-    cellRect.x >= minX - GEOMETRY_EPSILON_M &&
-    cellRect.y >= minZ - GEOMETRY_EPSILON_M &&
-    cellRect.x + cellRect.w <= maxX + GEOMETRY_EPSILON_M &&
-    cellRect.y + cellRect.h <= maxZ + GEOMETRY_EPSILON_M
-  );
-}
-
-function choosePatchMaterial(zoneType: IncludedZoneType, rng: DeterministicRng): FloorMaterialId {
-  const roll = rng.next();
-  if (zoneType === "spawn_plaza") {
-    if (roll < 0.82) return "sand_01";
-    if (roll < 0.95) return "large_sandstone_blocks_01";
-    return "cobblestone_color";
-  }
-
-  if (zoneType === "main_lane_segment") {
-    if (roll < 0.93) return "sand_01";
-    if (roll < 0.98) return "grey_tiles";
-    return "cobblestone_color";
-  }
-
-  if (zoneType === "connector") {
-    if (roll < 0.84) return "sand_01";
-    if (roll < 0.92) return "large_sandstone_blocks_01";
-    if (roll < 0.98) return "cobblestone_pavement";
-    return "cobblestone_color";
-  }
-
-  if (zoneType === "cut") {
-    if (roll < 0.93) return "sand_01";
-    if (roll < 0.96) return "grey_tiles";
-    return "cobblestone_color";
-  }
-
-  if (roll < 0.84) return "sand_01";
-  if (roll < 0.92) return "cobblestone_pavement";
-  return "cobblestone_color";
-}
-
 function finalizeGeometry(batch: MaterialBatch): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(batch.positions, 3));
@@ -312,9 +227,10 @@ export function buildPbrFloors(spec: RuntimeBlockoutSpec, opts: BuildPbrFloorsOp
 
   for (const zone of spec.zones) {
     if (!INCLUDED_ZONE_TYPES.has(zone.type)) continue;
-    const zoneType = asIncludedZoneType(zone.type);
-    if (!zoneType) continue;
 
+    const materialId = resolveFloorMaterialIdForZone(zone.id);
+    const tileSizeM = opts.manifest.getTileSizeM(materialId);
+    const batch = getBatch(batches, materialId);
     const rect = zone.rect;
     const cellXStart = Math.floor((rect.x - gridOriginX) / patchSizeM);
     const cellXEnd = Math.ceil((rect.x + rect.w - gridOriginX) / patchSizeM) - 1;
@@ -332,22 +248,6 @@ export function buildPbrFloors(spec: RuntimeBlockoutSpec, opts: BuildPbrFloorsOp
         const patchRect = intersectRect(rect, cellRect);
         if (!patchRect) continue;
 
-        let materialId: FloorMaterialId = BASE_FLOOR_MATERIAL;
-        if (
-          isFullyCoveredCellRect(cellRect, patchRect) &&
-          isInsideZoneInteriorMargin(cellRect, rect, PATCH_INTERIOR_MARGIN_M)
-        ) {
-          const patchRng = new DeterministicRng(
-            deriveSubSeed(opts.seed, `floorPatch:${cellX}:${cellZ}`),
-          );
-          const patchProbability = PATCH_PROBABILITY_BY_ZONE[zoneType];
-          if (patchRng.next() < patchProbability) {
-            materialId = choosePatchMaterial(zoneType, patchRng);
-          }
-        }
-
-        const tileSizeM = opts.manifest.getTileSizeM(materialId);
-        const batch = getBatch(batches, materialId);
         appendPatchQuad(
           batch,
           patchRect,

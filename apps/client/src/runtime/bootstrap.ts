@@ -1,10 +1,11 @@
-import { Vector3 } from "three";
+import { PerspectiveCamera, Vector3 } from "three";
 import { Game } from "./game/Game";
 import { PerfHud } from "./debug/PerfHud";
 import { PointerLockController } from "./input/PointerLock";
 import { loadMap, RuntimeMapLoadError } from "./map/loadMap";
+import { designToWorldVec3 } from "./map/coordinateTransforms";
 import { resolveShot } from "./map/shots";
-import type { RuntimeMapAssets } from "./map/types";
+import type { RuntimeAnchor, RuntimeBlockoutSpec, RuntimeMapAssets } from "./map/types";
 import { Renderer } from "./render/Renderer";
 import { FloorMaterialLibrary } from "./render/materials/FloorMaterialLibrary";
 import { WallMaterialLibrary } from "./render/materials/WallMaterialLibrary";
@@ -35,11 +36,16 @@ const FLOOR_MANIFEST_URL = "/assets/textures/environment/bazaar/floors/bazaar_fl
 const WALL_MANIFEST_URL = "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v5/materials.json";
 const PROP_MANIFEST_URL = "/assets/models/environment/bazaar/props/bazaar_prop_models_pack_v1/models.json";
 const PBR_FLOORS_ENABLED = true;
-const PBR_WALLS_ENABLED = false;
+const PBR_WALLS_ENABLED = true;
 const MAP_PROPS_ENABLED = false;
-const RUNTIME_TEXT_API_VERSION = 2;
+const RUNTIME_TEXT_API_VERSION = 4;
+const PUBLIC_AGENT_API_VERSION = 1;
+const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
 const SCORE_STORAGE_PREFIX = "clawd-strike:score-best";
 const SCORE_RULESET_KEY = "wave-score-v1-k10-hs2_5";
+const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+const AGENT_VISIBLE_RENDER_INTERVAL_MS = 1000 / 30;
+const AGENT_BACKGROUND_STEP_INTERVAL_MS = 500;
 
 type ScenePerfSnapshot = {
   materials: number;
@@ -118,6 +124,11 @@ export type RuntimeTextState = {
   };
   render: {
     webgl: boolean;
+    viewport: {
+      width: number;
+      height: number;
+    };
+    warnings: string[];
   };
   view: {
     camera: {
@@ -143,6 +154,102 @@ export type RuntimeTextState = {
   };
   player: {
     name: string;
+    pos: { x: number; y: number; z: number };
+    vel: { x: number; y: number; z: number };
+    withinPlayableBounds: boolean;
+    zoneId: string | null;
+    zoneType: string | null;
+    zoneLabel: string | null;
+    collision: {
+      hitX: boolean;
+      hitY: boolean;
+      hitZ: boolean;
+      grounded: boolean;
+    };
+  };
+  bots: {
+    waveNumber: number;
+    waveElapsedS: number;
+    tier: number;
+    aliveCount: number;
+    graphNodeCount: number;
+    roleCounts: Record<"anchor" | "rifler" | "flanker" | "roamer", number>;
+    preventedFriendlyFireCount: number;
+    lastSeenPlayer: {
+      x: number;
+      y: number;
+      z: number;
+      timeS: number;
+      sourceEnemyId?: string;
+      kind?: "gunshot" | "footstep" | "visual";
+    } | null;
+    lastHeardPlayer: {
+      x: number;
+      y: number;
+      z: number;
+      timeS: number;
+      sourceEnemyId?: string;
+      kind?: "gunshot" | "footstep" | "visual";
+    } | null;
+    enemies?: Array<{
+      id: string;
+      name: string;
+      team: "player" | "enemy";
+      role: "anchor" | "rifler" | "flanker" | "roamer";
+      state: "HOLD" | "OVERWATCH" | "ROTATE" | "INVESTIGATE" | "PEEK" | "PRESSURE" | "FALLBACK" | "RELOAD";
+      tier: number;
+      health: number;
+      reloading: boolean;
+      mag: number;
+      reserve: number;
+      assignedNodeId: string | null;
+      targetNodeId: string | null;
+      memoryRemainingS: number;
+      reactionRemainingS: number;
+      burstShotsRemaining: number;
+      debugReason: string;
+      position: { x: number; y: number; z: number };
+      movePoint: { x: number; z: number } | null;
+      holdPoint: { x: number; z: number } | null;
+      focusPoint: { x: number; y: number; z: number } | null;
+      directSight: boolean;
+      aimYawErrorDeg: number;
+      directiveAgeS: number;
+      targetNodeChangeCount: number;
+    }>;
+  };
+  landmarks: {
+    visible: Array<{
+      id: string;
+      type: string;
+      zone: string;
+      distanceM: number;
+      screenX: number;
+      screenY: number;
+    }>;
+    nearest: {
+      id: string;
+      type: string;
+      zone: string;
+      distanceM: number;
+    } | null;
+  };
+  assets: {
+    floor: {
+      requestedMode: string;
+      activeMode: string;
+      materialCount: number;
+    };
+    wall: {
+      requestedMode: string;
+      activeMode: string;
+      materialCount: number;
+    };
+    props: {
+      requestedVisualMode: string;
+      activeVisualMode: string;
+      modelCount: number;
+    };
   };
   score: {
     current: number;
@@ -197,6 +304,44 @@ export type RuntimeTextState = {
     instancedMeshes: number;
     instancedInstances: number;
   };
+};
+
+export type PublicAgentRunSummary = {
+  survivalTimeS: number;
+  kills: number;
+  headshots: number;
+  shotsFired: number;
+  shotsHit: number;
+  accuracy: number;
+  finalScore: number;
+  bestScore: number;
+  deathCause?: "enemy-fire" | "unknown";
+};
+
+export type PublicAgentObserveState = {
+  apiVersion: number;
+  contract: "public-agent-v1";
+  mode: "loading-screen" | "runtime";
+  runtimeReady: boolean;
+  gameplay: {
+    alive: boolean;
+    gameOverVisible: boolean;
+  };
+  health: number | null;
+  ammo:
+    | {
+        mag: number;
+        reserve: number;
+        reloading: boolean;
+      }
+    | null;
+  score: {
+    current: number;
+    best: number;
+    lastRun: number | null;
+    scope: "browser-session";
+  };
+  lastRunSummary: PublicAgentRunSummary | null;
 };
 
 export type RuntimeHandle = {
@@ -292,13 +437,117 @@ function makeScoreStorageKey(mapId: string): string {
   return `${SCORE_STORAGE_PREFIX}:${mapId}:${SCORE_RULESET_KEY}`;
 }
 
+function roundScoreValue(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.round(value * 2) / 2);
+}
+
+function splitOverlayMessages(text: string | null | undefined): string[] {
+  if (!text) return [];
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function findCurrentZone(spec: RuntimeBlockoutSpec | null, x: number, z: number): { id: string; type: string; label: string } | null {
+  if (!spec) return null;
+
+  let bestMatch: { id: string; type: string; label: string; area: number } | null = null;
+  for (const zone of spec.zones) {
+    const insideX = x >= zone.rect.x && x <= zone.rect.x + zone.rect.w;
+    const insideZ = z >= zone.rect.y && z <= zone.rect.y + zone.rect.h;
+    if (!insideX || !insideZ) continue;
+
+    const area = zone.rect.w * zone.rect.h;
+    if (!bestMatch || area < bestMatch.area) {
+      bestMatch = {
+        id: zone.id,
+        type: zone.type,
+        label: zone.label,
+        area,
+      };
+    }
+  }
+
+  if (!bestMatch) return null;
+  return {
+    id: bestMatch.id,
+    type: bestMatch.type,
+    label: bestMatch.label,
+  };
+}
+
+function isLandmarkAnchor(anchor: RuntimeAnchor): boolean {
+  const normalized = anchor.type.toLowerCase();
+  return normalized === "landmark" || normalized === "hero_landmark";
+}
+
+function collectLandmarkState(
+  anchors: readonly RuntimeAnchor[] | null,
+  camera: PerspectiveCamera,
+  viewportWidth: number,
+  viewportHeight: number,
+): RuntimeTextState["landmarks"] {
+  if (!anchors || anchors.length === 0) {
+    return {
+      visible: [],
+      nearest: null,
+    };
+  }
+
+  const scratch = new Vector3();
+  const visible: RuntimeTextState["landmarks"]["visible"] = [];
+  let nearest: RuntimeTextState["landmarks"]["nearest"] = null;
+
+  for (const anchor of anchors) {
+    if (!isLandmarkAnchor(anchor)) continue;
+
+    const world = designToWorldVec3(anchor.pos);
+    const dx = world.x - camera.position.x;
+    const dy = world.y - camera.position.y;
+    const dz = world.z - camera.position.z;
+    const distanceM = Math.hypot(dx, dy, dz);
+
+    if (!nearest || distanceM < nearest.distanceM) {
+      nearest = {
+        id: anchor.id,
+        type: anchor.type,
+        zone: anchor.zone,
+        distanceM,
+      };
+    }
+
+    scratch.set(world.x, world.y, world.z).project(camera);
+    const inClipSpace = scratch.z >= -1 && scratch.z <= 1;
+    const inViewport = Math.abs(scratch.x) <= 1 && Math.abs(scratch.y) <= 1;
+    if (!inClipSpace || !inViewport) continue;
+
+    visible.push({
+      id: anchor.id,
+      type: anchor.type,
+      zone: anchor.zone,
+      distanceM,
+      screenX: ((scratch.x + 1) * 0.5) * viewportWidth,
+      screenY: ((1 - scratch.y) * 0.5) * viewportHeight,
+    });
+  }
+
+  visible.sort((a, b) => a.distanceM - b.distanceM || a.id.localeCompare(b.id));
+
+  return {
+    visible: visible.slice(0, 6),
+    nearest,
+  };
+}
+
 function readBestScore(storageKey: string): number {
   try {
-    const raw = window.localStorage.getItem(storageKey);
+    const raw = window.sessionStorage.getItem(storageKey);
     if (raw === null) return 0;
     const parsed = Number(raw);
     if (!Number.isFinite(parsed)) return 0;
-    return Math.max(0, Math.round(parsed));
+    return roundScoreValue(parsed);
   } catch {
     return 0;
   }
@@ -306,7 +555,7 @@ function readBestScore(storageKey: string): number {
 
 function writeBestScore(storageKey: string, value: number): void {
   try {
-    window.localStorage.setItem(storageKey, String(Math.max(0, Math.round(value))));
+    window.sessionStorage.setItem(storageKey, String(roundScoreValue(value)));
   } catch {
     // Ignore storage errors in constrained browser contexts.
   }
@@ -390,8 +639,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const renderer = new Renderer(runtimeRoot, {
     highVis: runtimeParams.highVis,
     lightingPreset: runtimeParams.lightingPreset,
+    ao: runtimeParams.ao,
   });
   let disposed = false;
+  let shadowWarmupFrames = 0;
   const weaponAudio = new WeaponAudio();
   const viewModelEnabled = runtimeParams.vm;
   let viewModel: ViewModelInstance | null = warmupAssets?.viewModel ?? null;
@@ -500,7 +751,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     onWeaponShot: (shot) => {
       viewModel?.triggerShotFx();
       weaponAudio.playAk47Shot();
+      game.reportPlayerGunshot();
       waveStats.shotsFired++;
+      runStats.shotsFired++;
 
       // Enemy hit detection: re-raycast against enemy AABBs to see if the bullet hit one
       if (shot.hit && shot.hitPoint) {
@@ -528,8 +781,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
             damage = Math.round(BASE_DAMAGE * 0.75);
           }
           waveStats.shotsHit++;
+          runStats.shotsHit++;
           if (isHeadshot) {
             waveStats.headshots++;
+            runStats.headshots++;
             scoreHud.addHeadshot();
           }
           game.applyDamageToEnemy(enemyHit.enemyId, damage, isHeadshot);
@@ -584,11 +839,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     weaponAudio.playKillDing();
     scoreHud.addKill();
     waveStats.kills++;
+    runStats.kills++;
   });
 
-  // New wave → reset score, stats counters, and hide round-end screen
+  // New wave → keep run score, but reset per-wave breakdowns and timing.
   game.setEnemyNewWaveCallback((_wave) => {
-    scoreHud.reset();
     scoreHud.setTotal(TOTAL_ENEMIES);
     roundEndScreen.hide();
     roundEndShowing = false;
@@ -610,6 +865,13 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     fadeOverlay.fadeOut(0.18, () => {
       // Teleport happens while screen is black
       game.respawn();
+      scoreHud.reset();
+      runStats.kills = 0;
+      runStats.shotsFired = 0;
+      runStats.shotsHit = 0;
+      runStats.headshots = 0;
+      runStartedAtMs = performance.now();
+      lastDamageCause = null;
       game.setFreezeInput(false);
       pauseMenu.hide();
       if (runtimeParams.controlMode === "human") {
@@ -626,7 +888,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   if (mapAssets) {
     game.setBlockoutSpec(mapAssets.blockout);
     game.setAnchorsSpec(mapAssets.anchors);
-    renderer.requestShadowUpdate();
+    shadowWarmupFrames = 3;
   }
   if (resolvedShot?.cameraPose) {
     game.setCameraPose(resolvedShot.cameraPose);
@@ -638,6 +900,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   // Let any async map assignments resolve before we draw the first visible gameplay frame.
   await Promise.resolve();
+  renderer.requestShadowUpdate();
 
   const overviewCameraAtBoot = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
   viewModelVisible = Boolean(viewModelEnabled && viewModel && !overviewCameraAtBoot);
@@ -705,6 +968,12 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     shotsHit: 0,
     headshots: 0,
   };
+  const runStats = {
+    kills: 0,
+    shotsFired: 0,
+    shotsHit: 0,
+    headshots: 0,
+  };
   let perfMsPerFrame = 16.67;
   let perfFps = 60;
   let perfDrawCalls = 0;
@@ -723,9 +992,12 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let bestScore = readBestScore(scoreStorageKey);
   scoreHud.setBestScore(bestScore);
   let lastRunScore: number | null = null;
+  let lastRunSummary: PublicAgentRunSummary | null = null;
+  let runStartedAtMs = performance.now();
+  let lastDamageCause: PublicAgentRunSummary["deathCause"] | null = null;
   let wasAlive = !game.getIsDead();
   const pendingAgentActions: AgentAction[] = [];
-
+  const isInternalDebugSurface = import.meta.env.DEV || INTERNAL_DEBUG_HOSTNAMES.has(window.location.hostname);
   const applyQueuedAgentActions = (): void => {
     if (pendingAgentActions.length === 0) return;
     if (runtimeParams.controlMode === "agent") {
@@ -738,6 +1010,18 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   const state = (): RuntimeTextState => {
     const yawPitch = game.getYawPitchDeg();
+    const playerPosition = game.getPlayerPosition();
+    const playerVelocity = game.getPlayerVelocity();
+    const playerCollision = game.getPlayerCollisionState();
+    const botDebug = game.getBotDebugSnapshot();
+    const currentZone = findCurrentZone(mapAssets?.blockout ?? null, playerPosition.x, playerPosition.z);
+    const warningMessages = splitOverlayMessages(warningOverlay.textContent);
+    const landmarkState = collectLandmarkState(
+      mapAssets?.anchors.anchors ?? null,
+      game.camera,
+      renderer.getWidth(),
+      renderer.getHeight(),
+    );
     const alive = !game.getIsDead();
     const pointerLocked = game.isPointerLocked();
     const currentScore = scoreHud.getScore();
@@ -769,6 +1053,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       },
       render: {
         webgl: renderer.hasWebGL,
+        viewport: {
+          width: renderer.getWidth(),
+          height: renderer.getHeight(),
+        },
+        warnings: warningMessages,
       },
       // Include explicit camera data so screenshot review gates can assert framing consistency.
       // This prevents top-down/floor-only compare-shot regressions from passing unnoticed.
@@ -800,6 +1089,48 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       },
       player: {
         name: runtimeParams.playerName,
+        pos: playerPosition,
+        vel: playerVelocity,
+        withinPlayableBounds: game.isPlayerWithinPlayableBounds(),
+        zoneId: currentZone?.id ?? null,
+        zoneType: currentZone?.type ?? null,
+        zoneLabel: currentZone?.label ?? null,
+        collision: playerCollision,
+      },
+      bots: {
+        waveNumber: game.getWaveNumber(),
+        waveElapsedS: game.getWaveElapsedS(),
+        tier: botDebug?.tier ?? 0,
+        aliveCount: botDebug?.aliveCount ?? 0,
+        graphNodeCount: botDebug?.graphNodeCount ?? 0,
+        roleCounts: botDebug?.roleCounts ?? {
+          anchor: 0,
+          rifler: 0,
+          flanker: 0,
+          roamer: 0,
+        },
+        preventedFriendlyFireCount: botDebug?.preventedFriendlyFireCount ?? 0,
+        lastSeenPlayer: botDebug?.lastSeenPlayer ?? null,
+        lastHeardPlayer: botDebug?.lastHeardPlayer ?? null,
+        ...(runtimeParams.debug && botDebug ? { enemies: botDebug.enemies } : {}),
+      },
+      landmarks: landmarkState,
+      assets: {
+        floor: {
+          requestedMode: runtimeParams.floorMode,
+          activeMode: resolvedFloorMode,
+          materialCount: floorMaterials?.getMaterialIds().length ?? 0,
+        },
+        wall: {
+          requestedMode: runtimeParams.wallMode,
+          activeMode: resolvedWallMode,
+          materialCount: wallMaterials?.getMaterialIds().length ?? 0,
+        },
+        props: {
+          requestedVisualMode: runtimeParams.propVisuals,
+          activeVisualMode: resolvedPropVisuals,
+          modelCount: 0,
+        },
       },
       score: {
         current: currentScore,
@@ -850,6 +1181,34 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     };
   };
 
+  const publicObserveState = (): PublicAgentObserveState => {
+    const alive = !game.getIsDead();
+    const ammoSnapshot = game.getAmmoSnapshot();
+    return {
+      apiVersion: PUBLIC_AGENT_API_VERSION,
+      contract: PUBLIC_AGENT_CONTRACT,
+      mode: "runtime",
+      runtimeReady: mapLoaded,
+      gameplay: {
+        alive,
+        gameOverVisible: deathScreen.isVisible(),
+      },
+      health: Math.max(0, Math.round(game.getPlayerHealth())),
+      ammo: {
+        mag: Math.max(0, Math.floor(ammoSnapshot.mag)),
+        reserve: Math.max(0, Math.floor(ammoSnapshot.reserve)),
+        reloading: ammoSnapshot.reloading,
+      },
+      score: {
+        current: roundScoreValue(scoreHud.getScore()),
+        best: roundScoreValue(bestScore),
+        lastRun: lastRunScore === null ? null : roundScoreValue(lastRunScore),
+        scope: "browser-session",
+      },
+      lastRunSummary,
+    };
+  };
+
   const onResize = (): void => {
     renderer.resize();
     game.setAspect(renderer.getAspect());
@@ -857,9 +1216,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     viewModel?.setAspect(renderer.getAspect());
   };
 
-  const step = (deltaMs: number): void => {
+  const step = (deltaMs: number, options: { renderFrame?: boolean } = {}): void => {
     const clampedMs = Math.min(Math.max(deltaMs, 0), 100);
     const dt = clampedMs / 1000;
+    const renderFrame = options.renderFrame ?? true;
     applyQueuedAgentActions();
 
     // Freeze game input when pause menu is open (death-freeze is managed inside Game.ts)
@@ -872,7 +1232,22 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
     const aliveNow = !game.getIsDead();
     if (!aliveNow && wasAlive) {
-      lastRunScore = scoreHud.getScore();
+      lastRunScore = roundScoreValue(scoreHud.getScore());
+      const nextBestScore = Math.max(bestScore, lastRunScore);
+      const accuracy = runStats.shotsFired > 0
+        ? Math.round(((runStats.shotsHit / runStats.shotsFired) * 100) * 10) / 10
+        : 0;
+      lastRunSummary = {
+        survivalTimeS: Math.round((Math.max(0, performance.now() - runStartedAtMs) / 1000) * 10) / 10,
+        kills: runStats.kills,
+        headshots: runStats.headshots,
+        shotsFired: runStats.shotsFired,
+        shotsHit: runStats.shotsHit,
+        accuracy,
+        finalScore: lastRunScore,
+        bestScore: roundScoreValue(nextBestScore),
+        deathCause: lastDamageCause ?? "unknown",
+      };
       if (lastRunScore > bestScore) {
         bestScore = lastRunScore;
         writeBestScore(scoreStorageKey, bestScore);
@@ -885,6 +1260,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     const currentHealth = game.getPlayerHealth();
     if (currentHealth < previousHealth) {
       hitVignette.triggerHit();
+      lastDamageCause = "enemy-fire";
     }
     previousHealth = currentHealth;
 
@@ -896,6 +1272,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       if (footstepTimerS <= 0) {
         footstepTimerS = speedMps > 4.5 ? 0.45 : 0.65;
         weaponAudio.playFootstep(Math.min(1, speedMps / 6.0));
+        game.reportPlayerFootstep(speedMps);
       }
     } else {
       footstepTimerS = 0; // reset so first step fires immediately on landing
@@ -960,7 +1337,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     hitMarker.update(dt);
     damageNumbers.update(dt);
 
-    if (viewModel) {
+    if (renderFrame && viewModel) {
       viewModel.setFrameInput(speedMps, grounded, swayMouseDeltaX, swayMouseDeltaY);
       swayMouseDeltaX = 0;
       swayMouseDeltaY = 0;
@@ -968,18 +1345,27 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       const weaponDebug = viewModel.getAlignmentSnapshot();
       game.setWeaponDebugSnapshot(weaponDebug.loaded, weaponDebug.dot, weaponDebug.angleDeg);
     } else {
+      swayMouseDeltaX = 0;
+      swayMouseDeltaY = 0;
       game.setWeaponDebugSnapshot(false, -1, 180);
     }
 
-    renderer.renderWithViewModel(
-      game.scene,
-      game.camera,
-      viewModel?.viewModelScene ?? null,
-      viewModel?.viewModelCamera ?? null,
-      viewModelVisible,
-    );
+    if (renderFrame && shadowWarmupFrames > 0) {
+      renderer.requestShadowUpdate();
+      shadowWarmupFrames -= 1;
+    }
 
-    if (perfHud.isVisible()) {
+    if (renderFrame) {
+      renderer.renderWithViewModel(
+        game.scene,
+        game.camera,
+        viewModel?.viewModelScene ?? null,
+        viewModel?.viewModelCamera ?? null,
+        viewModelVisible,
+      );
+    }
+
+    if (renderFrame && perfHud.isVisible()) {
       perfMsPerFrame = perfMsPerFrame * 0.9 + clampedMs * 0.1;
       perfFps = 1000 / Math.max(0.01, perfMsPerFrame);
 
@@ -1009,17 +1395,75 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         dprCap: renderer.getPixelRatioCap(),
         debugEnabled: runtimeParams.debug,
       });
-    } else {
+    } else if (renderFrame) {
       // Sample immediately when the HUD is re-enabled.
       scenePerfSampleElapsed = PERF_SCENE_SAMPLE_INTERVAL_MS;
     }
   };
 
+  const advanceSimulation = (ms: number, options: { renderFrame?: boolean } = {}): void => {
+    const frameMs = 1000 / 60;
+    let remaining = Math.max(0, ms);
+
+    if (remaining === 0) {
+      step(0, options);
+      return;
+    }
+
+    while (remaining > 0) {
+      const nextStep = Math.min(frameMs, remaining);
+      step(nextStep, options);
+      remaining -= nextStep;
+    }
+  };
+
+  let lastAgentRenderTime = 0;
+  let hiddenAgentTimerId: number | null = null;
+  const isAgentHiddenLowPowerMode = (): boolean =>
+    runtimeParams.controlMode === "agent" && document.visibilityState === "hidden";
+  const stopHiddenAgentLoop = (): void => {
+    if (hiddenAgentTimerId === null) return;
+    window.clearTimeout(hiddenAgentTimerId);
+    hiddenAgentTimerId = null;
+  };
+  const scheduleHiddenAgentLoop = (): void => {
+    stopHiddenAgentLoop();
+    if (!isAgentHiddenLowPowerMode() || disposed) return;
+
+    hiddenAgentTimerId = window.setTimeout(() => {
+      hiddenAgentTimerId = null;
+      if (disposed || !isAgentHiddenLowPowerMode()) return;
+      advanceSimulation(AGENT_BACKGROUND_STEP_INTERVAL_MS, { renderFrame: false });
+      scheduleHiddenAgentLoop();
+    }, AGENT_BACKGROUND_STEP_INTERVAL_MS);
+  };
+  const onVisibilityModeChange = (): void => {
+    previousFrameTime = performance.now();
+    lastAgentRenderTime = 0;
+    if (isAgentHiddenLowPowerMode()) {
+      scheduleHiddenAgentLoop();
+      return;
+    }
+    stopHiddenAgentLoop();
+  };
+
   const animate = (time: number): void => {
     if (disposed) return;
+    if (isAgentHiddenLowPowerMode()) {
+      previousFrameTime = time;
+      rafId = window.requestAnimationFrame(animate);
+      return;
+    }
+
     const deltaMs = time - previousFrameTime;
     previousFrameTime = time;
-    step(deltaMs);
+    const shouldRender = runtimeParams.controlMode !== "agent"
+      || lastAgentRenderTime === 0
+      || time - lastAgentRenderTime >= AGENT_VISIBLE_RENDER_INTERVAL_MS;
+    step(deltaMs, { renderFrame: shouldRender });
+    if (shouldRender) {
+      lastAgentRenderTime = time;
+    }
     rafId = window.requestAnimationFrame(animate);
   };
 
@@ -1049,6 +1493,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   pointerLock?.init();
   onResize();
   window.addEventListener("resize", onResize);
+  document.addEventListener("visibilitychange", onVisibilityModeChange);
+  onVisibilityModeChange();
   timerHud.start(); // begin counting from game boot
   rafId = window.requestAnimationFrame(animate);
 
@@ -1057,21 +1503,12 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (!normalized) return;
     pendingAgentActions.push(normalized);
   };
-  window.render_game_to_text = () => JSON.stringify(state());
+  window.agent_observe = () => JSON.stringify(publicObserveState());
+  window.render_game_to_text = () => JSON.stringify(isInternalDebugSurface ? state() : publicObserveState());
   window.advanceTime = async (ms: number) => {
-    const frameMs = 1000 / 60;
-    let remaining = Math.max(0, ms);
-
-    if (remaining === 0) {
-      step(0);
-      return;
-    }
-
-    while (remaining > 0) {
-      const nextStep = Math.min(frameMs, remaining);
-      step(nextStep);
-      remaining -= nextStep;
-    }
+    advanceSimulation(ms, {
+      renderFrame: runtimeParams.controlMode !== "agent" || document.visibilityState === "visible",
+    });
   };
 
   const teardown = (): void => {
@@ -1079,10 +1516,15 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     disposed = true;
 
     window.cancelAnimationFrame(rafId);
+    stopHiddenAgentLoop();
     window.removeEventListener("resize", onResize);
     window.removeEventListener("pagehide", teardown);
     window.removeEventListener("beforeunload", teardown);
+    document.removeEventListener("visibilitychange", onVisibilityModeChange);
     delete window.agent_apply_action;
+    delete window.agent_observe;
+    delete window.render_game_to_text;
+    delete window.advanceTime;
 
     pointerLock?.dispose();
     game.teardown();

@@ -22,8 +22,13 @@ const DEFAULT_AUDIO: LoadingAmbientAudioOptions = {
   startDelayMs: 0,
 };
 
+const PUBLIC_AGENT_API_VERSION = 1;
+const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
+const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+
 export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = {}): LoadingScreenHandle {
   const isVirtualTime = typeof window.__vt_pending !== "undefined";
+  const isInternalDebugSurface = import.meta.env.DEV || INTERNAL_DEBUG_HOSTNAMES.has(window.location.hostname);
 
   const loadingAmbient = new LoadingAmbientAudio({ ...DEFAULT_AUDIO, ...(options.audio ?? {}) });
   let disposed = false;
@@ -114,10 +119,36 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
     // Runtime-only API. Loading screen intentionally ignores agent actions.
   };
 
+  const publicObserveState = () => ({
+    apiVersion: PUBLIC_AGENT_API_VERSION,
+    contract: PUBLIC_AGENT_CONTRACT,
+    mode: "loading-screen" as const,
+    runtimeReady: false,
+    gameplay: {
+      alive: false,
+      gameOverVisible: false,
+    },
+    health: null,
+    ammo: null,
+    score: {
+      current: 0,
+      best: 0,
+      lastRun: null,
+      scope: "browser-session" as const,
+    },
+    lastRunSummary: null,
+  });
+
+  window.agent_observe = () => JSON.stringify(publicObserveState());
+
   window.render_game_to_text = () => {
+    if (!isInternalDebugSurface) {
+      return JSON.stringify(publicObserveState());
+    }
+
     const uiState = ui.getState();
     return JSON.stringify({
-      apiVersion: 2,
+      apiVersion: 4,
       mode: "loading-screen",
       ui: {
         visible: true,

@@ -13,7 +13,7 @@
       },
       "yaw_degrees": "0=+Y(north), 90=+X(east), 180=-Y(south), 270=-X(west)"
     },
-    "shotCount": 9,
+    "shotCount": 11,
     "notes": [
       "MVP shot list for previews/validation. Shots are optional at runtime but useful for automated capture and QA.",
       "All shot positions are approximate and may be adjusted once blockout exists in-engine."
@@ -205,6 +205,74 @@
       "tags": [
         "visual",
         "canopy"
+      ]
+    },
+    {
+      "id": "SHOT_09_BZ_M2_EAST_FACADE",
+      "label": "BZ-M2 east facade",
+      "description": "Hero merchant facade review for the BZ_M2_JOG east wall; validates centered balcony stack and window hierarchy.",
+      "camera": {
+        "pos": {
+          "x": 24,
+          "y": 35.5,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 31.25,
+          "y": 40.5,
+          "z": 4.1
+        },
+        "fovDeg": 70
+      },
+      "durationSec": 4,
+      "tags": [
+        "visual",
+        "facade"
+      ],
+      "reviewPriority": "high",
+      "reviewFocus": [
+        "center hero bay hierarchy",
+        "balcony silhouette and projection",
+        "window rhythm without corner clutter"
+      ],
+      "mustShow": [
+        "one dominant balcony stack",
+        "no first-bay or last-bay windows",
+        "subordinate side openings"
+      ]
+    },
+    {
+      "id": "SHOT_10_SPAWN_A_HERO_FACADE",
+      "label": "Spawn A hero facade",
+      "description": "Spawn courtyard landmark facade review; validates centered stack, quieter neighboring rhythm, and readable value separation.",
+      "camera": {
+        "pos": {
+          "x": 17.5,
+          "y": 2.2,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 24.8,
+          "y": 12,
+          "z": 3.2
+        },
+        "fovDeg": 82
+      },
+      "durationSec": 4,
+      "tags": [
+        "visual",
+        "facade"
+      ],
+      "reviewPriority": "high",
+      "reviewFocus": [
+        "spawn landmark hierarchy",
+        "dominant center composition with quieter neighbors",
+        "window and trim value separation"
+      ],
+      "mustShow": [
+        "single landmark wall read",
+        "calm side windows",
+        "no repeated balcony wallpaper"
       ]
     },
     {

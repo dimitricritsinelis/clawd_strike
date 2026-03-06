@@ -6,21 +6,32 @@
   "scripts": {
     "gen:maps": "node scripts/gen-map-runtime.mjs",
     "review:shot-pair": "node scripts/review-shot-pair.mjs",
+    "capture:shots": "node scripts/capture-map-shots.mjs",
+    "bot:smoke": "node scripts/bot-intelligence-smoke.mjs",
+    "smoke:no-context": "node scripts/no-context-agent-smoke.mjs",
+    "verify:skills-contract": "node scripts/verify-skills-contract.mjs",
+    "qa:completion": "node scripts/qa-completion-gate.mjs && node scripts/bot-intelligence-smoke.mjs",
     "smoke:agent": "node scripts/agent-smoke-runner.mjs",
+    "qa:autonomous": "pnpm qa:completion",
     "predev": "pnpm gen:maps",
     "prebuild": "pnpm gen:maps",
     "prepreview": "pnpm gen:maps",
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:playwright": "playwright test",
+    "test:playwright:headed": "playwright test --headed",
+    "test:playwright:pointer-lock": "PW_POINTER_LOCK=1 playwright test playwright/manual-pointer-lock.spec.ts --headed --workers=1"
   },
   "dependencies": {
     "three": "^0.181.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/three": "^0.181.0",
     "playwright": "^1.58.2",
+    "pngjs": "^7.0.0",
     "typescript": "^5.7.3",
     "vite": "^6.0.11"
   }

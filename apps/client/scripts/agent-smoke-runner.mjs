@@ -1,144 +1,142 @@
-import { chromium } from "playwright";
+import path from "node:path";
+import {
+  DEFAULT_AGENT_NAME,
+  DEFAULT_BASE_URL,
+  DEFAULT_MAP_ID,
+  TRAVERSAL_ROUTES,
+  attachConsoleRecorder,
+  captureRuntimeSnapshot,
+  ensureDir,
+  gotoAgentRuntime,
+  launchBrowser,
+  parseBaseUrl,
+  parseBooleanEnv,
+  runAgentRoute,
+  startTracing,
+  stopTracing,
+  trimAgentName,
+  writeJson,
+} from "./lib/runtimePlaywright.mjs";
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:5174";
-const DEFAULT_AGENT_NAME = "SmokeRunner";
-const RUNTIME_READY_TIMEOUT_MS = 20_000;
-const RUN_DURATION_MS = 10_000;
-const ACTION_INTERVAL_MS = 100;
-const MIN_MOVED_DISTANCE_M = 0.1;
-
-function fail(message) {
-  throw new Error(`[smoke:agent] ${message}`);
+function timestampId() {
+  return new Date().toISOString().replace(/[:.]/g, "-");
 }
 
-function parseBaseUrl(value) {
-  try {
-    return new URL(value).toString();
-  } catch {
-    fail(`BASE_URL is invalid: '${value}'`);
+function resolveRoutes(routeIdsRaw) {
+  if (!routeIdsRaw) return TRAVERSAL_ROUTES;
+
+  const requestedIds = routeIdsRaw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  const routes = TRAVERSAL_ROUTES.filter((route) => requestedIds.includes(route.id));
+  if (routes.length === 0) {
+    throw new Error(`No traversal routes matched ROUTE_IDS='${routeIdsRaw}'`);
   }
-}
-
-function asFiniteNumber(value, label) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    fail(`${label} must be a finite number`);
-  }
-  return value;
-}
-
-function readCameraAndScore(state, label) {
-  if (!state || typeof state !== "object") {
-    fail(`${label} state is missing`);
-  }
-
-  const camera = state.view?.camera?.pos;
-  if (!camera || typeof camera !== "object") {
-    fail(`${label} missing view.camera.pos`);
-  }
-
-  return {
-    camera: {
-      x: asFiniteNumber(camera.x, `${label}.view.camera.pos.x`),
-      y: asFiniteNumber(camera.y, `${label}.view.camera.pos.y`),
-      z: asFiniteNumber(camera.z, `${label}.view.camera.pos.z`),
-    },
-    scoreCurrent: asFiniteNumber(state.score?.current, `${label}.score.current`),
-  };
-}
-
-async function readState(page) {
-  return page.evaluate(() => {
-    if (typeof window.render_game_to_text !== "function") {
-      return null;
-    }
-    try {
-      return JSON.parse(window.render_game_to_text());
-    } catch {
-      return null;
-    }
-  });
+  return routes;
 }
 
 const BASE_URL = parseBaseUrl(process.env.BASE_URL ?? DEFAULT_BASE_URL);
-const AGENT_NAME = (process.env.AGENT_NAME ?? DEFAULT_AGENT_NAME).trim().slice(0, 15);
+const MAP_ID = (process.env.MAP_ID ?? DEFAULT_MAP_ID).trim() || DEFAULT_MAP_ID;
+const AGENT_NAME = trimAgentName(process.env.AGENT_NAME, DEFAULT_AGENT_NAME);
+const HEADLESS = parseBooleanEnv(process.env.HEADLESS, true);
+const ROUTES = resolveRoutes(process.env.ROUTE_IDS);
+const OUTPUT_DIR = path.resolve(
+  process.cwd(),
+  process.env.OUTPUT_DIR ?? `../../artifacts/playwright/agent-smoke/${timestampId()}`,
+);
 
-if (AGENT_NAME.length === 0) {
-  fail("AGENT_NAME must be non-empty after trimming");
-}
+await ensureDir(OUTPUT_DIR);
 
-const browser = await chromium.launch({
-  channel: "chrome",
-  headless: false,
-});
+const { browser, context, page } = await launchBrowser({ headless: HEADLESS });
+const consoleRecorder = attachConsoleRecorder(page);
+await startTracing(context);
+
+const runSummary = {
+  baseUrl: BASE_URL,
+  mapId: MAP_ID,
+  agentName: AGENT_NAME,
+  headless: HEADLESS,
+  outputDir: OUTPUT_DIR,
+  startedAt: new Date().toISOString(),
+  routes: [],
+};
 
 try {
-  const context = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-  });
-  const page = await context.newPage();
+  for (const route of ROUTES) {
+    const routeDir = path.join(OUTPUT_DIR, route.id);
+    await ensureDir(routeDir);
+    consoleRecorder.clear();
 
-  console.log(`[smoke:agent] opening ${BASE_URL}`);
-  await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
-  await page.getByTestId("agent-mode").click();
-  await page.getByTestId("play").click();
-  const agentNameInput = page.getByTestId("agent-name");
-  await agentNameInput.fill(AGENT_NAME);
-  await agentNameInput.press("Enter");
+    await gotoAgentRuntime(page, {
+      baseUrl: BASE_URL,
+      mapId: MAP_ID,
+      agentName: AGENT_NAME,
+      spawn: route.spawn,
+      extraSearchParams: {
+        unlimitedHealth: 1,
+      },
+    });
 
-  await page.waitForFunction(() => {
-    if (typeof window.render_game_to_text !== "function") return false;
-    try {
-      const s = JSON.parse(window.render_game_to_text());
-      return s.mode === "runtime" && s.map?.loaded === true;
-    } catch {
-      return false;
+    const startState = await captureRuntimeSnapshot(page, {
+      imagePath: path.join(routeDir, "start.png"),
+      statePath: path.join(routeDir, "start.state.json"),
+    });
+    const routeSummary = await runAgentRoute(page, route);
+    const endState = await captureRuntimeSnapshot(page, {
+      imagePath: path.join(routeDir, "final.png"),
+      statePath: path.join(routeDir, "final.state.json"),
+    });
+    const consoleCounts = consoleRecorder.counts();
+
+    await writeJson(path.join(routeDir, "console.json"), {
+      events: consoleRecorder.snapshot(),
+      counts: consoleCounts,
+    });
+
+    const routeReport = {
+      ...routeSummary,
+      startZoneId: startState.player?.zoneId ?? null,
+      endZoneId: endState.player?.zoneId ?? null,
+      endedWithWarnings: endState.render?.warnings ?? [],
+      console: consoleCounts,
+    };
+    runSummary.routes.push(routeReport);
+
+    if (routeSummary.distanceM < route.expectedMinDistanceM) {
+      throw new Error(
+        `[smoke:agent] route ${route.id} moved ${routeSummary.distanceM.toFixed(2)}m (expected >= ${route.expectedMinDistanceM.toFixed(2)}m)`,
+      );
     }
-  }, { timeout: RUNTIME_READY_TIMEOUT_MS });
-
-  const initialState = await readState(page);
-  const initial = readCameraAndScore(initialState, "initial");
-  const runStarted = Date.now();
-  let tick = 0;
-
-  while (Date.now() - runStarted < RUN_DURATION_MS) {
-    const lookYawDelta = tick % 2 === 0 ? 0.5 : -0.3;
-    const lookPitchDelta = tick % 5 === 0 ? 0.04 : 0;
-    const fire = tick % 6 === 0;
-    const sampledState = await page.evaluate(({ lookYawDelta, lookPitchDelta, fire }) => {
-      window.agent_apply_action?.({
-        moveZ: 1,
-        sprint: true,
-        lookYawDelta,
-        lookPitchDelta,
-        fire,
-      });
-      return JSON.parse(window.render_game_to_text());
-    }, { lookYawDelta, lookPitchDelta, fire });
-
-    readCameraAndScore(sampledState, `tick-${tick}`);
-    tick += 1;
-    await page.waitForTimeout(ACTION_INTERVAL_MS);
+    if (routeSummary.maxStationaryTicks > route.maxStationaryTicks) {
+      throw new Error(
+        `[smoke:agent] route ${route.id} stalled for ${routeSummary.maxStationaryTicks} ticks (allowed ${route.maxStationaryTicks})`,
+      );
+    }
+    if (!routeSummary.withinPlayableBounds) {
+      throw new Error(`[smoke:agent] route ${route.id} ended outside playable bounds`);
+    }
+    if (!routeSummary.endedAlive) {
+      throw new Error(`[smoke:agent] route ${route.id} ended in a dead state`);
+    }
+    if (consoleCounts.errorCount > 0) {
+      throw new Error(`[smoke:agent] route ${route.id} emitted ${consoleCounts.errorCount} console/page errors`);
+    }
   }
 
-  const finalState = await readState(page);
-  const final = readCameraAndScore(finalState, "final");
-  const movedDistanceM = Math.hypot(
-    final.camera.x - initial.camera.x,
-    final.camera.y - initial.camera.y,
-    final.camera.z - initial.camera.z,
-  );
-
-  if (movedDistanceM < MIN_MOVED_DISTANCE_M) {
-    fail(
-      `camera moved only ${movedDistanceM.toFixed(3)}m (expected >= ${MIN_MOVED_DISTANCE_M.toFixed(3)}m)`,
-    );
-  }
-
-  console.log(
-    `[smoke:agent] pass | name=${AGENT_NAME} | moved=${movedDistanceM.toFixed(3)}m | score.current=${final.scoreCurrent}`,
-  );
-
-  await context.close();
+  runSummary.finishedAt = new Date().toISOString();
+  await stopTracing(context, path.join(OUTPUT_DIR, "trace.zip"));
+  await writeJson(path.join(OUTPUT_DIR, "summary.json"), runSummary);
+  console.log(`[smoke:agent] pass | routes=${ROUTES.length} | output=${OUTPUT_DIR}`);
+} catch (error) {
+  runSummary.finishedAt = new Date().toISOString();
+  runSummary.failed = true;
+  runSummary.failure = error instanceof Error ? error.message : String(error);
+  await stopTracing(context, path.join(OUTPUT_DIR, "trace.zip"));
+  await writeJson(path.join(OUTPUT_DIR, "summary.json"), runSummary);
+  throw error;
 } finally {
+  await context.close();
   await browser.close();
 }

@@ -32,7 +32,9 @@ export class PlayerController {
   private readonly motionResult: MotionResult = { hitX: false, hitY: false, hitZ: false, grounded: false };
 
   private world: WorldColliders | null = null;
+  private velocityX = 0;
   private velocityY = 0;
+  private velocityZ = 0;
   private grounded = true;
   private horizontalSpeedMps = 0;
   /** Coyote timer: counts down from COYOTE_TIME_S when the player leaves the ground. */
@@ -49,11 +51,17 @@ export class PlayerController {
     this.position.x = x;
     this.position.y = y;
     this.position.z = z;
+    this.velocityX = 0;
     this.velocityY = 0;
+    this.velocityZ = 0;
     this.grounded = true;
     this.horizontalSpeedMps = 0;
     this.coyoteTimerS = 0;
     this.jumpBufferTimerS = 0;
+    this.motionResult.hitX = false;
+    this.motionResult.hitY = false;
+    this.motionResult.hitZ = false;
+    this.motionResult.grounded = true;
     this.clampToPlayableBounds();
   }
 
@@ -93,6 +101,8 @@ export class PlayerController {
 
       const velocityX = (forwardX * forward + rightX * right) * speedMps;
       const velocityZ = (forwardZ * forward + rightZ * right) * speedMps;
+      this.velocityX = velocityX;
+      this.velocityZ = velocityZ;
       this.horizontalSpeedMps = Math.hypot(velocityX, velocityZ);
 
       // ── Coyote time: allow jumping briefly after walking off a ledge ────────
@@ -144,12 +154,45 @@ export class PlayerController {
     return this.position;
   }
 
+  getVelocity(): Readonly<MutablePosition> {
+    return {
+      x: this.velocityX,
+      y: this.velocityY,
+      z: this.velocityZ,
+    };
+  }
+
   getGrounded(): boolean {
     return this.grounded;
   }
 
   getHorizontalSpeedMps(): number {
     return this.horizontalSpeedMps;
+  }
+
+  getLastCollisionState(): MotionResult {
+    return {
+      hitX: this.motionResult.hitX,
+      hitY: this.motionResult.hitY,
+      hitZ: this.motionResult.hitZ,
+      grounded: this.motionResult.grounded,
+    };
+  }
+
+  isWithinPlayableBounds(): boolean {
+    if (!this.world) return true;
+
+    const minX = this.world.playableBounds.minX + PLAYER_HALF_WIDTH_M + BOUNDS_EPSILON_M;
+    const maxX = this.world.playableBounds.maxX - PLAYER_HALF_WIDTH_M - BOUNDS_EPSILON_M;
+    const minZ = this.world.playableBounds.minZ + PLAYER_HALF_WIDTH_M + BOUNDS_EPSILON_M;
+    const maxZ = this.world.playableBounds.maxZ - PLAYER_HALF_WIDTH_M - BOUNDS_EPSILON_M;
+
+    return (
+      this.position.x >= minX &&
+      this.position.x <= maxX &&
+      this.position.z >= minZ &&
+      this.position.z <= maxZ
+    );
   }
 
   private clampToPlayableBounds(): void {

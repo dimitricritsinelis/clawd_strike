@@ -1,7 +1,8 @@
 import { AmbientLight, Color, DirectionalLight, FogExp2, HemisphereLight, Object3D, PerspectiveCamera, Scene, Vector3 } from "three";
+import { installDesertSky, type DesertSkyHandle } from "../render/DesertSky";
 import { AnchorsDebug, type AnchorsDebugState } from "../debug/AnchorsDebug";
 import { Hud } from "../debug/Hud";
-import { EnemyManager, type EnemyHitResult } from "../enemies/EnemyManager";
+import { EnemyManager, type EnemyHitResult, type EnemyManagerDebugSnapshot } from "../enemies/EnemyManager";
 import type { WeaponAudio } from "../audio/WeaponAudio";
 import { buildBlockout } from "../map/buildBlockout";
 import { buildProps, type PropsBuildStats } from "../map/buildProps";
@@ -110,6 +111,7 @@ export class Game {
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
 
+  private desertSky: DesertSkyHandle | null = null;
   private controlMode: RuntimeControlMode = "human";
   private readonly pressedKeys = new Set<string>();
   private readonly lookDirection = new Vector3();
@@ -446,6 +448,7 @@ export class Game {
       }
       this.wasGrounded = nowGrounded;
       this.updateCameraFromPlayer();
+      this.desertSky?.update();
 
       this.camera.getWorldDirection(this.cameraForward);
       const fireResult = this.weapon.update(
@@ -562,12 +565,40 @@ export class Game {
     }
     this.enemyManager?.dispose(this.scene);
     this.enemyManager = null;
+    this.desertSky?.dispose();
+    this.desertSky = null;
     this.clearBlockout();
     this.clearProps();
   }
 
   getGrounded(): boolean {
     return this.playerController.getGrounded();
+  }
+
+  getPlayerPosition(): { x: number; y: number; z: number } {
+    const position = this.playerController.getPosition();
+    return {
+      x: position.x,
+      y: position.y,
+      z: position.z,
+    };
+  }
+
+  getPlayerVelocity(): { x: number; y: number; z: number } {
+    const velocity = this.playerController.getVelocity();
+    return {
+      x: velocity.x,
+      y: velocity.y,
+      z: velocity.z,
+    };
+  }
+
+  getPlayerCollisionState(): { hitX: boolean; hitY: boolean; hitZ: boolean; grounded: boolean } {
+    return this.playerController.getLastCollisionState();
+  }
+
+  isPlayerWithinPlayableBounds(): boolean {
+    return this.playerController.isWithinPlayableBounds();
   }
 
   getSpeedMps(): number {
@@ -635,6 +666,23 @@ export class Game {
 
   setEnemyNewWaveCallback(cb: (wave: number) => void): void {
     this.enemyManager?.setNewWaveCallback(cb);
+  }
+
+  reportPlayerGunshot(): void {
+    this.enemyManager?.reportPlayerGunshot(this.playerController.getPosition());
+  }
+
+  reportPlayerFootstep(speedMps: number): void {
+    if (speedMps <= 0.4) return;
+    this.enemyManager?.reportPlayerFootstep(this.playerController.getPosition(), speedMps);
+  }
+
+  getBotDebugSnapshot(): EnemyManagerDebugSnapshot | null {
+    return this.enemyManager?.getDebugSnapshot() ?? null;
+  }
+
+  getWaveElapsedS(): number {
+    return this.enemyManager?.getWaveElapsedS() ?? 0;
   }
 
   setLandingCallback(cb: () => void): void {
@@ -747,32 +795,63 @@ export class Game {
       return;
     }
 
-    this.scene.background = new Color(0xF9E6C4);
-    this.scene.fog = new FogExp2(0xF9E6C4, 0.009);
+    // ── Desert lighting rig (Dust2-style) ──────────────────────────────
+    // Tuning constants kept here for easy adjustment.
+    const FOG_COLOR = 0xEADBC8;       // warm dust
+    const AMBIENT_COLOR = 0xFFEFD4;
+    const AMBIENT_INTENSITY = 0.22;   // keep plaster readable without washing edges
+    const HEMI_SKY = 0xCFE3FF;        // cool pale blue
+    const HEMI_GROUND = 0xD7B07A;     // sand bounce
+    const HEMI_INTENSITY = 0.48;
+    const SUN_COLOR = 0xFFD2A1;
+    const SUN_INTENSITY = 2.1;
+    const SUN_POS: [number, number, number] = [-110, 75, -40];
+    const SUN_TARGET: [number, number, number] = [25, 0, 41];
+    const SHADOW_MAP_SIZE = 2048;
+    const SHADOW_BIAS = 0.0001;        // reduced shadow creep
+    const SHADOW_NORMAL_BIAS = 0.015;
+    const SHADOW_BOUNDS = 50;         // ±50 ortho frustum (covers 50×82m playable area)
+    const SHADOW_RADIUS = 1;
+    const FILL_COLOR = 0xBFD9FF;      // cool blue counter-fill
+    const FILL_INTENSITY = 0.16;
+    const FILL_POS: [number, number, number] = [90, 35, 70];
+    const FOG_DENSITY = 0.0045;
 
-    const ambient = new AmbientLight(0xFFEFD4, 0.52);
-    const hemi = new HemisphereLight(0xFFEBCB, 0xE2B684, 1.0);
+    this.scene.fog = new FogExp2(FOG_COLOR, FOG_DENSITY);
+
+    const ambient = new AmbientLight(AMBIENT_COLOR, AMBIENT_INTENSITY);
+    const hemi = new HemisphereLight(HEMI_SKY, HEMI_GROUND, HEMI_INTENSITY);
     hemi.position.set(0, 50, 0);
 
-    const sun = new DirectionalLight(0xFFD39C, 1.42);
-    sun.position.set(-32, 88, -10);
+    const sun = new DirectionalLight(SUN_COLOR, SUN_INTENSITY);
+    sun.position.set(...SUN_POS);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 200;
-    sun.shadow.camera.left = -70;
-    sun.shadow.camera.right = 70;
-    sun.shadow.camera.top = 70;
-    sun.shadow.camera.bottom = -70;
-    sun.shadow.bias = -0.00015;
-    sun.shadow.normalBias = 0.02;
-    sun.target.position.set(25, 0, 41);
+    sun.shadow.camera.left = -SHADOW_BOUNDS;
+    sun.shadow.camera.right = SHADOW_BOUNDS;
+    sun.shadow.camera.top = SHADOW_BOUNDS;
+    sun.shadow.camera.bottom = -SHADOW_BOUNDS;
+    sun.shadow.bias = SHADOW_BIAS;
+    sun.shadow.normalBias = SHADOW_NORMAL_BIAS;
+    sun.shadow.radius = SHADOW_RADIUS;
+    sun.target.position.set(...SUN_TARGET);
 
-    const fill = new DirectionalLight(0xFFD7A3, 0.52);
-    fill.position.set(54, 38, 28);
+    const fill = new DirectionalLight(FILL_COLOR, FILL_INTENSITY);
+    fill.position.set(...FILL_POS);
     fill.castShadow = false;
 
     this.scene.add(ambient, hemi, sun, sun.target, fill);
+
+    // Live procedural desert skydome (scaled within camera.far, follows camera each frame)
+    this.scene.background = null; // skydome IS the background; clearColor serves as fallback
+    this.desertSky = installDesertSky({
+      scene: this.scene,
+      camera: this.camera,
+      sunLight: sun,
+      preset: "late-afternoon",
+    });
   }
 
   private setupInitialView(): void {
@@ -1011,6 +1090,8 @@ export class Game {
     this.runtimeColliders = [...builtBlockout.colliders, ...this.propColliders].sort((a, b) => a.id.localeCompare(b.id));
     this.worldColliders = new WorldColliders(this.runtimeColliders, blockoutSpec.playable_boundary);
     this.playerController.setWorld(this.worldColliders);
+    this.enemyManager?.fullDispose(this.scene);
+    this.enemyManager?.setTacticalContext(blockoutSpec, this.anchorsSpec ?? null);
     this.enemyManager?.spawn(this.worldColliders);
 
     const spawnPose = this.selectSpawnPose(blockoutSpec, this.spawn);

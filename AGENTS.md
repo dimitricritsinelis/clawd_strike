@@ -54,11 +54,12 @@ If progress.md becomes noisy or transcript-like, fix it immediately.
 ### 1.3 Hard non-goals during MVP blockout (do NOT implement)
 Until the map blockout is approved:
 - texture/material ingestion systems, LUTs, decals, final lookdev pipelines
-- golden multi-shot suites, heavy audits, heavy Playwright loops
+- brittle golden multi-shot suites, broad browser matrices, or heavy Playwright loops that are expensive to maintain
 - netcode/server authority/multiplayer
 - “final performance budgets” (just avoid obvious perf footguns)
 
 If a task tries to pull these in, mark them out of scope and do not do them.
+Lightweight autonomous Playwright capture/review is in scope when it stays deterministic, produces local artifacts, and directly improves map iteration.
 
 ---
 
@@ -228,23 +229,28 @@ Every prompt must end with:
 - run repo typecheck
 - run repo build
 
-2) Manual smoke test (30–60 seconds)
-- restart dev server
-- open canonical playtest URL
-- verify spawn + pointer lock + move/look + collide + no console spam
+2) Autonomous completion gate (required)
+- run `pnpm qa:completion` headless so the browser stays behind the scenes
+- review the latest multi-angle screenshots + runtime summary under `artifacts/playwright/completion-gate/`
+- do not mark the implementation complete until the review passes and Codex has critiqued the screenshots/state
 
-3) Screenshots (exactly 2 per prompt)
+3) Human smoke test (only when needed)
+- required when input flow, pointer lock, fullscreen, or menu UX changed
+- otherwise the headless completion gate is the default end-of-prompt smoke path
+
+4) Screenshots (exactly 2 per prompt)
 - `before.png` captured at the start (pre-change)
 - `after.png` captured after validation passes
 - same deterministic viewpoint (use `shot=compare`)
+- Additional internal automation captures are required for self-review before completion: capture a fixed 5-8 shot set from `shots.json` plus state/console artifacts through the completion gate.
 
 Store under:
 - `artifacts/screenshots/<PROMPT_ID>/before.png`
 - `artifacts/screenshots/<PROMPT_ID>/after.png`
 
-Codex must return both screenshots in chat at the end of the prompt.
+Codex must return both screenshots in chat at the end of the prompt and summarize the completion-gate review.
 
-4) Update progress.md
+5) Update progress.md
 - tight bullets: what changed, files touched, how to test, next 3 tasks, known issues
 
 ---
@@ -279,11 +285,12 @@ Codex must return both screenshots in chat at the end of the prompt.
 ```bash
 # <typecheck command>
 # <build command>
+# <qa:completion command>
 ```
 Screenshots (exactly 2):
 artifacts/screenshots/<PROMPT_ID>/before.png
 artifacts/screenshots/<PROMPT_ID>/after.png
-Reset & Open:
+Reset & Open (only if human smoke is required):
 # <dev command>
 open "<canonical playtest URL from progress.md>"
 Progress update (required):

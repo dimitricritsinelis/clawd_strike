@@ -6,14 +6,24 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
 import { resolveBlockoutPalette } from "./BlockoutMaterials";
 import type { RuntimeLightingPreset } from "../utils/UrlParams";
 
 const MAX_PIXEL_RATIO = 2;
 
+// ── SSAO tuning constants ───────────────────────────────────────────
+const SSAO_KERNEL_RADIUS = 4;
+const SSAO_MIN_DISTANCE = 0.002;
+const SSAO_MAX_DISTANCE = 0.14;
+
 type RendererOptions = {
   highVis: boolean;
   lightingPreset: RuntimeLightingPreset;
+  ao: boolean;
 };
 
 export type RendererPerfInfo = {
@@ -57,6 +67,9 @@ export class Renderer {
   readonly canvas: HTMLCanvasElement;
   readonly hasWebGL: boolean;
   private readonly renderer: WebGLRenderer | null;
+  private composer: EffectComposer | null = null;
+  private worldPass: RenderPass | null = null;
+  private ssaoPass: SSAOPass | null = null;
   private width = 1;
   private height = 1;
 
@@ -94,19 +107,43 @@ export class Renderer {
     if (this.renderer) {
       this.renderer.outputColorSpace = SRGBColorSpace;
       this.renderer.toneMapping = ACESFilmicToneMapping;
-      this.renderer.toneMappingExposure = 1.45;
+      this.renderer.toneMappingExposure = 1.32;
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = PCFSoftShadowMap;
       this.renderer.shadowMap.autoUpdate = false;
+      this.renderer.shadowMap.needsUpdate = true;
       this.renderer.info.autoReset = false;
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
       this.renderer.setClearColor(
-        options.lightingPreset === "golden" ? 0xF9E6C4 : palette.background,
+        options.lightingPreset === "golden" ? 0xEADBC8 : palette.background,
         1,
       );
     }
 
     this.resize();
+
+    // ── SSAO composer (world-only; viewmodel is rendered directly after) ──
+    if (this.renderer && options.ao && options.lightingPreset === "golden") {
+      const dpr = this.renderer.getPixelRatio();
+      this.composer = new EffectComposer(this.renderer);
+      this.composer.setPixelRatio(dpr);
+      this.composer.setSize(this.width, this.height);
+
+      // Placeholder scene/camera — swapped each frame before render
+      this.worldPass = new RenderPass(new Scene(), new PerspectiveCamera());
+      this.composer.addPass(this.worldPass);
+
+      const halfW = Math.max(1, Math.floor(this.width / 2));
+      const halfH = Math.max(1, Math.floor(this.height / 2));
+      this.ssaoPass = new SSAOPass(new Scene(), new PerspectiveCamera(), halfW, halfH);
+      this.ssaoPass.kernelRadius = SSAO_KERNEL_RADIUS;
+      this.ssaoPass.minDistance = SSAO_MIN_DISTANCE;
+      this.ssaoPass.maxDistance = SSAO_MAX_DISTANCE;
+      this.composer.addPass(this.ssaoPass);
+
+      // OutputPass applies tone mapping + sRGB conversion (required since Three.js r154+)
+      this.composer.addPass(new OutputPass());
+    }
   }
 
   getAspect(): number {
@@ -161,6 +198,7 @@ export class Renderer {
     if (this.renderer) {
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
       this.renderer.setSize(nextWidth, nextHeight, false);
+      this.composer?.setSize(nextWidth, nextHeight);
       return;
     }
 
@@ -184,14 +222,30 @@ export class Renderer {
   ): void {
     if (!this.renderer) return;
     this.renderer.info.reset();
-    this.renderer.render(worldScene, worldCamera);
+
+    if (this.composer && this.worldPass && this.ssaoPass) {
+      // Swap scene/camera into the passes for this frame
+      this.worldPass.scene = worldScene;
+      this.worldPass.camera = worldCamera;
+      this.ssaoPass.scene = worldScene;
+      this.ssaoPass.camera = worldCamera;
+      this.composer.render();
+    } else {
+      this.renderer.render(worldScene, worldCamera);
+    }
+
     if (!renderViewModel || !viewModelScene || !viewModelCamera) return;
 
+    // Viewmodel rendered directly — no SSAO applied to weapon
     const prevAutoClear = this.renderer.autoClear;
     this.renderer.autoClear = false;
     this.renderer.clearDepth();
     this.renderer.render(viewModelScene, viewModelCamera);
     this.renderer.autoClear = prevAutoClear;
+  }
+
+  getWebGLRenderer(): WebGLRenderer | null {
+    return this.renderer;
   }
 
   dispose(): void {
