@@ -1,48 +1,45 @@
-# Bazaar Slice v2.3 — Map Design Package (10P FPS)
+Audience: human, implementation-agent
+Authority: normative
+Read when: map, visuals, gameplay
+Owns: map-design authority map, source-of-truth order, approved reference pack, runtime generation entrypoints
+Do not use for: repo workflow, bot policy, scoring policy, public agent contract rules, task history
+Last updated: 2026-03-07
 
-This package contains the **engineering-grade** map layout + specifications for **Bazaar Slice v2.3** (3-lane marketplace).
-It is intended to be consumed by **Codex** (or a level designer) to produce a blockout + final dressing pass.
+# Bazaar Map Design Authority
 
-## Quick Start (for Codex)
-1. Open `specs/map_spec.json` (source of truth for geometry + anchors).
-2. Use `blockout/topdown_layout.svg` + `refs/bazaar_slice_v2_2_detailed_birdseye.png` as the visual reference.
-3. Implement blockout volumes per `zones` rects (units = meters).
-4. Place props/shops **only** on `stall_strip` zones and at `prop_pocket` anchors.
-5. Maintain **6.0m clear travel zone** through all main bazaar segments.
+Current approved packet version: `2.3`
+Current runtime map id: `bazaar-map`
+Current map approval status: see `progress.md` for the live state; it is currently `NOT APPROVED`.
 
-## Package Contents
-### Visual references (`/refs`)
-- `bazaar_slice_v2_2_detailed_birdseye.png` — **signed-off** detailed birds-eye (dimensions + legend + callouts).
-- `bazaar_slice_v2_2_map_only.png` — map-only zoom.
-- `bazaar_main_hall_reference.png` — reference look for the main bazaar hallway.
+## Authoritative Files
+- Geometry, zones, anchors, and constraints: `specs/map_spec.json`
+- Runtime review shot contract: `shots.json`
+- Approved reference pack:
+  - `refs/bazaar_slice_v2_2_detailed_birdseye.png`
+  - `refs/bazaar_slice_v2_2_map_only.png`
+  - `refs/bazaar_main_hall_reference.png`
 
-### Specifications (`/specs`)
-- `map_spec.json` — **single source of truth** (zones, dimensions, anchors, constraints).
-- `dimension_schedule.csv` — all major dimensions.
-- `anchor_points.csv` — all object placement anchors (shopfronts, signage, prop pockets, cloth spans, landmarks).
-- `object_catalog.csv` — recommended prop types and placement rules.
-- `callouts.csv` — suggested comms callouts.
+## Authority Order
+1. `specs/map_spec.json` for measurable layout truth
+2. `refs/bazaar_slice_v2_2_detailed_birdseye.png` for signed visual and layout intent when the JSON needs visual clarification
+3. `blockout/topdown_layout.svg` for scaled sanity checks only
 
-### Archived legacy files
-- Legacy snapshots and older references were moved to `archive/docs/map-design/` to avoid source-of-truth drift.
-- Runtime generation uses `specs/map_spec.json` and `shots.json`; do not use archived files for gameplay changes.
+## Context-Only Files
+- `blockout/topdown_layout.svg`
+- `blockout/zones.geojson`
+- `blockout/anchors.geojson`
+- helper CSVs under `specs/`
+- `refs/user_review_screenshot.png`
 
-### Blockout assets (`/blockout`)
-- `topdown_layout.svg` — scaled topdown layout (10px/m).
-- `zones.geojson` — zones as polygons (meters).
-- `anchors.geojson` — anchors as points/lines (meters).
+These files may inform implementation, but they do not outrank the authority order above.
 
-### Design + implementation notes (`/docs`)
-- `design_brief.md`
-- `implementation_steps.md`
-- `acceptance_criteria.md`
-- `codex_instructions.md`
+## Archive And History
+- External archive material and generated review artifacts are historical evidence only.
+- Historical files must never override `specs/map_spec.json`, `shots.json`, or the approved reference pack.
 
-## Coordinate System
-- Origin **(0,0)** = **southwest** corner of playable boundary
-- +X = east, +Y = north, +Z = up
-- Yaw degrees: 0 = +Y (north), 90 = +X (east)
-
-## Non-Goals / Exclusions
-This package **does not** include engine-specific lighting rigs, materials, audio banks, or gameplay scripting.
-It provides the level **layout + placement intent** so those can be generated/implemented consistently.
+## Runtime Pipeline
+- Edit the design packet here.
+- Regenerate runtime copies with `pnpm --filter @clawd-strike/client gen:maps`.
+- Runtime consumes:
+  - `apps/client/public/maps/bazaar-map/map_spec.json`
+  - `apps/client/public/maps/bazaar-map/shots.json`

@@ -1,307 +1,142 @@
-# AGENTS.md — Codex Instructions (Web FPS)
-## MVP Milestone: Full-Map Blockout Playtest (Colors + Placeholder Props)
-
-> **Audience:** Codex (implementation agent)
-> **Role:** You are a **Senior Game Developer with 20 years of experience**.
-> Be decisive, implementation-first, and ruthless about scope.
-> The goal is a playable map blockout loop that the designer can approve.
-
----
-
-## 0) The two governing files (do not add more “process docs”)
-
-### 0.1 AGENTS.md (this file)
-Defines:
-- what we are building
-- what “MVP done” means
-- the per-prompt loop + prompt template
-- source-of-truth design references
-
-### 0.2 progress.md (required)
-- **progress.md must exist.**
-- **Codex must read `progress.md` at the start of every prompt** (before planning).
-- **Codex must update `progress.md` at the end of every prompt**.
-
-**progress.md must stay short and structured:**
-- Current Status (≤10 lines)
-- Canonical Playtest URL (single URL we always use)
-- Map Approval Status: `NOT APPROVED | APPROVED v1 | APPROVED v2 | ...`
-- How to Run (ONLY commands that actually exist)
-- Last Completed Prompt (what changed + files touched)
-- Next 3 Tasks
-- Known Issues / Risks (short bullets, no pasted logs)
-
-If progress.md becomes noisy or transcript-like, fix it immediately.
-
----
-
-## 1) What we are building
-
-### 1.1 Game type
-- Web-based first-person shooter (FPS) client.
-- MVP scope is **client-only** unless the repo already includes server code required for the MVP loop.
-
-### 1.2 Current milestone (the ONLY early milestone)
-**Playable full-map blockout** for the Bazaar slice design package:
-- Load via a single URL (canonical in progress.md)
-- Pointer lock + WASD + mouse-look
-- AABB-only collision (stable sliding, no tunneling at normal run speed)
-- Entire map traversable (no escaping bounds)
-- Blockout colors for readability (floors/walls/landmarks/blockers)
-- Deterministic placeholder props (instanced primitives) to feel density/rhythm
-- Debug toggles exist, but default view is clean
-
-### 1.3 Hard non-goals during MVP blockout (do NOT implement)
-Until the map blockout is approved:
-- texture/material ingestion systems, LUTs, decals, final lookdev pipelines
-- brittle golden multi-shot suites, broad browser matrices, or heavy Playwright loops that are expensive to maintain
-- netcode/server authority/multiplayer
-- “final performance budgets” (just avoid obvious perf footguns)
-
-If a task tries to pull these in, mark them out of scope and do not do them.
-Lightweight autonomous Playwright capture/review is in scope when it stays deterministic, produces local artifacts, and directly improves map iteration.
-
----
-
-## 2) Design packet: accurate paths + source of truth
-
-### 2.1 Design packet root (authoritative)
-All map work is driven by:
-
-`docs/map-design/`
-
-This package includes:
-
-**Root**
-- `README.md`
-
-**refs/**
-- `refs/bazaar_slice_v2_2_detailed_birdseye.png`
-- `refs/bazaar_slice_v2_2_map_only.png`
-- `refs/bazaar_main_hall_reference.png`
-- `refs/user_review_screenshot.png`
-
-**specs/** (Codex-friendly source-of-truth)
-- `specs/map_spec.json`  ✅ PRIMARY SOURCE OF TRUTH
-- `specs/map_spec_schema.json`
-- `specs/anchor_points.csv`
-- `specs/dimension_schedule.csv`
-- `specs/object_catalog.csv`
-- `specs/callouts.csv`
-
-**blockout/**
-- `blockout/topdown_layout.svg` (scaled; 10px = 1m)
-- `blockout/zones.geojson`
-- `blockout/anchors.geojson`
-
-**docs/**
-- `docs/design_brief.md`
-- `docs/implementation_steps.md`
-- `docs/acceptance_criteria.md`
-- `docs/codex_instructions.md`
-- `docs/modular_kit_spec.md`
-- `docs/art_dressing_notes.md`
-- `docs/gameplay_balance_notes.md`
-
-### 2.2 “Source of truth” rule (no invented layout)
-Codex must treat these as source of truth in this order:
-1) `specs/map_spec.json` (zones + constraints + anchors embedded)
-2) `refs/bazaar_slice_v2_2_detailed_birdseye.png` (visual intent + labels)
-3) `blockout/topdown_layout.svg` (quick geometry confirmation)
-
-Codex must not invent layout. If implementation-ready data is missing, update the spec (or add a small derived runtime spec) rather than guessing.
-Coordinate note: design packet axes are `x/y` ground + `z` up; runtime axes are `x/z` ground + `y` up.
-
-### 2.3 Path verification (mandatory once per new thread/branch)
-If Codex cannot find the above files at the expected paths:
-- search the repo for `specs/map_spec.json`
-- set the correct design packet root
-- record the corrected root path in `progress.md`
-- proceed using the found path (do not guess)
-
----
-
-## 3) Art direction (for blockout readability only)
-Reference vibe: sun-baked Middle Eastern / North African bazaar.
-This is used to guide *readability* and *landmarking* during blockout.
-
-### 3.1 Blockout color rules (placeholder only)
-Blockout must be solid-color materials (no texture dependencies):
-- floors: darker stone/cobble tone, distinct from walls
-- walls: warm sand/ochre
-- landmark (arch): higher contrast to read as endcap
-- blockers (stall strips / major occluders): distinct mid-tone or accent
-- optional storefront hints: teal/green accent (readability only)
-
----
-
-## 4) MVP technical contracts
-
-### 4.1 Units + coordinates
-- X/Z ground plane, Y up
-- 1 unit = 1 meter
-- floor top surface at y = 0
-
-### 4.2 Collision rules (keep simple + debuggable)
-- World collision uses axis-aligned AABBs only.
-- Walls have thickness ≥ 0.3m.
-- Player collision slides cleanly; avoid sticky corners.
-- Prefer collider-driven meshes so “what you see == what you collide with”.
-
-### 4.3 Determinism
-Same map id + same spec + same seed ⇒ same:
-- geometry/colliders
-- spawns
-- placeholder prop placement
-
-### 4.4 Performance sanity (MVP only)
-Avoid obvious footguns:
-- no per-frame allocations in movement/collision/update loops
-- reuse vectors/quats
-- small fixed material palette
-- placeholder props should use InstancedMesh where appropriate
-
----
-
-## 5) Tech stack + repo discovery (avoid invented commands/paths)
-
-### 5.1 Tech stack (state what exists; confirm quickly)
-Codex should assume a typical web client stack but must confirm reality:
-- package manager: pnpm
-- language: TypeScript
-- rendering: three.js (WebGL)
-- dev server: typically Vite-style (often localhost:5174 in this repo)
-
-If any of these are false in the repo, Codex must:
-- adapt to the repo conventions
-- record the truth in `progress.md`
-
-### 5.2 Repo discovery (mandatory when uncertain)
-Before implementing (or when starting a new branch/thread), Codex must:
-1) Read `package.json` and record the real script names into `progress.md`:
-   - dev
-   - typecheck
-   - build
-2) Identify the real client entrypoint and how `?map=` is handled.
-3) Identify where static/public files live (e.g., `apps/client/public`).
-
-**Never reference commands that don’t exist.**
-
----
-
-## 6) Runtime map content layout (MVP standard)
-The design packet lives under docs/. The runtime should not load from docs/ directly.
-
-We will create a small runtime copy under the client’s public/static directory:
-
-- `apps/client/public/maps/<mapId>/map_spec.json`  (copied from design `specs/map_spec.json`)
-- `apps/client/public/maps/<mapId>/shots.json`     (one compare shot is enough for MVP)
-
-Anchors are read from `map_spec.json` (anchors are embedded there).
-
-Runtime-ready 3D assets (models) live under the client public directory, for example:
-- `apps/client/public/assets/models/weapons/ak47/ak47.glb`
-
-Runtime-ready textures live alongside assets, for example:
-- `apps/client/public/assets/textures/weapons/ak47/`
-
-If the repo uses a different static path, Codex must adapt and document it in `progress.md`.
-
----
-
-## 7) Canonical playtest URL + toggles
-progress.md must define ONE canonical URL. Common shape:
-- `http://127.0.0.1:5174/?map=<mapId>`
-
-Recommended toggles:
-- `&blockout=1` force solid colors by tag
-- `&debug=1` show player coords + yaw/pitch
-- `&colliders=1` show collision overlay (optional)
-- `&anchors=1` show anchor overlay
-- `&shot=compare` snap to deterministic screenshot camera (from shots.json)
-
----
-
-## 8) Minimal per-prompt loop (non-negotiable)
-Every prompt must end with:
-
-1) Validation (commands that exist)
-- run repo typecheck
-- run repo build
-
-2) Autonomous completion gate (required)
-- run `pnpm qa:completion` headless so the browser stays behind the scenes
-- review the latest multi-angle screenshots + runtime summary under `artifacts/playwright/completion-gate/`
-- do not mark the implementation complete until the review passes and Codex has critiqued the screenshots/state
-
-3) Human smoke test (only when needed)
-- required when input flow, pointer lock, fullscreen, or menu UX changed
-- otherwise the headless completion gate is the default end-of-prompt smoke path
-
-4) Screenshots (exactly 2 per prompt)
-- `before.png` captured at the start (pre-change)
-- `after.png` captured after validation passes
-- same deterministic viewpoint (use `shot=compare`)
-- Additional internal automation captures are required for self-review before completion: capture a fixed 5-8 shot set from `shots.json` plus state/console artifacts through the completion gate.
-
-Store under:
-- `artifacts/screenshots/<PROMPT_ID>/before.png`
-- `artifacts/screenshots/<PROMPT_ID>/after.png`
-
-Codex must return both screenshots in chat at the end of the prompt and summarize the completion-gate review.
-
-5) Update progress.md
-- tight bullets: what changed, files touched, how to test, next 3 tasks, known issues
-
----
-
-## 9) Prompt template (Codex must use verbatim)
-
-**Title:** one feature only
-
-**Read first:**
-- `AGENTS.md`
-- `progress.md`
-- Design packet files (list full paths, only relevant ones)
-
-**Goal (1 sentence):**
-- player-visible outcome
-
-**Non-goals:**
-- explicit exclusions (to prevent scope creep)
-
-**Implementation plan (file-specific, numbered):**
-1) ...
-2) ...
-
-**Acceptance checks (observable):**
-- ✅ map loads via canonical URL
-- ✅ movement + collision still works (or is newly added)
-- ✅ entire map remains traversable
-- ✅ blockout colors/readability improved (if applicable)
-- ✅ determinism preserved
-
-**Validation (commands that exist):**
-```bash
-# <typecheck command>
-# <build command>
-# <qa:completion command>
+Audience: implementation-agent
+Authority: normative
+Read when: map, visuals, ai, gameplay, ui, public-contract, perf, tooling, docs
+Owns: repo operating rules, authority order, change tags, validation policy, memory model, prompt template
+Do not use for: current branch status, long-term design history outside durable decisions, public browser-agent behavior details
+Last updated: 2026-03-07
+
+# AGENTS.md — Clawd Strike Operating Contract
+
+## Purpose
+This is the only normative internal implementation doc in the repo.
+
+If any internal prose conflicts with this file, follow this file.
+
+Active repo-owned Markdown is limited to six files:
+1. `README.md`
+2. `AGENTS.md`
+3. `progress.md`
+4. `docs/decisions.md`
+5. `docs/map-design/README.md`
+6. `apps/client/public/skills.md`
+
+Do not add a third memory layer. No per-thread notes, no duplicate tool guides, no subsystem process docs.
+
+## Read Order
+1. Read `AGENTS.md`.
+2. Read `progress.md`.
+3. Read the single spec or contract selected by the task's primary change tag.
+4. Read only the code and scripts directly touched.
+
+If a fact is not in one of the six Markdown authorities, prefer code, scripts, JSON specs, and runtime contracts over creating new Markdown.
+
+## Memory Model
+- Short-term memory: `progress.md` only. Overwrite aggressively. Never turn it into a transcript.
+- Long-term prose memory: `docs/decisions.md` only. Add entries only for durable, non-obvious choices that should survive context resets.
+- Durable structured memory: `docs/map-design/specs/map_spec.json`, `docs/map-design/shots.json`, and `apps/client/public/skills.md`.
+- Evidence, not memory: `artifacts/`, generated `apps/client/dist/skills.md`, external archive material at `/Users/dimitri/Desktop/clawd-strike-archive`, and bundled skills under `.agents/skills/`.
+
+## Authority Map
+- `README.md`: human quick start only.
+- `AGENTS.md`: internal policy, read order, change tags, validation policy.
+- `progress.md`: current branch/task state only.
+- `docs/decisions.md`: durable internal decisions that change future implementation behavior.
+- `docs/map-design/README.md`: map-design authority map only.
+- `apps/client/public/skills.md`: public browser-only contract only.
+
+### Hard Authority Rules
+- Map geometry and layout authority, in order:
+  1. `docs/map-design/specs/map_spec.json`
+  2. `docs/map-design/refs/bazaar_slice_v2_2_detailed_birdseye.png`
+  3. `docs/map-design/blockout/topdown_layout.svg`
+- Runtime map files must be generated from the design packet with `pnpm --filter @clawd-strike/client gen:maps`. Do not hand-maintain drift in `apps/client/public/maps/`.
+- `apps/client/public/skills.md` must stay fair and browser-only. Do not expose coordinates, map zones, landmark IDs, enemy positions, routes, seeds, hidden line-of-sight truth, or repo-only debug data.
+- Tool shims such as `CLAUDE.md` may point to this file, but they may not redefine policy.
+
+## Primary Change Tag
+Every task must carry exactly one primary change tag in the prompt and in `progress.md`.
+
+Allowed tags:
+- `map-geometry`
+- `map-visual`
+- `movement-sim`
+- `combat-gameplay`
+- `bot-ai`
+- `ui-flow`
+- `public-contract`
+- `perf`
+- `tooling`
+- `docs`
+
+If a user prompt omits the tag, infer the best fit from the requested change and record it explicitly before doing work.
+
+## Change Tag Matrix
+
+| Tag | Read this first | Ignore this by default | Required targeted validation |
+| --- | --- | --- | --- |
+| `map-geometry` | `docs/map-design/README.md`, `docs/map-design/specs/map_spec.json`, `docs/map-design/shots.json` when shot framing changes, touched map runtime scripts/code | `apps/client/public/skills.md`, archive material, `artifacts/` except direct review evidence | `pnpm --filter @clawd-strike/client gen:maps`, `pnpm qa:completion` |
+| `map-visual` | `docs/map-design/README.md`, `docs/map-design/specs/map_spec.json` for openings/collision truth, touched rendering/material code | `apps/client/public/skills.md`, archive material, `artifacts/` except the latest review captures | `pnpm qa:completion` |
+| `movement-sim` | `progress.md`, touched runtime movement/input code, `docs/map-design/specs/map_spec.json` only if traversal geometry is affected | map-design refs, `apps/client/public/skills.md` unless public controls/readiness change | the smallest targeted runtime validation; human smoke when pointer lock, fullscreen, or live input flow changes |
+| `combat-gameplay` | `progress.md`, touched combat/scoring runtime code, `apps/client/public/skills.md` if score or run-summary semantics change | map-design refs unless sightlines, cover, or traversal are affected | the smallest targeted combat validation; `pnpm --filter @clawd-strike/client bot:smoke` when enemy combat tuning is involved |
+| `bot-ai` | `progress.md`, touched enemy/runtime code, `docs/map-design/specs/map_spec.json` only if navigation/layout assumptions matter, `apps/client/public/skills.md` if exposed summaries change | visual refs unless lane/readability behavior is being tuned against them | `pnpm --filter @clawd-strike/client bot:smoke` |
+| `ui-flow` | `progress.md`, touched loading-screen/runtime UI code, `apps/client/public/skills.md` if agent entry flow or public selectors change | map-design docs unless the UI is map-specific | `pnpm test:playwright`; human smoke when pointer lock, fullscreen, or menu UX changes |
+| `public-contract` | `apps/client/public/skills.md`, touched public runtime API/state code, touched contract verification scripts | map-design docs unless the contract text directly depends on map truth | `pnpm verify:skills-contract`, `pnpm smoke:no-context` |
+| `perf` | `progress.md`, touched bootstrap/render/warmup code, `apps/client/public/skills.md` if readiness or public state changes | map-design docs unless asset/layout paths changed | the smallest targeted perf validation; `pnpm qa:completion` if player-visible defaults changed; contract validations if public readiness changed |
+| `tooling` | `package.json`, `apps/client/package.json`, touched scripts, `.github/workflows/ci.yml` | map-design docs and `apps/client/public/skills.md` unless the tool directly validates them | the smallest targeted script or CI validation |
+| `docs` | only the authority file being corrected, plus `docs/decisions.md` when a durable rule must be captured | runtime code, visual refs, `artifacts/`, archive material unless needed to verify a fact | targeted `rg` or reference scan only; run contract validations only if a runtime-facing contract doc changed |
+
+## Validation Policy
+Every task ends with:
+1. `pnpm typecheck`
+2. `pnpm build`
+3. the targeted validation required by the primary change tag
+
+### Repo Policy vs Current CI Reality
+
+| Scope | Repo policy | Current CI on 2026-03-07 |
+| --- | --- | --- |
+| All tasks | `pnpm typecheck`, `pnpm build`, and the smallest targeted validation that matches the change | `pnpm install --frozen-lockfile`, `pnpm --filter @clawd-strike/client gen:maps`, `git diff --exit-code -- apps/client/public/maps`, `pnpm typecheck`, `pnpm build` |
+| Player-visible map or visual changes | `pnpm qa:completion` | not covered |
+| Public contract or public runtime surface changes | `pnpm verify:skills-contract`, `pnpm smoke:no-context` | not covered |
+| Input flow, pointer lock, fullscreen, or menu UX changes | human smoke | not covered |
+
+CI is narrower than the repo completion policy. Passing CI does not replace the required local completion gates.
+
+## Play-Facing Review Standard
+Apply this standard to `map-geometry`, `map-visual`, `combat-gameplay`, `bot-ai`, and any other task that changes what the player sees or feels.
+
+- Operate like a senior level designer and environment artist at a top-tier game studio with 20+ years of competitive FPS map experience.
+- Use Counter-Strike's Dust II as the quality benchmark for production polish, not as a template to copy.
+- Be ultra-critical, detail-oriented, and honest. Assume the map still needs meaningful improvement before it is production-ready.
+- Push work toward studio-quality execution while staying realistic about the current tech stack, tools, and runtime constraints.
+- Prefer practical, high-impact recommendations over vague or overly ambitious ideas.
+- When useful, separate quick wins from larger rework items.
+- Keep asking what is missing and what is not being asked.
+- Readability beats clutter. Never trade navigation, collision, sightlines, or callout clarity for superficial dressing.
+
+For `tooling`, `docs`, and pure `public-contract` work, use the normal engineering standard instead of forcing a level-design critique lens onto unrelated tasks.
+
+## Implementation Guardrails
+- Preserve deterministic behavior where the current runtime already depends on it.
+- Keep collision and traversal quality stable when polishing visuals.
+- Treat map beautification as gameplay-sensitive work: materials, props, openings, and silhouette changes must not silently damage navigation, sightlines, or cover behavior.
+- When runtime behavior changes, update the owning authority file in the same task.
+- Prefer maintainable, explicit systems over clever one-off process.
+- Delete obsolete docs instead of leaving stale instruction surfaces behind.
+
+## Prompt Template
+Use this shape when starting work:
+
+```text
+Primary change tag: <one tag from AGENTS.md>
+Goal: <what should change>
+Constraints: <quality, runtime, product, or scope limits>
+Acceptance signal: <what proves the task is done>
+Relevant authority: <spec, contract, or file that owns the change>
 ```
-Screenshots (exactly 2):
-artifacts/screenshots/<PROMPT_ID>/before.png
-artifacts/screenshots/<PROMPT_ID>/after.png
-Reset & Open (only if human smoke is required):
-# <dev command>
-open "<canonical playtest URL from progress.md>"
-Progress update (required):
-update progress.md with summary + files + test steps + next 3 tasks + known issues
 
----
-
-## 10) Map approval definition
-The blockout is approved when:
-- you can traverse the full map without escaping bounds or snagging on collision
-- widths/dimensions feel correct vs spec intent
-- sightlines and rhythm match the package
-- colors + placeholder props make the layout readable
-- canonical URL + compare shot produce stable before/after screenshots
+## Completion Discipline
+- Update `progress.md` at the end of every task.
+- Keep `progress.md` short and current.
+- Keep `docs/decisions.md` short and durable.
+- Do not create `TESTING.md`, `ARCHITECTURE.md`, `BOTS.md`, `TEXTURES.md`, `MAP_NOTES.md`, or any tool-specific duplicate of this file.
