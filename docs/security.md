@@ -98,7 +98,7 @@ Clawd Strike is deployed publicly on Vercel. This document covers every security
 - `X-Content-Type-Options: nosniff` — prevents MIME type sniffing
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-- `Content-Security-Policy` — restricts script/style/img sources to `'self'`, allows `'unsafe-inline'` for styles (Three.js needs it), `blob:` for images, `frame-ancestors 'none'`
+- `Content-Security-Policy` — restricts script/style/img sources to `'self'`, allows `'unsafe-inline'` for styles (Three.js needs it), permits `blob:` in both `img-src` and `connect-src` so embedded-texture GLB assets can load, `frame-ancestors 'none'`
 
 **File**: `vercel.json`
 
