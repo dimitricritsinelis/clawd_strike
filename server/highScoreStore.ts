@@ -20,6 +20,33 @@ const CREATE_HIGH_SCORE_TABLE_SQL = `
   );
 `;
 
+const CREATE_SUBMISSIONS_LOG_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS champion_submissions_log (
+    id SERIAL PRIMARY KEY,
+    client_ip TEXT NOT NULL,
+    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`;
+
+const CREATE_SUBMISSIONS_LOG_INDEX_SQL = `
+  CREATE INDEX IF NOT EXISTS idx_submissions_ip_time
+  ON champion_submissions_log (client_ip, submitted_at);
+`;
+
+const RATE_LIMIT_CHECK_SQL = `
+  SELECT COUNT(*) AS recent
+  FROM champion_submissions_log
+  WHERE client_ip = $1 AND submitted_at > NOW() - INTERVAL '30 seconds';
+`;
+
+const RATE_LIMIT_INSERT_SQL = `
+  INSERT INTO champion_submissions_log (client_ip) VALUES ($1);
+`;
+
+const RATE_LIMIT_CLEANUP_SQL = `
+  DELETE FROM champion_submissions_log WHERE submitted_at < NOW() - INTERVAL '1 hour';
+`;
+
 const SELECT_CHAMPION_SQL = `
   SELECT score_half_points, holder_name, holder_mode, updated_at
   FROM shared_champion_scores
@@ -72,6 +99,8 @@ export type SharedChampionStore = {
     updated: boolean;
     champion: SharedChampion | null;
   }>;
+  isRateLimited: (clientIp: string) => Promise<boolean>;
+  logSubmission: (clientIp: string) => Promise<void>;
 };
 
 function mapRowToChampion(row: ChampionRow): SharedChampion {
@@ -88,6 +117,7 @@ function normalizeSubmission(input: SharedChampionPostRequest): SharedChampionPo
     playerName: sanitizeSharedChampionName(input.playerName, input.controlMode),
     scoreHalfPoints: normalizeScoreHalfPoints(input.scoreHalfPoints),
     controlMode: input.controlMode,
+    telemetry: input.telemetry,
   };
 }
 
@@ -119,6 +149,13 @@ export function createInMemorySharedChampionStore(): SharedChampionStore {
         updated: false,
         champion,
       };
+    },
+    async isRateLimited() {
+      // In-memory store is dev/test only — skip rate limiting
+      return false;
+    },
+    async logSubmission() {
+      // No-op in dev/test
     },
   };
 }
@@ -152,9 +189,9 @@ function resolveSslConfig(connectionString: string): PoolConfig["ssl"] {
     const sslMode = parsedUrl.searchParams.get("sslmode")?.trim().toLowerCase();
     const isLocalHost = parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1";
     if (sslMode === "disable" || isLocalHost) return undefined;
-    return { rejectUnauthorized: false };
+    return { rejectUnauthorized: true };
   } catch {
-    return { rejectUnauthorized: false };
+    return { rejectUnauthorized: true };
   }
 }
 
@@ -180,13 +217,15 @@ async function ensureSchemaReady(): Promise<void> {
     return schemaReadyPromise;
   }
 
-  schemaReadyPromise = getPool()
-    .query(CREATE_HIGH_SCORE_TABLE_SQL)
-    .then(() => undefined)
-    .catch((error) => {
-      schemaReadyPromise = null;
-      throw error;
-    });
+  schemaReadyPromise = (async () => {
+    const p = getPool();
+    await p.query(CREATE_HIGH_SCORE_TABLE_SQL);
+    await p.query(CREATE_SUBMISSIONS_LOG_TABLE_SQL);
+    await p.query(CREATE_SUBMISSIONS_LOG_INDEX_SQL);
+  })().catch((error) => {
+    schemaReadyPromise = null;
+    throw error;
+  });
 
   return schemaReadyPromise;
 }
@@ -217,6 +256,18 @@ export function createPostgresSharedChampionStore(): SharedChampionStore {
         updated: row?.updated === true,
         champion: row ? mapRowToChampion(row) : null,
       };
+    },
+    async isRateLimited(clientIp) {
+      await ensureSchemaReady();
+      const result = await getPool().query<{ recent: string }>(RATE_LIMIT_CHECK_SQL, [clientIp]);
+      const recent = parseInt(result.rows[0]?.recent ?? "0", 10);
+      return recent > 0;
+    },
+    async logSubmission(clientIp) {
+      await ensureSchemaReady();
+      await getPool().query(RATE_LIMIT_INSERT_SQL, [clientIp]);
+      // Best-effort cleanup of old entries
+      getPool().query(RATE_LIMIT_CLEANUP_SQL).catch(() => {});
     },
   };
 }

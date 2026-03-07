@@ -31,14 +31,47 @@ async function readSharedChampion(request: APIRequestContext, baseUrl: string) {
   return response.json();
 }
 
+function buildTelemetryForScore(scoreHalfPoints: number) {
+  // Reverse the scoring formula: half_points = kills * 20 + headshots * 5
+  // Use all-headshot kills for simplicity: half_points = kills * 25 → kills = half_points / 25
+  // If not evenly divisible, use non-headshot kills for remainder
+  const killsFromHeadshots = Math.floor(scoreHalfPoints / 25);
+  const remainderHalfPoints = scoreHalfPoints - killsFromHeadshots * 25;
+  const extraKills = Math.floor(remainderHalfPoints / 20);
+  const kills = killsFromHeadshots + extraKills;
+  const headshots = killsFromHeadshots;
+  return {
+    kills,
+    headshots,
+    shotsFired: Math.max(kills, kills + 5),
+    shotsHit: Math.max(kills, kills + 2),
+    survivalTimeS: Math.max(1, kills * 2),
+  };
+}
+
+async function getSessionToken(request: APIRequestContext, baseUrl: string): Promise<string> {
+  const response = await request.post(new URL("/api/session", baseUrl).toString(), {
+    failOnStatusCode: false,
+  });
+  expect(response.ok()).toBe(true);
+  const data = await response.json();
+  expect(typeof data.token).toBe("string");
+  return data.token as string;
+}
+
 async function submitSharedChampion(
   request: APIRequestContext,
   baseUrl: string,
   body: { playerName: string; scoreHalfPoints: number; controlMode: "human" | "agent" },
 ) {
+  const sessionToken = await getSessionToken(request, baseUrl);
   const response = await request.post(new URL("/api/high-score", baseUrl).toString(), {
     failOnStatusCode: false,
-    data: body,
+    data: {
+      ...body,
+      telemetry: buildTelemetryForScore(body.scoreHalfPoints),
+      sessionToken,
+    },
   });
   expect(response.ok()).toBe(true);
   return response.json();
@@ -48,8 +81,8 @@ test("api stores the sitewide champion with strict overwrite rules", async ({ re
   const baseUrl = testInfo.project.use.baseURL as string;
   const current = await readSharedChampion(request, baseUrl);
   const baseScore = typeof current.champion?.scoreHalfPoints === "number" ? current.champion.scoreHalfPoints : 0;
-  const firstScore = baseScore + 8;
-  const higherScore = firstScore + 2;
+  const firstScore = baseScore + 20;
+  const higherScore = firstScore + 5;
 
   const first = await submitSharedChampion(request, baseUrl, {
     playerName: "AlphaUnit",
@@ -65,7 +98,7 @@ test("api stores the sitewide champion with strict overwrite rules", async ({ re
 
   const lower = await submitSharedChampion(request, baseUrl, {
     playerName: "BravoUnit",
-    scoreHalfPoints: Math.max(0, firstScore - 2),
+    scoreHalfPoints: Math.max(0, firstScore - 5),
     controlMode: "human",
   });
   expect(lower.updated).toBe(false);

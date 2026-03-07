@@ -65,6 +65,7 @@ export async function loadSharedChampion(options: { force?: boolean } = {}): Pro
 
 export async function submitSharedChampionCandidate(
   candidate: SharedChampionPostRequest,
+  sessionToken: string | null,
 ): Promise<{ updated: boolean; snapshot: SharedChampionSnapshot }> {
   try {
     const response = await fetch(SHARED_CHAMPION_ENDPOINT, {
@@ -73,7 +74,7 @@ export async function submitSharedChampionCandidate(
       headers: {
         "content-type": "application/json; charset=utf-8",
       },
-      body: JSON.stringify(candidate),
+      body: JSON.stringify({ ...candidate, sessionToken }),
     });
     if (!response.ok) {
       throw new Error(`POST /api/high-score failed: ${response.status}`);

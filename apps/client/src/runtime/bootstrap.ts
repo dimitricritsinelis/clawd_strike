@@ -32,6 +32,7 @@ import {
   loadSharedChampion,
   submitSharedChampionCandidate,
 } from "../shared/sharedChampionClient";
+import { requestSessionToken } from "../shared/sessionClient";
 import {
   isBetterSharedChampionCandidate,
   scoreValueToHalfPoints,
@@ -1062,6 +1063,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       runStats.shotsHit = 0;
       runStats.headshots = 0;
       runStartedAtMs = performance.now();
+      currentSessionToken = null;
+      void requestSessionToken().then((token) => {
+        if (disposed) return;
+        currentSessionToken = token;
+      });
       lastDamageCause = null;
       game.setFreezeInput(false);
       pauseMenu.hide();
@@ -1216,6 +1222,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let lastRunScore: number | null = null;
   let lastRunSummary: PublicAgentRunSummary | null = null;
   let runStartedAtMs = performance.now();
+  let currentSessionToken: string | null = null;
+  void requestSessionToken().then((token) => {
+    if (disposed) return;
+    currentSessionToken = token;
+  });
   let lastDamageCause: PublicAgentRunSummary["deathCause"] | null = null;
   let wasAlive = !game.getIsDead();
   const pendingAgentActions: AgentAction[] = [];
@@ -1575,7 +1586,14 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
             playerName: runtimeParams.playerName,
             scoreHalfPoints: candidateHalfPoints,
             controlMode: runtimeParams.controlMode,
-          }).then(({ snapshot }) => {
+            telemetry: {
+              kills: runStats.kills,
+              headshots: runStats.headshots,
+              shotsFired: runStats.shotsFired,
+              shotsHit: runStats.shotsHit,
+              survivalTimeS: lastRunSummary!.survivalTimeS,
+            },
+          }, currentSessionToken).then(({ snapshot }) => {
             if (disposed) return;
             applySharedChampionSnapshot(snapshot);
           });
