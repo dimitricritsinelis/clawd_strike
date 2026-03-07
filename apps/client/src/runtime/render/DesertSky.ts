@@ -45,9 +45,9 @@ export function installDesertSky(opts: {
     u["mieCoefficient"]!.value = 0.012;
     u["mieDirectionalG"]!.value = 0.88;
   } else {
-    u["turbidity"]!.value = 18;
-    u["rayleigh"]!.value = 0.75;
-    u["mieCoefficient"]!.value = 0.020;
+    u["turbidity"]!.value = 14;        // less haze (was 18)
+    u["rayleigh"]!.value = 0.90;       // slightly more blue (was 0.75)
+    u["mieCoefficient"]!.value = 0.015; // less forward scatter (was 0.020)
     u["mieDirectionalG"]!.value = 0.92;
   }
 
