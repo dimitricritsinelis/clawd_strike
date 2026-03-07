@@ -645,7 +645,7 @@ body {
     right: var(--corner-btn-edge-right-mobile);
   }
   #start .logo-wrap {
-    top: 31%;
+    top: 28%;
   }
   #start .logo-img {
     width: min(98vw, 780px);
