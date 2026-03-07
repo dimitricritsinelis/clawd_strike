@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import type { BoundarySegment } from "./buildBlockout";
 import type { WallDetailInstance } from "./wallDetailKit";
+import { CASTLE_DOOR_ID, ROLLERSHUTTER_ID, type DoorModelPlacement } from "./buildDoorModels";
 import {
   resolveFacadeStyleForSegment,
   type BalconyStyle,
@@ -201,6 +202,11 @@ type SegmentDecorContext = {
   isSpawnOuterWall: boolean;
   /** Connector wall facing toward the spawn (not the main lane). */
   isConnectorSpawnFacing: boolean;
+  /** Collected door model placements for 3D door rendering. */
+  doorModelPlacements: DoorModelPlacement[];
+  /** Plinth dimensions computed early (for deferred emit with door gaps). */
+  plinthHeight: number;
+  plinthDepth: number;
 };
 
 export type BuildWallDetailProfile = "blockout" | "pbr";
@@ -231,6 +237,7 @@ export type WallDetailPlacementStats = {
 
 export type WallDetailPlacementResult = {
   instances: WallDetailInstance[];
+  doorModelPlacements: DoorModelPlacement[];
   segmentHeights: number[];
   stats: WallDetailPlacementStats;
 };
@@ -588,25 +595,66 @@ function placeBuildingEnclosure(ctx: SegmentDecorContext): void {
 
 // ── Horizontal banding ─────────────────────────────────────────────────────
 
-function placePlinthStrip(ctx: SegmentDecorContext): void {
+/** Consume RNG and compute plinth dimensions — does NOT emit geometry.
+ *  Call emitPlinthStrip() later once door gap positions are known. */
+function computePlinthDims(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const dims = getTrimDims(ctx.wallHeightM);
   const isHero = isSpawnHeroFacade(ctx);
-  ctx.rng.range(0.28, 0.48); // consume
+  ctx.rng.range(0.28, 0.48); // consume (preserve determinism)
   ctx.rng.range(0.06, 0.13); // consume
   const tierHeightScale = ctx.trimTier === "hero" ? 1.08 : ctx.trimTier === "accented" ? 0.96 : 0.84;
   const tierDepthScale = ctx.trimTier === "hero" ? 1.12 : ctx.trimTier === "accented" ? 0.95 : 0.8;
-  const plinthHeight = dims.plinthH * (isHero ? 1.28 : tierHeightScale);
-  const plinthDepth = clamp(
+  ctx.plinthHeight = dims.plinthH * (isHero ? 1.28 : tierHeightScale);
+  ctx.plinthDepth = clamp(
     dims.plinthD * (isHero ? 1.35 : tierDepthScale),
     0.04,
     ctx.maxProtrusionM + 0.06,
   );
-  if (ctx.isSideHall) return; // side halls: no base trim (RNG consumed above for determinism)
-  pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
-    ctx.frame, 0, plinthHeight * 0.5, plinthDepth * 0.5,
-    plinthDepth, plinthHeight, ctx.frame.lengthM);
-  tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
+}
+
+/** Emit plinth_strip segments, skipping gaps where 3D door models are placed. */
+function emitPlinthStrip(
+  ctx: SegmentDecorContext,
+  doorGaps: readonly { centerS: number; halfW: number }[],
+): void {
+  if (ctx.plinthHeight === 0 || ctx.isSideHall) return;
+  const halfLen = ctx.frame.lengthM * 0.5;
+
+  if (doorGaps.length === 0) {
+    // No gaps — one continuous strip (same as original)
+    pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
+      ctx.frame, 0, ctx.plinthHeight * 0.5, ctx.plinthDepth * 0.5,
+      ctx.plinthDepth, ctx.plinthHeight, ctx.frame.lengthM);
+    tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
+    return;
+  }
+
+  // Sort gaps by position, then emit segments between them
+  const sorted = [...doorGaps].sort((a, b) => a.centerS - b.centerS);
+  let cursor = -halfLen;
+  for (const gap of sorted) {
+    const gapStart = gap.centerS - gap.halfW;
+    const gapEnd = gap.centerS + gap.halfW;
+    if (gapStart > cursor + 0.01) {
+      const segLen = gapStart - cursor;
+      const segCenter = (cursor + gapStart) * 0.5;
+      pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
+        ctx.frame, segCenter, ctx.plinthHeight * 0.5, ctx.plinthDepth * 0.5,
+        ctx.plinthDepth, ctx.plinthHeight, segLen);
+      tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
+    }
+    cursor = Math.max(cursor, gapEnd);
+  }
+  // Trailing segment after last gap
+  if (halfLen > cursor + 0.01) {
+    const segLen = halfLen - cursor;
+    const segCenter = (cursor + halfLen) * 0.5;
+    pushBox(ctx.instances, ctx.maxInstances, "plinth_strip", ctx.wallMaterialId,
+      ctx.frame, segCenter, ctx.plinthHeight * 0.5, ctx.plinthDepth * 0.5,
+      ctx.plinthDepth, ctx.plinthHeight, segLen);
+    tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
+  }
 }
 
 function placeStringCourses(ctx: SegmentDecorContext): void {
@@ -1162,15 +1210,29 @@ function placeArchedDoor(
   centerS: number,
   spec: FacadeSpec,
 ): void {
-  // 1. Dark void — flush with wall surface (tiny offset prevents z-fighting)
-  pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
-    ctx.frame, centerS, spec.doorH * 0.5, 0.003,
-    0.006, spec.doorH, spec.doorW);
+  const uses3DModel = spec.doorH >= 2.0 && spec.doorW >= 0.8;
 
-  // 2. Lintel bar — marks the top edge of the opening
-  pushBox(ctx.instances, ctx.maxInstances, "door_lintel", null,
-    ctx.frame, centerS, spec.doorH + spec.frameThickness * 0.5, spec.frameDepth * 0.5,
-    spec.frameDepth, spec.frameThickness, spec.doorW + spec.frameThickness * 2);
+  if (uses3DModel) {
+    // 3D model fully replaces the flat void + lintel
+    const wallCenter = toWorld(ctx.frame, centerS, spec.doorH * 0.5, 0);
+    ctx.doorModelPlacements.push({
+      wallSurfacePos: wallCenter,
+      doorW: spec.doorW,
+      doorH: spec.doorH,
+      yawRad: ctx.frame.yawRad,
+      outwardX: -ctx.frame.inwardX,
+      outwardZ: -ctx.frame.inwardZ,
+      modelId: spec.doorW >= 1.2 ? CASTLE_DOOR_ID : ROLLERSHUTTER_ID,
+    });
+  } else {
+    // Small doors keep the flat void + lintel trim
+    pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
+      ctx.frame, centerS, spec.doorH * 0.5, 0.003,
+      0.006, spec.doorH, spec.doorW);
+    pushBox(ctx.instances, ctx.maxInstances, "door_lintel", null,
+      ctx.frame, centerS, spec.doorH + spec.frameThickness * 0.5, spec.frameDepth * 0.5,
+      spec.frameDepth, spec.frameThickness, spec.doorW + spec.frameThickness * 2);
+  }
 }
 
 function placeUpperDoorOpening(
@@ -1532,14 +1594,15 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   placeRoofCap(ctx);
   placeBuildingEnclosure(ctx);
 
-  // Horizontal banding
-  placePlinthStrip(ctx);
+  // Horizontal banding (plinth computed now, emitted after door positions are known)
+  computePlinthDims(ctx);
   placeStringCourses(ctx);
   placeCorniceStrip(ctx);
 
   // Compute facade spec — all proportions decided once
   const spec = computeFacadeSpec(ctx);
   if (!spec) {
+    emitPlinthStrip(ctx, []); // full continuous strip (no doors to gap)
     placeCableSegments(ctx);
     return;
   }
@@ -1585,6 +1648,19 @@ function decorateSegment(ctx: SegmentDecorContext): void {
 
   }
 
+  // Emit plinth strips with gaps at 3D door positions
+  const doorGaps: { centerS: number; halfW: number }[] = [];
+  for (let col = 0; col < spec.bayCount; col += 1) {
+    if (spec.columnRoles[col] === "door"
+        && spec.doorH >= 2.0 && spec.doorW >= 0.8) {
+      doorGaps.push({
+        centerS: columnCenterS(spec, col),
+        halfW: spec.doorW * 0.5,
+      });
+    }
+  }
+  emitPlinthStrip(ctx, doorGaps);
+
   // Cables on side halls/cuts
   placeCableSegments(ctx);
 }
@@ -1599,11 +1675,13 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   const maxProtrusionM = clamp(options.maxProtrusionM, 0.03, 0.2);
   const maxInstances = Math.max(1, INSTANCE_BUDGET);
   const instances: WallDetailInstance[] = [];
+  const doorModelPlacements: DoorModelPlacement[] = [];
   const segmentHeights: number[] = [];
 
   if (!options.enabled || options.segments.length === 0) {
     return {
       instances,
+      doorModelPlacements,
       segmentHeights,
       stats: {
         enabled: false,
@@ -1793,6 +1871,9 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       cornerAtEnd,
       isSpawnOuterWall,
       isConnectorSpawnFacing,
+      doorModelPlacements,
+      plinthHeight: 0,
+      plinthDepth: 0,
     });
     if (instances.length > countBefore) {
       segmentsDecorated += 1;
@@ -1801,6 +1882,7 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
 
   return {
     instances,
+    doorModelPlacements,
     segmentHeights,
     stats: {
       enabled: true,

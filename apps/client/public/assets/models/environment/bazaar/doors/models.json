@@ -1,0 +1,14 @@
+{
+  "models": [
+    {
+      "id": "ph_large_castle_door",
+      "url": "large_castle_door/large_castle_door_2k.gltf",
+      "scale": 1.0
+    },
+    {
+      "id": "ph_rollershutter_window_02",
+      "url": "rollershutter_window_02/rollershutter_window_02_2k.gltf",
+      "scale": 1.0
+    }
+  ]
+}

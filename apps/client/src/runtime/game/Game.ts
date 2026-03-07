@@ -90,6 +90,7 @@ type GameOptions = {
   wallMaterials: WallMaterialLibrary | null;
   propVisuals: RuntimePropVisualMode;
   propModels: PropModelLibrary | null;
+  doorModels: PropModelLibrary | null;
   onTogglePerfHud?: () => void;
   mountEl?: HTMLElement;
   anchorsDebug?: {
@@ -166,6 +167,7 @@ export class Game {
   private wallMaterials: WallMaterialLibrary | null = null;
   private propVisuals: RuntimePropVisualMode = "blockout";
   private propModels: PropModelLibrary | null = null;
+  private doorModels: PropModelLibrary | null = null;
   private propChaos: RuntimePropChaosOptions = {
     profile: "subtle",
     jitter: null,
@@ -318,6 +320,7 @@ export class Game {
     this.wallMaterials = options.wallMaterials;
     this.propVisuals = options.propVisuals;
     this.propModels = options.propModels;
+    this.doorModels = options.doorModels;
     this.propChaos = options.propChaos;
     this.freezeInput = options.freezeInput ?? false;
     this.spawn = options.spawn ?? "A";
@@ -1052,6 +1055,7 @@ export class Game {
         enabled: this.wallDetailsEnabled,
         densityScale: this.wallDetailDensity,
       },
+      doorModels: this.doorModels,
     });
     this.wallDetailStats = builtBlockout.wallDetailStats;
     this.blockoutRoot = builtBlockout.root;

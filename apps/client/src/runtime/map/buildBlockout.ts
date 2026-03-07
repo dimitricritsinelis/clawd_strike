@@ -10,6 +10,8 @@ import { buildSandAccumulation } from "./buildSandAccumulation";
 import { buildPbrWalls } from "./buildPbrWalls";
 import { buildWallDetailMeshes } from "./wallDetailKit";
 import { buildWallDetailPlacements, type WallDetailPlacementStats } from "./wallDetailPlacer";
+import { buildDoorModels } from "./buildDoorModels";
+import type { PropModelLibrary } from "../render/models/PropModelLibrary";
 
 const WALKABLE_ZONE_TYPES = new Set([
   "spawn_plaza",
@@ -64,6 +66,7 @@ export type BlockoutBuildOptions = {
   wallMaterials: WallMaterialLibrary | null;
   anchors: RuntimeAnchorsSpec | null;
   wallDetails: BlockoutWallDetailOptions;
+  doorModels: PropModelLibrary | null;
 };
 
 function rectContainsPoint(rect: RuntimeRect, x: number, y: number): boolean {
@@ -426,6 +429,11 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       seed: options.seed,
     });
     root.add(detailRoot);
+
+    if (options.doorModels && wallDetailPlacements.doorModelPlacements.length > 0) {
+      const doorRoot = buildDoorModels(wallDetailPlacements.doorModelPlacements, options.doorModels, wallThicknessM);
+      root.add(doorRoot);
+    }
   }
 
   colliders.push({

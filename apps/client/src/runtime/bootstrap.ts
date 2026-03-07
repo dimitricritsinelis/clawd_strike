@@ -47,9 +47,11 @@ const POINTER_LOCK_BANNER_GRACE_MS = 2600;
 const FLOOR_MANIFEST_URL = "/assets/textures/environment/bazaar/floors/bazaar_floor_textures_pack_v4/materials.json";
 const WALL_MANIFEST_URL = "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v5/materials.json";
 const PROP_MANIFEST_URL = "/assets/models/environment/bazaar/props/bazaar_prop_models_pack_v1/models.json";
+const DOOR_MANIFEST_URL = "/assets/models/environment/bazaar/doors/models.json";
 const PBR_FLOORS_ENABLED = true;
 const PBR_WALLS_ENABLED = true;
 const MAP_PROPS_ENABLED = false;
+const DOOR_MODELS_ENABLED = true;
 const RUNTIME_TEXT_API_VERSION = 4;
 const PUBLIC_AGENT_API_VERSION = 1;
 const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
@@ -805,6 +807,17 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     }
   }
 
+  let doorModels: PropModelLibrary | null = null;
+  if (DOOR_MODELS_ENABLED) {
+    try {
+      doorModels = await PropModelLibrary.load(DOOR_MANIFEST_URL);
+    } catch (error) {
+      appendWarning(
+        `Failed to load door model pack. Doors will use flat void panels.\n${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   if (viewModelEnabled && viewModel) {
     viewModel.setAspect(renderer.getAspect());
   }
@@ -935,6 +948,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     wallMaterials,
     propVisuals: resolvedPropVisuals,
     propModels,
+    doorModels,
     freezeInput: inputFrozen,
     spawn: runtimeParams.spawn,
     debug: runtimeParams.debug,
