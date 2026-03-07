@@ -281,7 +281,7 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
       dirtEnabled: true,
       floorTopY: options.floorTopY,
       dirtHeightM: 1.5,
-      dirtDarken: 0.22,
+      dirtDarken: 0.12,
       dirtRoughnessBoost: 0.12,
       ...resolveWallShaderProfile(materialId, "wall"),
     });
