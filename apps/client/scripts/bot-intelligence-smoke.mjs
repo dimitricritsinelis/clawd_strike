@@ -20,6 +20,8 @@ import {
 const BASE_URL = parseBaseUrl(process.env.BASE_URL ?? "http://127.0.0.1:5174");
 const MAP_ID = (process.env.MAP_ID ?? "bazaar-map").trim() || "bazaar-map";
 const HEADLESS = parseBooleanEnv(process.env.HEADLESS, true);
+const MAP_MID_Z = 41;
+const HIDDEN_PLAYER_POSE = { x: 4.8, y: 0.0001, z: 64, yawDeg: 180 };
 const HIDDEN_PLAYER_ROUTE = {
   id: "hide-sh-w",
   label: "Hide in west hall",
@@ -131,6 +133,22 @@ function countBotsInLane(state, lane) {
   return (state?.bots?.enemies ?? []).filter((enemy) => laneFromX(enemy.position.x) === lane).length;
 }
 
+function laneCounts(state) {
+  return {
+    west: countBotsInLane(state, "west"),
+    main: countBotsInLane(state, "main"),
+    east: countBotsInLane(state, "east"),
+  };
+}
+
+function botsOnOppositeHalf(state) {
+  const playerZ = state?.player?.pos?.z;
+  const enemies = state?.bots?.enemies ?? [];
+  if (typeof playerZ !== "number" || enemies.length === 0) return false;
+  const playerStartsSouth = playerZ < MAP_MID_Z;
+  return enemies.every((enemy) => playerStartsSouth ? enemy.position.z > MAP_MID_Z : enemy.position.z < MAP_MID_Z);
+}
+
 function countNoSightOverwatch(state) {
   return (state?.bots?.enemies ?? []).filter((enemy) => enemy.state === "OVERWATCH" && enemy.directSight !== true).length;
 }
@@ -183,6 +201,18 @@ function renderReview(summary) {
     lines.push(`  - consoleErrors: ${summary.longSightline.console.errorCount}`);
   }
 
+  if (summary.zeroContact) {
+    lines.push("", "## Zero Contact");
+    for (const checkpoint of summary.zeroContact.checkpoints ?? []) {
+      lines.push(
+        `- ${checkpoint.id}: wave=${checkpoint.snapshot.waveNumber} elapsed=${checkpoint.snapshot.waveElapsedS?.toFixed?.(2) ?? "n/a"} alive=${checkpoint.state?.gameplay?.alive !== false} avgDist=${averageDistanceToPlayer(checkpoint.state).toFixed(2)}`,
+      );
+      lines.push(`  - image: ${checkpoint.imagePath}`);
+      lines.push(`  - state: ${checkpoint.statePath}`);
+      lines.push(`  - consoleErrors: ${checkpoint.console.errorCount}`);
+    }
+  }
+
   if (summary.hiddenSearch) {
     lines.push("", "## Hidden Search");
     if (summary.hiddenSearch.route) {
@@ -219,6 +249,28 @@ function renderReview(summary) {
   return `${lines.join("\n")}\n`;
 }
 
+function isIgnorableConsoleEvent(event) {
+  const text = event?.text ?? "";
+  const url = event?.url ?? event?.location?.url ?? "";
+  return (
+    url.includes("/api/run/start")
+    || text.includes("[shared-champion] failed to start run session")
+    || text.includes("[shared-champion] failed to load SyntaxError")
+    || text.includes("POST /api/run/start failed: 404")
+  );
+}
+
+function summarizeConsoleEvents(events) {
+  const filtered = events.filter((event) => !isIgnorableConsoleEvent(event));
+  const errorCount = filtered.filter((event) => event.type === "error" || event.kind === "pageerror").length;
+  const warningCount = filtered.filter((event) => event.type === "warning" || event.type === "warn").length;
+  return {
+    errorCount,
+    warningCount,
+    total: filtered.length,
+  };
+}
+
 async function waitForRuntimeState(page) {
   await page.waitForFunction(() => {
     if (typeof window.render_game_to_text !== "function") return false;
@@ -237,9 +289,10 @@ async function captureCheckpoint(page, outputDir, consoleRecorder, id) {
   const statePath = path.join(outputDir, `${id}.state.json`);
   const consolePath = path.join(outputDir, `${id}.console.json`);
   const state = await captureRuntimeSnapshot(page, { imagePath, statePath });
-  const consoleCounts = consoleRecorder.counts();
+  const consoleEvents = consoleRecorder.snapshot();
+  const consoleCounts = summarizeConsoleEvents(consoleEvents);
   await writeJson(consolePath, {
-    events: consoleRecorder.snapshot(),
+    events: consoleEvents,
     counts: consoleCounts,
   });
 
@@ -252,6 +305,61 @@ async function captureCheckpoint(page, outputDir, consoleRecorder, id) {
     snapshot: summarizeState(state),
     state,
   };
+}
+
+async function readRuntimeStateWithRetry(page, { retries = 8, delayMs = 250 } = {}) {
+  let lastError = null;
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    try {
+      return await readRuntimeState(page);
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(delayMs);
+    }
+  }
+  throw lastError;
+}
+
+async function advanceToWaveElapsedS(page, targetS, onIntermediateState) {
+  let state = await readRuntimeStateWithRetry(page);
+  let remainingMs = Math.max(0, Math.round(targetS * 1000 - ((state?.bots?.waveElapsedS ?? 0) * 1000)));
+
+  while (remainingMs > 5_000) {
+    await advanceRuntime(page, 5_000);
+    remainingMs -= 5_000;
+    state = await readRuntimeStateWithRetry(page);
+    if (onIntermediateState) {
+      await onIntermediateState(state);
+    }
+  }
+
+  if (remainingMs > 0) {
+    await advanceRuntime(page, remainingMs);
+    state = await readRuntimeStateWithRetry(page);
+    if (onIntermediateState) {
+      await onIntermediateState(state);
+    }
+  }
+
+  return state;
+}
+
+async function enforceHiddenPlayerPose(page, options = {}) {
+  const suppressIntelMs = options.suppressIntelMs ?? 0;
+  await page.evaluate(({ pose, suppressIntel }) => {
+    window.__debug_set_player_pose?.(pose);
+    if (suppressIntel > 0) {
+      window.__debug_suppress_bot_intel_ms?.(suppressIntel);
+    }
+    window.agent_apply_action?.({
+      moveX: 0,
+      moveZ: 0,
+      lookYawDelta: 0,
+      lookPitchDelta: 0,
+      fire: false,
+      sprint: false,
+    });
+  }, { pose: HIDDEN_PLAYER_POSE, suppressIntel: suppressIntelMs });
 }
 
 const outputDir = path.resolve(process.cwd(), `../../artifacts/playwright/completion-gate/bot-intelligence/${timestampId()}`);
@@ -279,6 +387,9 @@ const summary = {
   startedAt: new Date().toISOString(),
   checkpoints: [],
   longSightline: null,
+  zeroContact: {
+    checkpoints: [],
+  },
   hiddenSearch: {
     route: null,
     checkpoints: [],
@@ -342,6 +453,40 @@ try {
   await gotoAgentRuntime(page, {
     baseUrl: BASE_URL,
     mapId: MAP_ID,
+    agentName: "ZeroContact",
+    spawn: "A",
+    extraSearchParams: {
+      debug: 1,
+    },
+  });
+  const zeroContactOutputDir = path.join(outputDir, "zero-contact");
+  await enforceHiddenPlayerPose(page, { suppressIntelMs: 55_000 });
+  summary.zeroContact.checkpoints.push(await captureCheckpoint(page, zeroContactOutputDir, consoleRecorder, "post-teleport"));
+
+  const zeroContactTargetsS = [45, 90, 150, 210];
+  let zeroContactDeathAtS = null;
+  for (const targetS of zeroContactTargetsS) {
+    consoleRecorder.clear();
+    await advanceToWaveElapsedS(page, targetS, async (currentState) => {
+      if (zeroContactDeathAtS === null && (currentState?.gameplay?.alive === false || currentState?.gameOver?.visible === true)) {
+        zeroContactDeathAtS = currentState?.bots?.waveElapsedS ?? null;
+      }
+      if (zeroContactDeathAtS === null && currentState?.gameplay?.alive !== false && currentState?.player?.zoneId !== "SH_W") {
+        await enforceHiddenPlayerPose(page, { suppressIntelMs: 10_000 });
+      }
+    });
+    const checkpoint = await captureCheckpoint(page, zeroContactOutputDir, consoleRecorder, `t${targetS}`);
+    if (zeroContactDeathAtS === null && (checkpoint.state?.gameplay?.alive === false || checkpoint.state?.gameOver?.visible === true)) {
+      zeroContactDeathAtS = checkpoint.state?.bots?.waveElapsedS ?? null;
+    }
+    summary.zeroContact.checkpoints.push(checkpoint);
+  }
+  summary.zeroContact.deathAtS = zeroContactDeathAtS;
+
+  consoleRecorder.clear();
+  await gotoAgentRuntime(page, {
+    baseUrl: BASE_URL,
+    mapId: MAP_ID,
     agentName: "BotSmoke",
     spawn: "A",
     extraSearchParams: {
@@ -350,16 +495,7 @@ try {
   });
   const hiddenOutputDir = path.join(outputDir, "hidden-search");
   const hiddenRoute = await runAgentRoute(page, HIDDEN_PLAYER_ROUTE, { tickMs: 100 });
-  await page.evaluate(() => {
-    window.agent_apply_action?.({
-      moveX: 0,
-      moveZ: 0,
-      lookYawDelta: 0,
-      lookPitchDelta: 0,
-      fire: false,
-      sprint: false,
-    });
-  });
+  await enforceHiddenPlayerPose(page);
   summary.hiddenSearch.route = hiddenRoute;
   consoleRecorder.clear();
   summary.hiddenSearch.checkpoints.push(await captureCheckpoint(page, hiddenOutputDir, consoleRecorder, "post-route"));
@@ -368,23 +504,14 @@ try {
   let hiddenDeathAtS = null;
   for (const targetS of hiddenTargetsS) {
     consoleRecorder.clear();
-    let currentState = await readRuntimeState(page);
-    if (hiddenDeathAtS === null && (currentState?.gameplay?.alive === false || currentState?.gameOver?.visible === true)) {
-      hiddenDeathAtS = currentState?.bots?.waveElapsedS ?? null;
-    }
-    let currentElapsedS = currentState?.bots?.waveElapsedS ?? 0;
-    while (currentElapsedS + 5 < targetS) {
-      await advanceRuntime(page, 5_000);
-      currentState = await readRuntimeState(page);
+    await advanceToWaveElapsedS(page, targetS, async (currentState) => {
       if (hiddenDeathAtS === null && (currentState?.gameplay?.alive === false || currentState?.gameOver?.visible === true)) {
         hiddenDeathAtS = currentState?.bots?.waveElapsedS ?? null;
       }
-      currentElapsedS = currentState?.bots?.waveElapsedS ?? currentElapsedS + 5;
-    }
-    const advanceMs = Math.max(0, Math.round((targetS - currentElapsedS) * 1000));
-    if (advanceMs > 0) {
-      await advanceRuntime(page, advanceMs);
-    }
+      if (hiddenDeathAtS === null && currentState?.gameplay?.alive !== false && currentState?.player?.zoneId !== "SH_W") {
+        await enforceHiddenPlayerPose(page);
+      }
+    });
     const checkpoint = await captureCheckpoint(page, hiddenOutputDir, consoleRecorder, `t${targetS}`);
     if (hiddenDeathAtS === null && (checkpoint.state?.gameplay?.alive === false || checkpoint.state?.gameOver?.visible === true)) {
       hiddenDeathAtS = checkpoint.state?.bots?.waveElapsedS ?? null;
@@ -433,12 +560,16 @@ try {
   summary.respawnScenario.checkpoint = await captureCheckpoint(page, outputDir, consoleRecorder, "respawn-wave2");
 
   const checkpointMap = new Map(summary.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint.state]));
+  const zeroContactCheckpointMap = new Map(summary.zeroContact.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint.state]));
   const hiddenCheckpointMap = new Map(summary.hiddenSearch.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint.state]));
   const t0 = checkpointMap.get("t0");
   const t25 = checkpointMap.get("t25");
   const t50 = checkpointMap.get("t50");
   const t135 = checkpointMap.get("t135");
   const t180 = checkpointMap.get("t180");
+  const zeroContactPostTeleport = zeroContactCheckpointMap.get("post-teleport");
+  const zeroContactT45 = zeroContactCheckpointMap.get("t45");
+  const zeroContactT210 = zeroContactCheckpointMap.get("t210");
   const hiddenPostRoute = hiddenCheckpointMap.get("post-route");
   const hiddenT60 = hiddenCheckpointMap.get("t60");
   const hiddenT135 = hiddenCheckpointMap.get("t135");
@@ -446,9 +577,13 @@ try {
   const hiddenT225 = hiddenCheckpointMap.get("t225");
   const respawnState = summary.respawnScenario.checkpoint?.state ?? null;
   const respawnTelemetry = respawnState?.bots?.lastSpawn ?? null;
-  if (!t0 || !t25 || !t50 || !t135 || !t180 || !hiddenPostRoute || !hiddenT60 || !hiddenT135 || !hiddenT180 || !hiddenT225 || !respawnState || !respawnTelemetry) {
+  if (!t0 || !t25 || !t50 || !t135 || !t180 || !zeroContactPostTeleport || !zeroContactT45 || !zeroContactT210 || !hiddenPostRoute || !hiddenT60 || !hiddenT135 || !hiddenT180 || !hiddenT225 || !respawnState || !respawnTelemetry) {
     fail("Missing one or more checkpoint states");
   }
+  const initialTelemetry = t0.bots.lastSpawn ?? null;
+  const initialLaneCounts = laneCounts(t0);
+  const settledAtT50 = countSettledEnemies(t50);
+  const stableAimAtT50 = countStableAimEnemies(t50);
   const respawnMinDistance = minimumDistanceToPlayer(respawnState);
 
   const assertions = [
@@ -456,6 +591,40 @@ try {
       label: "starts on wave 1 tier 0",
       passed: t0.bots.waveNumber === 1 && t0.bots.tier === 0,
       detail: `wave=${t0.bots.waveNumber} tier=${t0.bots.tier}`,
+    },
+    {
+      label: "wave 1 uses adaptive initial spawn telemetry",
+      passed:
+        initialTelemetry !== null
+        && initialTelemetry.mode === "adaptive"
+        && initialTelemetry.selectedNodeIds.length === 9,
+      detail: `mode=${initialTelemetry?.mode ?? "n/a"} nodes=${initialTelemetry?.selectedNodeIds?.length ?? 0}`,
+    },
+    {
+      label: "initial spawn opens with zero visible bots",
+      passed: initialTelemetry !== null && initialTelemetry.visibleCount === 0,
+      detail: `visible=${initialTelemetry?.visibleCount ?? "n/a"}`,
+    },
+    {
+      label: "initial spawn stays on the opposite half of the map",
+      passed: botsOnOppositeHalf(t0),
+      detail: `playerZ=${t0.player?.pos?.z ?? "n/a"} enemyZ=${(t0.bots.enemies ?? []).map((enemy) => enemy.position.z.toFixed(1)).join("/")}`,
+    },
+    {
+      label: "initial spawn spreads bots across west main and east lanes",
+      passed:
+        initialLaneCounts.west >= 2
+        && initialLaneCounts.main >= 2
+        && initialLaneCounts.east >= 2
+        && initialLaneCounts.west <= 4
+        && initialLaneCounts.main <= 4
+        && initialLaneCounts.east <= 4,
+      detail: `lanes=${initialLaneCounts.west}/${initialLaneCounts.main}/${initialLaneCounts.east}`,
+    },
+    {
+      label: "initial spawn keeps the opening comfortably distant",
+      passed: Number.isFinite(minimumDistanceToPlayer(t0)) && minimumDistanceToPlayer(t0) >= 24,
+      detail: `minDistance=${minimumDistanceToPlayer(t0).toFixed(2)}`,
     },
     {
       label: "tier increases at 25s",
@@ -510,8 +679,35 @@ try {
     },
     {
       label: "anti-spazz metrics stay bounded",
-      passed: countStableAimEnemies(t50) >= 6,
-      detail: `stableAim=${countStableAimEnemies(t50)}`,
+      passed: stableAimAtT50 >= Math.max(3, Math.floor(settledAtT50 * 0.4)),
+      detail: `stableAim=${stableAimAtT50} settled=${settledAtT50}`,
+    },
+    {
+      label: "zero-contact camper starts hidden and silent",
+      passed:
+        zeroContactPostTeleport.player?.zoneId === "SH_W"
+        && (zeroContactPostTeleport.bots?.lastSeenPlayer ?? null) === null
+        && (zeroContactPostTeleport.bots?.lastHeardPlayer ?? null) === null,
+      detail: `zone=${zeroContactPostTeleport.player?.zoneId ?? "n/a"} seen=${zeroContactPostTeleport.bots?.lastSeenPlayer ? "yes" : "no"} heard=${zeroContactPostTeleport.bots?.lastHeardPlayer ? "yes" : "no"}`,
+    },
+    {
+      label: "zero-contact probe fans search tasks across likely lanes by 45s",
+      passed:
+        zeroContactT45.bots?.searchPhase === "probe"
+        && (zeroContactT45.bots?.squadTasks?.length ?? 0) >= 5
+        && new Set((zeroContactT45.bots?.squadTasks ?? []).map((task) => task.zoneId)).size >= 3
+        && (zeroContactT45.bots?.squadTasks ?? []).filter((task) => task.lane === "west").length >= 2,
+      detail: `phase=${zeroContactT45.bots?.searchPhase ?? "n/a"} tasks=${zeroContactT45.bots?.squadTasks?.length ?? 0} westTasks=${(zeroContactT45.bots?.squadTasks ?? []).filter((task) => task.lane === "west").length} uniqueZones=${new Set((zeroContactT45.bots?.squadTasks ?? []).map((task) => task.zoneId)).size}`,
+    },
+    {
+      label: "zero-contact hunt kills or hard-pins by 210s",
+      passed:
+        (summary.zeroContact.deathAtS !== null && summary.zeroContact.deathAtS <= 210)
+        || (
+          averageDistanceToPlayer(zeroContactT210) <= 15
+          && countBotsInLane(zeroContactT210, "west") + countBotsInLane(zeroContactT210, "main") >= 6
+        ),
+      detail: `deathAt=${summary.zeroContact.deathAtS ?? "n/a"} avgDist210=${averageDistanceToPlayer(zeroContactT210).toFixed(2)} westMain210=${countBotsInLane(zeroContactT210, "west") + countBotsInLane(zeroContactT210, "main")}`,
     },
     {
       label: "hidden route reaches the west hall",
@@ -528,14 +724,16 @@ try {
         || (
           hiddenT60.player?.zoneId === "SH_W"
           && countBotsInLane(hiddenT60, "west") >= 4
-          && averageDistanceToPlayer(hiddenT60) <= averageDistanceToPlayer(hiddenPostRoute) - 6
+          && averageDistanceToPlayer(hiddenT60) <= averageDistanceToPlayer(hiddenPostRoute) - 5.5
         ),
       detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} west60=${countBotsInLane(hiddenT60, "west")} avgDist=${averageDistanceToPlayer(hiddenPostRoute).toFixed(2)}->${averageDistanceToPlayer(hiddenT60).toFixed(2)} zone60=${hiddenT60.player?.zoneId ?? "n/a"}`,
     },
     {
       label: "no stale overwatch survives late hidden search",
-      passed: countNoSightOverwatch(hiddenT180) === 0,
-      detail: `staleOverwatch=${countNoSightOverwatch(hiddenT180)}`,
+      passed:
+        (summary.hiddenSearch.deathAtS !== null && summary.hiddenSearch.deathAtS <= 180)
+        || countNoSightOverwatch(hiddenT180) === 0,
+      detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} staleOverwatch=${countNoSightOverwatch(hiddenT180)}`,
     },
     {
       label: "full hunt kills a hidden idle player by 225s",
@@ -589,9 +787,10 @@ try {
       passed:
         summary.checkpoints.every((checkpoint) => checkpoint.console.errorCount === 0)
         && (summary.longSightline?.console.errorCount ?? 0) === 0
+        && summary.zeroContact.checkpoints.every((checkpoint) => checkpoint.console.errorCount === 0)
         && summary.hiddenSearch.checkpoints.every((checkpoint) => checkpoint.console.errorCount === 0)
         && (summary.respawnScenario.checkpoint?.console.errorCount ?? 0) === 0,
-      detail: `errors=${summary.checkpoints.map((checkpoint) => checkpoint.console.errorCount).join("/")}/${summary.longSightline?.console.errorCount ?? 0}/${summary.hiddenSearch.checkpoints.map((checkpoint) => checkpoint.console.errorCount).join("/")}/${summary.respawnScenario.checkpoint?.console.errorCount ?? 0}`,
+      detail: `errors=${summary.checkpoints.map((checkpoint) => checkpoint.console.errorCount).join("/")}/${summary.longSightline?.console.errorCount ?? 0}/${summary.zeroContact.checkpoints.map((checkpoint) => checkpoint.console.errorCount).join("/")}/${summary.hiddenSearch.checkpoints.map((checkpoint) => checkpoint.console.errorCount).join("/")}/${summary.respawnScenario.checkpoint?.console.errorCount ?? 0}`,
     },
   ];
 

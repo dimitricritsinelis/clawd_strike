@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type APIResponse } from "@playwright/test";
 import {
   advanceRuntime,
   gotoAgentRuntimeViaUi,
@@ -7,6 +7,64 @@ import {
 
 function formatScoreHalfPoints(scoreHalfPoints: number): string {
   return (scoreHalfPoints / 2).toLocaleString("en-US");
+}
+
+function computeFinalScore(kills: number, headshots: number): number {
+  return (kills * 10) + (headshots * 2.5);
+}
+
+function buildRunSummary(kills: number, headshots: number) {
+  const shotsHit = kills;
+  const shotsFired = kills;
+  const accuracy = shotsFired > 0 ? Math.round(((shotsHit / shotsFired) * 100) * 10) / 10 : 0;
+  return {
+    survivalTimeS: 0.5,
+    kills,
+    headshots,
+    shotsFired,
+    shotsHit,
+    accuracy,
+    finalScore: computeFinalScore(kills, headshots),
+    deathCause: "enemy-fire" as const,
+  };
+}
+
+function chooseRunAtLeastHalfPoints(minHalfPoints: number): { kills: number; headshots: number; scoreHalfPoints: number } {
+  let units = Math.max(0, Math.ceil(minHalfPoints / 5));
+  while (true) {
+    const kills = Math.ceil(units / 5);
+    const headshots = units - (4 * kills);
+    if (headshots >= 0 && headshots <= kills) {
+      return {
+        kills,
+        headshots,
+        scoreHalfPoints: units * 5,
+      };
+    }
+    units += 1;
+  }
+}
+
+function chooseRunAtMostHalfPoints(maxHalfPoints: number): { kills: number; headshots: number; scoreHalfPoints: number } {
+  let units = Math.max(0, Math.floor(maxHalfPoints / 5));
+  while (units >= 0) {
+    const kills = Math.ceil(units / 5);
+    const headshots = units - (4 * kills);
+    if (headshots >= 0 && headshots <= kills) {
+      return {
+        kills,
+        headshots,
+        scoreHalfPoints: units * 5,
+      };
+    }
+    units -= 1;
+  }
+
+  return {
+    kills: 0,
+    headshots: 0,
+    scoreHalfPoints: 0,
+  };
 }
 
 function expectChampion(
@@ -21,6 +79,12 @@ function expectChampion(
     scope: "sitewide",
     updatedAt: expect.any(String),
   });
+}
+
+function originHeaders(baseUrl: string) {
+  return {
+    origin: new URL(baseUrl).origin,
+  };
 }
 
 async function readSharedChampion(request: APIRequestContext, baseUrl: string) {
@@ -59,76 +123,227 @@ async function getSessionToken(request: APIRequestContext, baseUrl: string): Pro
   return data.token as string;
 }
 
-async function submitSharedChampion(
+async function startValidatedRun(
   request: APIRequestContext,
   baseUrl: string,
-  body: { playerName: string; scoreHalfPoints: number; controlMode: "human" | "agent" },
+  body: { playerName: string; controlMode: "human" | "agent"; mapId?: string },
 ) {
-  const sessionToken = await getSessionToken(request, baseUrl);
-  const response = await request.post(new URL("/api/high-score", baseUrl).toString(), {
+  const response = await request.post(new URL("/api/run/start", baseUrl).toString(), {
     failOnStatusCode: false,
+    headers: {
+      ...originHeaders(baseUrl),
+      "content-type": "application/json",
+    },
     data: {
-      ...body,
-      telemetry: buildTelemetryForScore(body.scoreHalfPoints),
-      sessionToken,
+      playerName: body.playerName,
+      controlMode: body.controlMode,
+      mapId: body.mapId ?? "bazaar-map",
     },
   });
-  expect(response.ok()).toBe(true);
-  return response.json();
+  return {
+    response,
+    body: await response.json().catch(() => null),
+  };
 }
 
-test("api stores the sitewide champion with strict overwrite rules", async ({ request }, testInfo) => {
+async function finishValidatedRun(
+  request: APIRequestContext,
+  baseUrl: string,
+  body: { runToken: string; summary: ReturnType<typeof buildRunSummary> },
+) {
+  const response = await request.post(new URL("/api/run/finish", baseUrl).toString(), {
+    failOnStatusCode: false,
+    headers: {
+      ...originHeaders(baseUrl),
+      "content-type": "application/json",
+    },
+    data: body,
+  });
+  return {
+    response,
+    body: await response.json().catch(() => null),
+  };
+}
+
+async function completeValidatedRun(
+  request: APIRequestContext,
+  baseUrl: string,
+  options: { playerName: string; controlMode: "human" | "agent"; kills: number; headshots: number },
+) {
+  const started = await startValidatedRun(request, baseUrl, {
+    playerName: options.playerName,
+    controlMode: options.controlMode,
+  });
+  expect(started.response.ok()).toBe(true);
+  expect(started.body).toEqual({
+    runToken: expect.any(String),
+    issuedAt: expect.any(String),
+    expiresAt: expect.any(String),
+    ruleset: "wave-score-v1-k10-hs2_5",
+  });
+
+  const summary = buildRunSummary(options.kills, options.headshots);
+  const finished = await finishValidatedRun(request, baseUrl, {
+    runToken: started.body.runToken,
+    summary,
+  });
+
+  return {
+    started,
+    finished,
+    summary,
+  };
+}
+
+test("api blocks raw writes and only accepts validated run submissions", async ({ request }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL as string;
+
+  const directWrite = await request.post(new URL("/api/high-score", baseUrl).toString(), {
+    failOnStatusCode: false,
+    data: {
+      playerName: "RawWrite",
+      scoreHalfPoints: 500,
+      controlMode: "agent",
+    },
+  });
+  expect(directWrite.status()).toBe(403);
+  expect(await directWrite.json()).toEqual({
+    error: "Direct shared champion writes are internal-only.",
+  });
+
+  const forgedFinish = await finishValidatedRun(request, baseUrl, {
+    runToken: "forged-token",
+    summary: buildRunSummary(1, 0),
+  });
+  expect(forgedFinish.response.status()).toBe(404);
+  expect(forgedFinish.body.accepted).toBe(false);
+  expect(forgedFinish.body.updated).toBe(false);
+  expect(forgedFinish.body.reason).toBe("missing");
+
+  const replay = await completeValidatedRun(request, baseUrl, {
+    playerName: "ReplayProbe",
+    controlMode: "agent",
+    kills: 1,
+    headshots: 0,
+  });
+  expect(replay.finished.response.ok()).toBe(true);
+  expect(replay.finished.body.accepted).toBe(true);
+
+  const replayAttempt = await finishValidatedRun(request, baseUrl, {
+    runToken: replay.started.body.runToken,
+    summary: replay.summary,
+  });
+  expect(replayAttempt.response.status()).toBe(409);
+  expect(replayAttempt.body.accepted).toBe(false);
+  expect(replayAttempt.body.updated).toBe(false);
+  expect(replayAttempt.body.reason).toBe("used");
+
+  const hugeRunStart = await startValidatedRun(request, baseUrl, {
+    playerName: "HugeScore",
+    controlMode: "human",
+  });
+  expect(hugeRunStart.response.ok()).toBe(true);
+  const hugeRun = await finishValidatedRun(request, baseUrl, {
+    runToken: hugeRunStart.body.runToken,
+    summary: {
+      survivalTimeS: 0.5,
+      kills: 99_999,
+      headshots: 99_999,
+      shotsFired: 99_999,
+      shotsHit: 99_999,
+      accuracy: 100,
+      finalScore: computeFinalScore(99_999, 99_999),
+      deathCause: "enemy-fire",
+    },
+  });
+  expect(hugeRun.response.status()).toBe(422);
+  expect(hugeRun.body.accepted).toBe(false);
+  expect(hugeRun.body.reason).toBe("kills-exceed-cap");
+
+  const textPlainStart = await request.fetch(new URL("/api/run/start", baseUrl).toString(), {
+    method: "POST",
+    failOnStatusCode: false,
+    headers: {
+      ...originHeaders(baseUrl),
+      "content-type": "text/plain",
+    },
+    data: JSON.stringify({
+      playerName: "TextPlain",
+      controlMode: "agent",
+      mapId: "bazaar-map",
+    }),
+  });
+  expect(textPlainStart.status()).toBe(415);
+  expect(await textPlainStart.json()).toEqual({
+    error: "Expected application/json request body.",
+  });
+});
+
+test("validated run submissions keep strict overwrite rules", async ({ request }, testInfo) => {
   const baseUrl = testInfo.project.use.baseURL as string;
   const current = await readSharedChampion(request, baseUrl);
   const baseScore = typeof current.champion?.scoreHalfPoints === "number" ? current.champion.scoreHalfPoints : 0;
-  const firstScore = baseScore + 20;
-  const higherScore = firstScore + 5;
+  const firstRun = chooseRunAtLeastHalfPoints(baseScore + 5);
+  const lowerRun = chooseRunAtMostHalfPoints(Math.max(0, firstRun.scoreHalfPoints - 5));
+  const higherRun = chooseRunAtLeastHalfPoints(firstRun.scoreHalfPoints + 5);
 
-  const first = await submitSharedChampion(request, baseUrl, {
+  const first = await completeValidatedRun(request, baseUrl, {
     playerName: "AlphaUnit",
-    scoreHalfPoints: firstScore,
     controlMode: "agent",
+    kills: firstRun.kills,
+    headshots: firstRun.headshots,
   });
-  expect(first.updated).toBe(true);
-  expectChampion(first.champion, {
+  expect(first.finished.response.ok()).toBe(true);
+  expect(first.finished.body.accepted).toBe(true);
+  expect(first.finished.body.updated).toBe(true);
+  expectChampion(first.finished.body.champion, {
     holderName: "AlphaUnit",
-    scoreHalfPoints: firstScore,
+    scoreHalfPoints: firstRun.scoreHalfPoints,
     controlMode: "agent",
   });
 
-  const lower = await submitSharedChampion(request, baseUrl, {
+  const lower = await completeValidatedRun(request, baseUrl, {
     playerName: "BravoUnit",
-    scoreHalfPoints: Math.max(0, firstScore - 5),
     controlMode: "human",
+    kills: lowerRun.kills,
+    headshots: lowerRun.headshots,
   });
-  expect(lower.updated).toBe(false);
-  expectChampion(lower.champion, {
+  expect(lower.finished.response.ok()).toBe(true);
+  expect(lower.finished.body.accepted).toBe(true);
+  expect(lower.finished.body.updated).toBe(false);
+  expectChampion(lower.finished.body.champion, {
     holderName: "AlphaUnit",
-    scoreHalfPoints: firstScore,
+    scoreHalfPoints: firstRun.scoreHalfPoints,
     controlMode: "agent",
   });
 
-  const tie = await submitSharedChampion(request, baseUrl, {
+  const tie = await completeValidatedRun(request, baseUrl, {
     playerName: "CharlieTie",
-    scoreHalfPoints: firstScore,
     controlMode: "human",
+    kills: firstRun.kills,
+    headshots: firstRun.headshots,
   });
-  expect(tie.updated).toBe(false);
-  expectChampion(tie.champion, {
+  expect(tie.finished.response.ok()).toBe(true);
+  expect(tie.finished.body.accepted).toBe(true);
+  expect(tie.finished.body.updated).toBe(false);
+  expectChampion(tie.finished.body.champion, {
     holderName: "AlphaUnit",
-    scoreHalfPoints: firstScore,
+    scoreHalfPoints: firstRun.scoreHalfPoints,
     controlMode: "agent",
   });
 
-  const higher = await submitSharedChampion(request, baseUrl, {
+  const higher = await completeValidatedRun(request, baseUrl, {
     playerName: "DeltaLead",
-    scoreHalfPoints: higherScore,
     controlMode: "human",
+    kills: higherRun.kills,
+    headshots: higherRun.headshots,
   });
-  expect(higher.updated).toBe(true);
-  expectChampion(higher.champion, {
+  expect(higher.finished.response.ok()).toBe(true);
+  expect(higher.finished.body.accepted).toBe(true);
+  expect(higher.finished.body.updated).toBe(true);
+  expectChampion(higher.finished.body.champion, {
     holderName: "DeltaLead",
-    scoreHalfPoints: higherScore,
+    scoreHalfPoints: higherRun.scoreHalfPoints,
     controlMode: "human",
   });
 });
@@ -137,15 +352,18 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
   const baseUrl = testInfo.project.use.baseURL as string;
   const current = await readSharedChampion(request, baseUrl);
   const currentHalfPoints = typeof current.champion?.scoreHalfPoints === "number" ? current.champion.scoreHalfPoints : 0;
-  const nextHalfPoints = currentHalfPoints + 10;
+  const nextRun = chooseRunAtLeastHalfPoints(currentHalfPoints + 5);
   const holderName = "SiteChampion";
 
-  const seeded = await submitSharedChampion(request, baseUrl, {
+  const seeded = await completeValidatedRun(request, baseUrl, {
     playerName: holderName,
-    scoreHalfPoints: nextHalfPoints,
     controlMode: "agent",
+    kills: nextRun.kills,
+    headshots: nextRun.headshots,
   });
-  expect(seeded.updated).toBe(true);
+  expect(seeded.finished.response.ok()).toBe(true);
+  expect(seeded.finished.body.accepted).toBe(true);
+  expect(seeded.finished.body.updated).toBe(true);
 
   const contextA = await browser.newContext();
   const contextB = await browser.newContext();
@@ -158,9 +376,9 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
 
     await expect(pageA.getByTestId("loading-world-champion-name")).toHaveText(holderName.toUpperCase());
     await expect(pageB.getByTestId("loading-world-champion-name")).toHaveText(holderName.toUpperCase());
-    await expect(pageA.getByTestId("loading-world-champion-score")).toHaveText(formatScoreHalfPoints(nextHalfPoints));
+    await expect(pageA.getByTestId("loading-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
     await expect(pageA.getByTestId("loading-world-champion-mode")).toHaveText("AGENT");
-    await expect(pageB.getByTestId("loading-world-champion-score")).toHaveText(formatScoreHalfPoints(nextHalfPoints));
+    await expect(pageB.getByTestId("loading-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
 
     await gotoAgentRuntimeViaUi(pageA, {
       baseUrl,
@@ -168,7 +386,7 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
     });
 
     await expect(pageA.getByTestId("hud-world-champion-name")).toHaveText(holderName.toUpperCase());
-    await expect(pageA.getByTestId("hud-world-champion-score")).toHaveText(formatScoreHalfPoints(nextHalfPoints));
+    await expect(pageA.getByTestId("hud-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
     await expect(pageA.getByTestId("hud-world-champion-mode")).toHaveText("AGENT");
 
     for (let step = 0; step < 120; step += 1) {
@@ -198,7 +416,7 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
     }, { timeout: 20_000 }).toBe(true);
 
     await expect(pageA.getByTestId("death-world-champion-name")).toHaveText(holderName.toUpperCase());
-    await expect(pageA.getByTestId("death-world-champion-score")).toHaveText(formatScoreHalfPoints(nextHalfPoints));
+    await expect(pageA.getByTestId("death-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
     await expect(pageA.getByTestId("death-world-champion-mode")).toHaveText("AGENT");
   } finally {
     await contextA.close();

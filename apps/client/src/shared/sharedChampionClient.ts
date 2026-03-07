@@ -1,13 +1,24 @@
 import {
   parseSharedChampionGetResponse,
-  parseSharedChampionPostResponse,
+  parseSharedChampionRunFinishResponse,
+  parseSharedChampionRunStartResponse,
+  SHARED_CHAMPION_RUN_FINISH_ENDPOINT,
+  SHARED_CHAMPION_RUN_START_ENDPOINT,
+  SHARED_CHAMPION_SCORE_WRITE_ENDPOINT,
   type SharedChampion,
-  type SharedChampionPostRequest,
+  type SharedChampionRunStartRequest,
+  type SharedChampionRunSummary,
   type SharedChampionSnapshot,
   type SharedChampionSnapshotStatus,
 } from "../../../shared/highScore";
 
-const SHARED_CHAMPION_ENDPOINT = "/api/high-score";
+const SHARED_CHAMPION_ENDPOINT = SHARED_CHAMPION_SCORE_WRITE_ENDPOINT;
+
+export type SharedChampionRunSession = {
+  runToken: string;
+  issuedAt: string;
+  expiresAt: string;
+};
 
 let status: SharedChampionSnapshotStatus = "idle";
 let champion: SharedChampion | null = null;
@@ -63,41 +74,94 @@ export async function loadSharedChampion(options: { force?: boolean } = {}): Pro
   return pendingLoad;
 }
 
-export async function submitSharedChampionCandidate(
-  candidate: SharedChampionPostRequest,
-  sessionToken: string | null,
-): Promise<{ updated: boolean; snapshot: SharedChampionSnapshot }> {
+export async function startSharedChampionRunSession(
+  input: SharedChampionRunStartRequest,
+): Promise<SharedChampionRunSession | null> {
   try {
-    const response = await fetch(SHARED_CHAMPION_ENDPOINT, {
+    const response = await fetch(SHARED_CHAMPION_RUN_START_ENDPOINT, {
       method: "POST",
       cache: "no-store",
       headers: {
         "content-type": "application/json; charset=utf-8",
       },
-      body: JSON.stringify({ ...candidate, sessionToken }),
+      body: JSON.stringify(input),
     });
     if (!response.ok) {
-      throw new Error(`POST /api/high-score failed: ${response.status}`);
+      throw new Error(`POST ${SHARED_CHAMPION_RUN_START_ENDPOINT} failed: ${response.status}`);
     }
 
-    const parsed = parseSharedChampionPostResponse(await response.json());
+    const parsed = parseSharedChampionRunStartResponse(await response.json());
     if (!parsed) {
-      throw new Error("POST /api/high-score returned an invalid payload.");
+      throw new Error("POST /api/run/start returned an invalid payload.");
+    }
+
+    return {
+      runToken: parsed.runToken,
+      issuedAt: parsed.issuedAt,
+      expiresAt: parsed.expiresAt,
+    };
+  } catch (error) {
+    console.warn("[shared-champion] failed to start run session", error);
+    return null;
+  }
+}
+
+export async function submitSharedChampionRunSession(
+  session: SharedChampionRunSession,
+  summary: SharedChampionRunSummary,
+): Promise<{ accepted: boolean; updated: boolean; reason: string | null; snapshot: SharedChampionSnapshot }> {
+  try {
+    const response = await fetch(SHARED_CHAMPION_RUN_FINISH_ENDPOINT, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        runToken: session.runToken,
+        summary,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    const parsed = parseSharedChampionRunFinishResponse(payload);
+
+    if (!response.ok) {
+      if (parsed) {
+        champion = parsed.champion;
+        status = "ready";
+        return {
+          accepted: parsed.accepted,
+          updated: parsed.updated,
+          reason: parsed.reason,
+          snapshot: snapshot(),
+        };
+      }
+
+      throw new Error(`POST ${SHARED_CHAMPION_RUN_FINISH_ENDPOINT} failed: ${response.status}`);
+    }
+
+    if (!parsed) {
+      throw new Error("POST /api/run/finish returned an invalid payload.");
     }
 
     champion = parsed.champion;
     status = "ready";
     return {
+      accepted: parsed.accepted,
       updated: parsed.updated,
+      reason: parsed.reason,
       snapshot: snapshot(),
     };
   } catch (error) {
-    console.warn("[shared-champion] failed to submit", error);
+    console.warn("[shared-champion] failed to finish run session", error);
     if (!champion) {
       status = "unavailable";
     }
     return {
+      accepted: false,
       updated: false,
+      reason: error instanceof Error ? error.message : String(error),
       snapshot: snapshot(),
     };
   }

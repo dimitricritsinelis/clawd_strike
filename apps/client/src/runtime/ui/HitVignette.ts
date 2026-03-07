@@ -68,6 +68,14 @@ export class HitVignette {
     this.hitLayer.style.opacity = (this.peakOpacity * t * t).toFixed(3);
   }
 
+  clear(): void {
+    this.timerS = 0;
+    this.fadeDurationS = 0.4;
+    this.peakOpacity = 1.0;
+    this.hitLayer.style.opacity = "0";
+    this.lowHpLayer.style.opacity = "0";
+  }
+
   dispose(): void {
     this.hitLayer.remove();
     this.lowHpLayer.remove();

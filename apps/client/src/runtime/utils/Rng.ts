@@ -52,6 +52,10 @@ export class DeterministicRng {
     return minInclusive + Math.floor(this.next() * span);
   }
 
+  reset(): void {
+    this.state = this.seed;
+  }
+
   fork(tag: string): DeterministicRng {
     return new DeterministicRng(deriveSubSeed(this.seed, tag));
   }

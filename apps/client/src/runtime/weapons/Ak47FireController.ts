@@ -152,6 +152,18 @@ export class Ak47FireController {
     this.recoilRng = new DeterministicRng(deriveSubSeed(rootSeed, "recoil"));
   }
 
+  reset(): void {
+    this.spreadRng.reset();
+    this.recoilRng.reset();
+    this.fireHeldLastFrame = false;
+    this.timeUntilNextShotS = 0;
+    this.timeSinceLastShotS = Number.POSITIVE_INFINITY;
+    this.debugSpreadDeg = SPREAD_STATIONARY_DEG;
+    this.debugLastShotRecoilPitchDeg = 0;
+    this.debugLastShotRecoilYawDeg = 0;
+    this.resetSprayState();
+  }
+
   cancelTrigger(): void {
     this.fireHeldLastFrame = false;
     this.timeUntilNextShotS = 0;

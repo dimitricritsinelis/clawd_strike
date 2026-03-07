@@ -49,6 +49,7 @@ Last updated: 2026-03-07
 - Hunt pressure is independent of tier/difficulty — it ensures that no round can stall indefinitely regardless of how low the current difficulty is.
 - Effects ramp continuously from 45s to 180s: OVERWATCH hold distance shrinks (18m → 1.8m), flank budgets grow, shared-knowledge trust rises, collapse scoring strengthens, and directive commit windows shorten.
 - Hunt uses uncertain zone/node estimates with delayed squad sharing rather than exact player-coordinate injection. Full hunt must replan destinations into likely contact zones, not just relabel states.
+- Zero-contact rounds must still bootstrap a believable search from enemy-spawn inference, cleared-zone elimination, and coordinated lane tasks; the squad may not wait forever for first sight or sound before beginning the hunt.
 - This guarantees that idle or hidden players are eventually collapsed on without wallhack-like omniscience, which is required for both human gameplay feel and RL agent training signal.
 
 ## DEC-009: Layout reference catalog is generated evidence, not authority
@@ -60,3 +61,8 @@ Last updated: 2026-03-07
 - The public agent contract keeps `score.best` scoped to the current browser context so local self-improvement loops and existing no-context agent behavior remain stable.
 - The sitewide shared record is exposed separately as `sharedChampion`, shown on the loading screen and runtime score surfaces, and overwritten only by a strictly higher score.
 - The shared record stores holder name, score, mode, and timestamp, but it is not a multi-entry leaderboard.
+
+## DEC-011: Direct champion writes are internal-only
+- `GET /api/high-score` remains public and read-only, but browser clients may no longer write arbitrary champion scores directly.
+- Public champion submissions now use a server-issued run token plus a server-side validator over run summary stats before any overwrite attempt.
+- Production defaults to public run submissions disabled until stronger anti-cheat verification is explicitly enabled; direct `POST /api/high-score` is reserved for internal admin use behind a secret.

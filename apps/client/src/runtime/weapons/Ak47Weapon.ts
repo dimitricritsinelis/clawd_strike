@@ -61,6 +61,17 @@ export class Ak47Weapon {
     this.reloadQueued = true;
   }
 
+  reset(): void {
+    this.mag = MAG_CAPACITY;
+    this.reserve = RESERVE_START;
+    this.reloading = false;
+    this.reloadTimerS = 0;
+    this.reloadQueued = false;
+    this.dryFireCooldownS = 0;
+    this.wasFireHeld = false;
+    this.fireController.reset();
+  }
+
   cancelTrigger(): void {
     this.reloadQueued = false;
     this.fireController.cancelTrigger();

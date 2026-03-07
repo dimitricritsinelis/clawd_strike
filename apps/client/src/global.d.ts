@@ -15,6 +15,14 @@ declare global {
       enemyName?: string;
     }) => void;
     __debug_eliminate_all_bots?: () => number;
+    __debug_set_player_pose?: (payload: {
+      x: number;
+      y: number;
+      z: number;
+      yawDeg?: number;
+    }) => void;
+    __debug_reset_bot_knowledge?: () => void;
+    __debug_suppress_bot_intel_ms?: (durationMs: number) => void;
     __vt_pending?: unknown;
   }
 }

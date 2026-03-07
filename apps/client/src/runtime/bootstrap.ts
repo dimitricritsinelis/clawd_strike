@@ -30,13 +30,15 @@ import type { RuntimeWarmupAssets } from "./warmup";
 import {
   getSharedChampionSnapshot,
   loadSharedChampion,
-  submitSharedChampionCandidate,
+  startSharedChampionRunSession,
+  submitSharedChampionRunSession,
+  type SharedChampionRunSession,
 } from "../shared/sharedChampionClient";
-import { requestSessionToken } from "../shared/sessionClient";
 import {
   isBetterSharedChampionCandidate,
   scoreValueToHalfPoints,
   type SharedChampion,
+  type SharedChampionRunSummary,
   type SharedChampionSnapshot,
 } from "../../../shared/highScore";
 
@@ -226,6 +228,20 @@ export type RuntimeTextState = {
     tier: number;
     aliveCount: number;
     graphNodeCount: number;
+    searchPhase: "caution" | "probe" | "sweep" | "collapse" | "pinch";
+    topSearchZones: Array<{
+      zoneId: string;
+      score: number;
+      reason: string;
+      lastClearedAgeS: number | null;
+    }>;
+    squadTasks: Array<{
+      enemyId: string;
+      kind: "hold" | "clear" | "contain" | "flank";
+      zoneId: string;
+      lane: "west" | "main" | "east";
+      reason: string;
+    }>;
     roleCounts: Record<"anchor" | "rifler" | "flanker" | "roamer", number>;
     preventedFriendlyFireCount: number;
     lastSeenPlayer: {
@@ -1063,26 +1079,43 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     waveStats.headshots = 0;
   });
 
-  // Death screen respawn handler — fires on both click and auto-countdown
-  // Fade to black → teleport → fade back in for a smooth transition
+  // Death screen restart handler — fires on both click and auto-countdown.
+  // Fade to black → reset the run → fade back in for a smooth transition.
   deathScreen.onRespawn = () => {
     respawnInProgress = true;
     fadeOverlay.fadeOut(0.18, () => {
-      // Teleport happens while screen is black
-      game.respawn();
+      // Reset happens while the screen is black so the restart feels atomic.
+      pendingAgentActions.length = 0;
+      combatFeedbackQueue.length = 0;
+      lastCombatFeedbackMs = 0;
+      lastKillFeedbackMs = 0;
+      game.restartRun();
+      roundEndScreen.hide();
+      roundEndShowing = false;
+      killFeed.clear();
+      hitMarker.clear();
+      hitVignette.clear();
+      damageNumbers.clear();
       scoreHud.reset();
       submittedSharedChampionForCurrentRun = false;
+      waveElapsedS = 0;
+      timerHud.reset();
+      timerHud.start();
+      waveStats.kills = 0;
+      waveStats.totalEnemies = TOTAL_ENEMIES;
+      waveStats.shotsFired = 0;
+      waveStats.shotsHit = 0;
+      waveStats.headshots = 0;
       runStats.kills = 0;
       runStats.shotsFired = 0;
       runStats.shotsHit = 0;
       runStats.headshots = 0;
       runStartedAtMs = performance.now();
-      currentSessionToken = null;
-      void requestSessionToken().then((token) => {
-        if (disposed) return;
-        currentSessionToken = token;
-      });
       lastDamageCause = null;
+      previousHealth = game.getPlayerHealth();
+      footstepTimerS = 0;
+      wasAlive = true;
+      beginSharedChampionRun();
       game.setFreezeInput(false);
       pauseMenu.hide();
       if (runtimeParams.controlMode === "human") {
@@ -1233,16 +1266,26 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (disposed) return;
     applySharedChampionSnapshot(snapshot);
   });
+  let activeSharedChampionRun: SharedChampionRunSession | null = null;
+  let sharedChampionRunRequestSerial = 0;
+  const beginSharedChampionRun = (): void => {
+    const requestSerial = ++sharedChampionRunRequestSerial;
+    activeSharedChampionRun = null;
+    void startSharedChampionRunSession({
+      playerName: runtimeParams.playerName,
+      controlMode: runtimeParams.controlMode,
+      mapId: runtimeParams.mapId,
+    }).then((session) => {
+      if (disposed || requestSerial !== sharedChampionRunRequestSerial) return;
+      activeSharedChampionRun = session;
+    });
+  };
   let lastRunScore: number | null = null;
   let lastRunSummary: PublicAgentRunSummary | null = null;
   let runStartedAtMs = performance.now();
-  let currentSessionToken: string | null = null;
-  void requestSessionToken().then((token) => {
-    if (disposed) return;
-    currentSessionToken = token;
-  });
   let lastDamageCause: PublicAgentRunSummary["deathCause"] | null = null;
   let wasAlive = !game.getIsDead();
+  beginSharedChampionRun();
   const pendingAgentActions: AgentAction[] = [];
   const isInternalDebugSurface = import.meta.env.DEV || INTERNAL_DEBUG_HOSTNAMES.has(window.location.hostname);
   const applyQueuedAgentActions = (): void => {
@@ -1430,6 +1473,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         tier: botDebug?.tier ?? 0,
         aliveCount: botDebug?.aliveCount ?? 0,
         graphNodeCount: botDebug?.graphNodeCount ?? 0,
+        searchPhase: botDebug?.searchPhase ?? "caution",
+        topSearchZones: botDebug?.topSearchZones ?? [],
+        squadTasks: botDebug?.squadTasks ?? [],
         roleCounts: botDebug?.roleCounts ?? {
           anchor: 0,
           rifler: 0,
@@ -1568,10 +1614,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (!aliveNow && wasAlive) {
       lastRunScore = roundScoreValue(scoreHud.getScore());
       const nextBestScore = Math.max(bestScore, lastRunScore);
+      const deathCause = lastDamageCause ?? "unknown";
       const accuracy = runStats.shotsFired > 0
         ? Math.round(((runStats.shotsHit / runStats.shotsFired) * 100) * 10) / 10
         : 0;
-      lastRunSummary = {
+      const sharedChampionRunSummary: SharedChampionRunSummary = {
         survivalTimeS: Math.round((Math.max(0, performance.now() - runStartedAtMs) / 1000) * 10) / 10,
         kills: runStats.kills,
         headshots: runStats.headshots,
@@ -1579,8 +1626,18 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         shotsHit: runStats.shotsHit,
         accuracy,
         finalScore: lastRunScore,
+        deathCause,
+      };
+      lastRunSummary = {
+        survivalTimeS: sharedChampionRunSummary.survivalTimeS,
+        kills: sharedChampionRunSummary.kills,
+        headshots: sharedChampionRunSummary.headshots,
+        shotsFired: sharedChampionRunSummary.shotsFired,
+        shotsHit: sharedChampionRunSummary.shotsHit,
+        accuracy: sharedChampionRunSummary.accuracy,
+        finalScore: sharedChampionRunSummary.finalScore,
         bestScore: roundScoreValue(nextBestScore),
-        deathCause: lastDamageCause ?? "unknown",
+        deathCause,
       };
       if (lastRunScore > bestScore) {
         bestScore = lastRunScore;
@@ -1596,21 +1653,14 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
           || isBetterSharedChampionCandidate(sharedChampionSnapshot.champion, candidateHalfPoints);
 
         if (shouldSubmitSharedChampion) {
-          void submitSharedChampionCandidate({
-            playerName: runtimeParams.playerName,
-            scoreHalfPoints: candidateHalfPoints,
-            controlMode: runtimeParams.controlMode,
-            telemetry: {
-              kills: runStats.kills,
-              headshots: runStats.headshots,
-              shotsFired: runStats.shotsFired,
-              shotsHit: runStats.shotsHit,
-              survivalTimeS: lastRunSummary!.survivalTimeS,
-            },
-          }, currentSessionToken).then(({ snapshot }) => {
-            if (disposed) return;
-            applySharedChampionSnapshot(snapshot);
-          });
+          const runSession = activeSharedChampionRun;
+          activeSharedChampionRun = null;
+          if (runSession) {
+            void submitSharedChampionRunSession(runSession, sharedChampionRunSummary).then(({ snapshot }) => {
+              if (disposed) return;
+              applySharedChampionSnapshot(snapshot);
+            });
+          }
         }
       }
     }
@@ -1877,11 +1927,23 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       enqueueDebugCombatFeedback(payload);
     };
     window.__debug_eliminate_all_bots = () => game.eliminateAllEnemiesForDebug();
+    window.__debug_set_player_pose = (payload: { x: number; y: number; z: number; yawDeg?: number }) => {
+      const yawRad = typeof payload.yawDeg === "number" ? (payload.yawDeg * Math.PI) / 180 : undefined;
+      game.debugSetPlayerPose({ x: payload.x, y: payload.y, z: payload.z }, yawRad);
+    };
+    window.__debug_reset_bot_knowledge = () => {
+      game.resetBotKnowledgeForDebug();
+    };
+    window.__debug_suppress_bot_intel_ms = (durationMs: number) => {
+      game.suppressBotIntelForDebug(durationMs);
+    };
   }
 
   const teardown = (): void => {
     if (disposed) return;
     disposed = true;
+    sharedChampionRunRequestSerial += 1;
+    activeSharedChampionRun = null;
 
     window.cancelAnimationFrame(rafId);
     stopHiddenAgentLoop();
@@ -1895,6 +1957,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     delete window.advanceTime;
     delete window.__debug_emit_combat_feedback;
     delete window.__debug_eliminate_all_bots;
+    delete window.__debug_set_player_pose;
+    delete window.__debug_reset_bot_knowledge;
+    delete window.__debug_suppress_bot_intel_ms;
 
     pointerLock?.dispose();
     game.teardown();

@@ -109,6 +109,13 @@ export class KillFeed {
     }
   }
 
+  clear(): void {
+    while (this.entries.length > 0) {
+      const entry = this.entries.pop()!;
+      this.recycleEntry(entry);
+    }
+  }
+
   dispose(): void {
     window.removeEventListener("resize", this.resizeHandler);
     for (const entry of this.entries) {

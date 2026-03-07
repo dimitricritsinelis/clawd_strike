@@ -1,11 +1,12 @@
 import { Scene, Vector3 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import type { WeaponAudio } from "../audio/WeaponAudio";
+import { AK47_AUDIO_TUNING, type WeaponAudio } from "../audio/WeaponAudio";
 import type { RuntimeAnchorsSpec, RuntimeBlockoutSpec } from "../map/types";
 import { PLAYER_EYE_HEIGHT_M, PLAYER_HEIGHT_M, PLAYER_WIDTH_M } from "../sim/PlayerController";
 import { rayVsAabb } from "../sim/collision/rayVsAabb";
 import type { WorldColliders } from "../sim/collision/WorldColliders";
 import { DeterministicRng, deriveSubSeed, resolveRuntimeSeed } from "../utils/Rng";
+import type { RuntimeSpawnId } from "../utils/UrlParams";
 import {
   EnemyController,
   ENEMY_EYE_HEIGHT_M,
@@ -46,6 +47,10 @@ const ADAPTIVE_RESPAWN_EMERGENCY_DISTANCE_M = 0;
 const ADAPTIVE_RESPAWN_MAX_VISIBLE_BOTS = 1;
 const ADAPTIVE_RESPAWN_TIGHT_CLUSTER_M = 4;
 const ADAPTIVE_RESPAWN_NEAR_CLUSTER_M = 7;
+const INITIAL_SPAWN_MIN_PER_LANE = 2;
+const INITIAL_SPAWN_TARGET_PER_LANE = 3;
+const INITIAL_SPAWN_MAX_PER_LANE = 4;
+const TACTICAL_LANES: readonly TacticalLane[] = ["west", "main", "east"] as const;
 
 /** Hunt pressure: forces increasingly aggressive behavior over time to prevent stalling. */
 const HUNT_ACTIVATION_S = 45;
@@ -150,6 +155,7 @@ type SharedContactReport = {
 type SpawnRequest = {
   mode: "initial" | "respawn";
   playerPos?: { x: number; y: number; z: number } | null;
+  playerSpawnId?: RuntimeSpawnId;
 };
 
 type SpawnPlacement = {
@@ -179,6 +185,36 @@ type RespawnPhase = {
   maxVisibleBots: number;
 };
 
+type SearchPhase = "caution" | "probe" | "sweep" | "collapse" | "pinch";
+
+type SearchBelief = {
+  zoneId: string;
+  lane: TacticalLane;
+  x: number;
+  z: number;
+  score: number;
+  reason: string;
+  phase: SearchPhase;
+  taskKind: SquadTask["kind"];
+};
+
+type ZoneSearchState = {
+  zoneId: string;
+  belief: number;
+  reason: string;
+  lastClearedAtS: number | null;
+  lastAssignedAtS: number | null;
+  lastAssignedEnemyId: string | null;
+};
+
+type SquadTask = {
+  enemyId: string;
+  kind: "hold" | "clear" | "contain" | "flank";
+  zoneId: string;
+  lane: TacticalLane;
+  reason: string;
+};
+
 type ScoringMode = "caution" | "search" | "contain" | "collapse";
 
 export type EnemySpawnTelemetry = {
@@ -204,6 +240,14 @@ export type EnemyManagerDebugSnapshot = {
   tier: number;
   aliveCount: number;
   graphNodeCount: number;
+  searchPhase: SearchPhase;
+  topSearchZones: Array<{
+    zoneId: string;
+    score: number;
+    reason: string;
+    lastClearedAgeS: number | null;
+  }>;
+  squadTasks: SquadTask[];
   roleCounts: Record<EnemyRole, number>;
   lastSeenPlayer: BlackboardContact | null;
   lastHeardPlayer: BlackboardContact | null;
@@ -255,6 +299,14 @@ function zoneCenter(zone: { rect: { x: number; y: number; w: number; h: number }
   };
 }
 
+function createLaneUsageMap(): Map<TacticalLane, number> {
+  return new Map(TACTICAL_LANES.map((lane) => [lane, 0]));
+}
+
+function zoneSearchSeedReason(phase: SearchPhase, source: string): string {
+  return `${phase}:${source}`;
+}
+
 export function resolveEnemyTier(waveNumber: number, waveElapsedS: number): number {
   const baseTier = Math.min(Math.max(0, Math.floor((waveNumber - 1) / 2)), 3);
   const timeBonus = (waveElapsedS >= 30 ? 1 : 0) + (waveElapsedS >= 60 ? 1 : 0);
@@ -278,6 +330,9 @@ export class EnemyManager {
   private tacticalGraph: TacticalGraph | null = null;
   private tacticalMapId = "bazaar-map";
   private lastSpawnTelemetry: EnemySpawnTelemetry | null = null;
+  private searchPhase: SearchPhase = "caution";
+  private assumedPlayerSpawnZoneId: string | null = null;
+  private debugPlayerIntelSuppressedUntilS = 0;
 
   private readonly aabbScratch: EnemyAabb[] = [];
   private readonly targetPool: EnemyTarget[];
@@ -308,6 +363,8 @@ export class EnemyManager {
   private readonly localKnowledgeByEnemyId = new Map<string, BlackboardContact>();
   private readonly sharedKnowledgeByEnemyId = new Map<string, BlackboardContact>();
   private readonly pendingSharedReports: SharedContactReport[] = [];
+  private readonly zoneSearchStateByZoneId = new Map<string, ZoneSearchState>();
+  private readonly squadTaskByEnemyId = new Map<string, SquadTask>();
   private readonly respawnLosScratch = createLineOfSightScratch();
 
   constructor(scene: Scene) {
@@ -349,6 +406,7 @@ export class EnemyManager {
   setTacticalContext(blockout: RuntimeBlockoutSpec, anchors: RuntimeAnchorsSpec | null): void {
     this.tacticalMapId = blockout.mapId;
     this.tacticalGraph = buildTacticalGraph(blockout, anchors);
+    this.initializeSearchState();
   }
 
   getWaveNumber(): number {
@@ -366,6 +424,18 @@ export class EnemyManager {
       flanker: 0,
       roamer: 0,
     };
+    const topSearchZones = Array.from(this.zoneSearchStateByZoneId.values())
+      .sort((a, b) => b.belief - a.belief || a.zoneId.localeCompare(b.zoneId))
+      .slice(0, 5)
+      .map((zone) => ({
+        zoneId: zone.zoneId,
+        score: Number(zone.belief.toFixed(3)),
+        reason: zone.reason,
+        lastClearedAgeS: zone.lastClearedAtS === null ? null : Number((this.waveElapsedS - zone.lastClearedAtS).toFixed(2)),
+      }));
+    const squadTasks = Array.from(this.squadTaskByEnemyId.values())
+      .sort((a, b) => a.enemyId.localeCompare(b.enemyId))
+      .map((task) => ({ ...task }));
     const enemies = this.controllers
       .filter((controller) => !controller.isDead())
       .map((controller) => controller.getDebugSnapshot())
@@ -381,6 +451,9 @@ export class EnemyManager {
       tier: this.blackboard.currentTier,
       aliveCount: enemies.length,
       graphNodeCount: this.tacticalGraph?.nodes.length ?? 0,
+      searchPhase: this.searchPhase,
+      topSearchZones,
+      squadTasks,
       roleCounts,
       lastSeenPlayer: safeCopyContact(this.blackboard.lastSeenPlayer),
       lastHeardPlayer: safeCopyContact(this.blackboard.lastHeardPlayer),
@@ -416,6 +489,13 @@ export class EnemyManager {
     this.localKnowledgeByEnemyId.clear();
     this.sharedKnowledgeByEnemyId.clear();
     this.pendingSharedReports.length = 0;
+    this.squadTaskByEnemyId.clear();
+    this.assumedPlayerSpawnZoneId = request.mode === "initial" && request.playerPos
+      ? this.resolveRequestedPlayerSpawnZoneId(request.playerPos, request.playerSpawnId)
+      : null;
+    this.searchPhase = "caution";
+    this.debugPlayerIntelSuppressedUntilS = 0;
+    this.initializeSearchState();
 
     if (
       this.controllers.length > 0 &&
@@ -426,9 +506,12 @@ export class EnemyManager {
 
     const mapSeed = resolveRuntimeSeed(this.tacticalMapId, null);
     const waveSeed = deriveSubSeed(mapSeed, `wave_${this.waveNumber}`);
-    const spawnBatch = request.mode === "respawn" && this.waveNumber > 1 && request.playerPos
-      ? this.resolveAdaptiveRespawnPlacements(worldColliders, request.playerPos, waveSeed) ?? this.resolveFixedSpawnPlacements(worldColliders, waveSeed)
-      : this.resolveFixedSpawnPlacements(worldColliders, waveSeed);
+    const spawnBatch =
+      request.mode === "respawn" && this.waveNumber > 1 && request.playerPos
+        ? this.resolveAdaptiveRespawnPlacements(worldColliders, request.playerPos, waveSeed) ?? this.resolveFixedSpawnPlacements(worldColliders, waveSeed)
+        : request.mode === "initial" && request.playerPos
+          ? this.resolveInitialSpawnPlacements(worldColliders, request.playerPos, request.playerSpawnId, waveSeed) ?? this.resolveFixedSpawnPlacements(worldColliders, waveSeed)
+          : this.resolveFixedSpawnPlacements(worldColliders, waveSeed);
     this.lastSpawnTelemetry = spawnBatch.telemetry;
 
     if (this.controllers.length === 0) {
@@ -457,10 +540,12 @@ export class EnemyManager {
   }
 
   reportPlayerGunshot(position: { x: number; y: number; z: number }): void {
+    if (this.isPlayerIntelSuppressed()) return;
     this.reportHeardContact(position, "gunshot", GUNSHOT_HEAR_RANGE_M, 5.2, 0.72);
   }
 
   reportPlayerFootstep(position: { x: number; y: number; z: number }, speedMps: number): void {
+    if (this.isPlayerIntelSuppressed()) return;
     if (speedMps <= 0.4) return;
     const speedFactor = clamp01((speedMps - 0.4) / 4);
     this.reportHeardContact(position, "footstep", FOOTSTEP_HEAR_RANGE_M + speedFactor * 8, 4.2 + speedFactor * 2.4, 0.58 + speedFactor * 0.14);
@@ -537,18 +622,109 @@ export class EnemyManager {
     };
   }
 
+  private resolveInitialSpawnPlacements(
+    worldColliders: WorldColliders,
+    playerPos: { x: number; y: number; z: number },
+    playerSpawnId: RuntimeSpawnId | undefined,
+    waveSeed: number,
+  ): { placements: SpawnPlacement[]; telemetry: EnemySpawnTelemetry } | null {
+    const candidates = this.buildSpawnCandidates(worldColliders, playerPos, waveSeed);
+    if (!candidates || candidates.length < ENEMY_SPAWN_CONFIG.length) {
+      return null;
+    }
+
+    const playerZoneId = this.resolveRequestedPlayerSpawnZoneId(playerPos, playerSpawnId);
+    const mapMidZ = (worldColliders.playableBounds.minZ + worldColliders.playableBounds.maxZ) * 0.5;
+    const playerStartsSouth = playerSpawnId ? playerSpawnId === "A" : playerPos.z <= mapMidZ;
+    const oppositeSideCandidates = candidates.filter((candidate) => {
+      if (!this.isStrictlyHiddenInitialCandidate(candidate, playerPos, worldColliders)) return false;
+      if (playerZoneId && candidate.zoneId === playerZoneId) return false;
+      return playerStartsSouth ? candidate.spawnZ > mapMidZ : candidate.spawnZ < mapMidZ;
+    });
+
+    if (oppositeSideCandidates.length < ENEMY_SPAWN_CONFIG.length) {
+      return null;
+    }
+
+    const laneTargets = this.buildInitialLaneTargets(oppositeSideCandidates);
+    if (!laneTargets) {
+      return null;
+    }
+
+    const placements = this.pickInitialSpawnSet(oppositeSideCandidates, laneTargets, waveSeed);
+    if (!placements) {
+      return null;
+    }
+
+    const minDistanceToPlayerM = placements.reduce((best, placement) => Math.min(best, placement.distanceToPlayerM), Number.POSITIVE_INFINITY);
+    const visibleCount = placements.reduce((count, placement) => count + (placement.visibleToPlayer ? 1 : 0), 0);
+
+    return {
+      placements,
+      telemetry: {
+        mode: "adaptive",
+        distanceFloorM: null,
+        minDistanceToPlayerM: Number.isFinite(minDistanceToPlayerM) ? minDistanceToPlayerM : null,
+        visibleCount,
+        selectedNodeIds: placements.map((placement) => placement.nodeId),
+        playerZoneId,
+        usedAdjacentZoneFallback: false,
+        usedVisibilityFallback: false,
+        usedPlayerZoneEmergencyFallback: false,
+        usedDistanceEmergencyFallback: false,
+      },
+    };
+  }
+
   private resolveAdaptiveRespawnPlacements(
     worldColliders: WorldColliders,
     playerPos: { x: number; y: number; z: number },
     waveSeed: number,
   ): { placements: SpawnPlacement[]; telemetry: EnemySpawnTelemetry } | null {
+    const candidates = this.buildSpawnCandidates(worldColliders, playerPos, waveSeed);
+    if (!candidates || candidates.length < ENEMY_SPAWN_CONFIG.length) {
+      return null;
+    }
+
+    for (const phase of this.buildAdaptiveRespawnPhases()) {
+      const playerZone = findZoneForPoint(this.tacticalGraph, playerPos.x, playerPos.z);
+      const adjacentZones = new Set<string>(playerZone ? this.tacticalGraph?.zoneAdjacency.get(playerZone.id) ?? [] : []);
+      const placements = this.pickAdaptiveRespawnSet(candidates, phase, playerZone?.id ?? null, adjacentZones, waveSeed);
+      if (!placements) continue;
+
+      const minDistanceToPlayerM = placements.reduce((best, placement) => Math.min(best, placement.distanceToPlayerM), Number.POSITIVE_INFINITY);
+      const visibleCount = placements.reduce((count, placement) => count + (placement.visibleToPlayer ? 1 : 0), 0);
+
+      return {
+        placements,
+        telemetry: {
+          mode: "adaptive",
+          distanceFloorM: phase.distanceFloorM,
+          minDistanceToPlayerM: Number.isFinite(minDistanceToPlayerM) ? minDistanceToPlayerM : null,
+          visibleCount,
+          selectedNodeIds: placements.map((placement) => placement.nodeId),
+          playerZoneId: playerZone?.id ?? null,
+          usedAdjacentZoneFallback: phase.allowAdjacentZones,
+          usedVisibilityFallback: phase.maxVisibleBots > 0,
+          usedPlayerZoneEmergencyFallback: phase.allowPlayerZone,
+          usedDistanceEmergencyFallback: phase.distanceFloorM < ADAPTIVE_RESPAWN_DISTANCE_FLOORS_M[ADAPTIVE_RESPAWN_DISTANCE_FLOORS_M.length - 1]!,
+        },
+      };
+    }
+
+    return null;
+  }
+
+  private buildSpawnCandidates(
+    worldColliders: WorldColliders,
+    playerPos: { x: number; y: number; z: number },
+    waveSeed: number,
+  ): AdaptiveSpawnCandidate[] | null {
     if (!this.tacticalGraph || this.tacticalGraph.nodes.length < ENEMY_SPAWN_CONFIG.length) {
       return null;
     }
 
-    const playerZone = findZoneForPoint(this.tacticalGraph, playerPos.x, playerPos.z);
-    const adjacentZones = new Set<string>(playerZone ? this.tacticalGraph.zoneAdjacency.get(playerZone.id) ?? [] : []);
-    const candidates: AdaptiveSpawnCandidate[] = this.tacticalGraph.nodes
+    return this.tacticalGraph.nodes
       .map((node) => {
         const nodeRng = new DeterministicRng(deriveSubSeed(waveSeed, `adaptive-node:${node.id}`));
         const { spawnX, spawnZ } = this.getJitteredSpawn(
@@ -579,32 +755,6 @@ export class EnemyManager {
         };
       })
       .sort((a, b) => a.nodeId.localeCompare(b.nodeId));
-
-    for (const phase of this.buildAdaptiveRespawnPhases()) {
-      const placements = this.pickAdaptiveRespawnSet(candidates, phase, playerZone?.id ?? null, adjacentZones, waveSeed);
-      if (!placements) continue;
-
-      const minDistanceToPlayerM = placements.reduce((best, placement) => Math.min(best, placement.distanceToPlayerM), Number.POSITIVE_INFINITY);
-      const visibleCount = placements.reduce((count, placement) => count + (placement.visibleToPlayer ? 1 : 0), 0);
-
-      return {
-        placements,
-        telemetry: {
-          mode: "adaptive",
-          distanceFloorM: phase.distanceFloorM,
-          minDistanceToPlayerM: Number.isFinite(minDistanceToPlayerM) ? minDistanceToPlayerM : null,
-          visibleCount,
-          selectedNodeIds: placements.map((placement) => placement.nodeId),
-          playerZoneId: playerZone?.id ?? null,
-          usedAdjacentZoneFallback: phase.allowAdjacentZones,
-          usedVisibilityFallback: phase.maxVisibleBots > 0,
-          usedPlayerZoneEmergencyFallback: phase.allowPlayerZone,
-          usedDistanceEmergencyFallback: phase.distanceFloorM < ADAPTIVE_RESPAWN_DISTANCE_FLOORS_M[ADAPTIVE_RESPAWN_DISTANCE_FLOORS_M.length - 1]!,
-        },
-      };
-    }
-
-    return null;
   }
 
   private buildAdaptiveRespawnPhases(): RespawnPhase[] {
@@ -661,11 +811,7 @@ export class EnemyManager {
   ): AdaptiveSpawnCandidate[] | null {
     const selected: AdaptiveSpawnCandidate[] = [];
     const selectedNodeIds = new Set<string>();
-    const laneUsage = new Map<TacticalLane, number>([
-      ["west", 0],
-      ["main", 0],
-      ["east", 0],
-    ]);
+    const laneUsage = createLaneUsageMap();
     const zoneUsage = new Map<string, number>();
     let visibleCount = 0;
 
@@ -696,6 +842,124 @@ export class EnemyManager {
       if (bestCandidate.visibleToPlayer) {
         visibleCount += 1;
       }
+    }
+
+    return selected;
+  }
+
+  private buildInitialLaneTargets(
+    candidates: readonly AdaptiveSpawnCandidate[],
+  ): ReadonlyMap<TacticalLane, number> | null {
+    const availableByLane = createLaneUsageMap();
+    for (const candidate of candidates) {
+      availableByLane.set(candidate.lane, (availableByLane.get(candidate.lane) ?? 0) + 1);
+    }
+
+    const totalAvailable = Array.from(availableByLane.values()).reduce((sum, count) => sum + count, 0);
+    if (totalAvailable < ENEMY_SPAWN_CONFIG.length) {
+      return null;
+    }
+
+    const targets = createLaneUsageMap();
+    let remaining = ENEMY_SPAWN_CONFIG.length;
+
+    for (const lane of TACTICAL_LANES) {
+      const baseTarget = Math.min(INITIAL_SPAWN_MIN_PER_LANE, availableByLane.get(lane) ?? 0);
+      targets.set(lane, baseTarget);
+      remaining -= baseTarget;
+    }
+
+    while (remaining > 0) {
+      let assigned = false;
+      for (const lane of TACTICAL_LANES) {
+        const current = targets.get(lane) ?? 0;
+        const available = availableByLane.get(lane) ?? 0;
+        const laneCap = Math.min(available, INITIAL_SPAWN_TARGET_PER_LANE);
+        if (current >= laneCap) continue;
+        targets.set(lane, current + 1);
+        remaining -= 1;
+        assigned = true;
+        if (remaining === 0) break;
+      }
+      if (!assigned) break;
+    }
+
+    while (remaining > 0) {
+      let assigned = false;
+      const lanesByHeadroom = [...TACTICAL_LANES].sort((a, b) => {
+        const aHeadroom = (availableByLane.get(a) ?? 0) - (targets.get(a) ?? 0);
+        const bHeadroom = (availableByLane.get(b) ?? 0) - (targets.get(b) ?? 0);
+        return bHeadroom - aHeadroom;
+      });
+      for (const lane of lanesByHeadroom) {
+        const current = targets.get(lane) ?? 0;
+        const available = availableByLane.get(lane) ?? 0;
+        const laneCap = Math.min(available, INITIAL_SPAWN_MAX_PER_LANE);
+        if (current >= laneCap) continue;
+        targets.set(lane, current + 1);
+        remaining -= 1;
+        assigned = true;
+        if (remaining === 0) break;
+      }
+      if (!assigned) {
+        return null;
+      }
+    }
+
+    return targets;
+  }
+
+  private pickInitialSpawnSet(
+    candidates: readonly AdaptiveSpawnCandidate[],
+    laneTargets: ReadonlyMap<TacticalLane, number>,
+    waveSeed: number,
+  ): AdaptiveSpawnCandidate[] | null {
+    const pickOrder: TacticalLane[] = [];
+    const remainingByLane = new Map(laneTargets);
+    while (pickOrder.length < ENEMY_SPAWN_CONFIG.length) {
+      let appended = false;
+      for (const lane of TACTICAL_LANES) {
+        const remaining = remainingByLane.get(lane) ?? 0;
+        if (remaining <= 0) continue;
+        pickOrder.push(lane);
+        remainingByLane.set(lane, remaining - 1);
+        appended = true;
+        if (pickOrder.length === ENEMY_SPAWN_CONFIG.length) break;
+      }
+      if (!appended) {
+        return null;
+      }
+    }
+
+    const selected: AdaptiveSpawnCandidate[] = [];
+    const selectedNodeIds = new Set<string>();
+    const laneUsage = createLaneUsageMap();
+    const zoneUsage = new Map<string, number>();
+
+    for (let pickIndex = 0; pickIndex < pickOrder.length; pickIndex += 1) {
+      const desiredLane = pickOrder[pickIndex]!;
+      let bestCandidate: AdaptiveSpawnCandidate | null = null;
+      let bestScore = Number.NEGATIVE_INFINITY;
+
+      for (const candidate of candidates) {
+        if (candidate.lane !== desiredLane) continue;
+        if (selectedNodeIds.has(candidate.nodeId)) continue;
+
+        const score = this.scoreInitialSpawnCandidate(candidate, selected, laneUsage, zoneUsage, waveSeed, pickIndex, laneTargets);
+        if (score > bestScore) {
+          bestScore = score;
+          bestCandidate = candidate;
+        }
+      }
+
+      if (!bestCandidate) {
+        return null;
+      }
+
+      selected.push(bestCandidate);
+      selectedNodeIds.add(bestCandidate.nodeId);
+      laneUsage.set(bestCandidate.lane, (laneUsage.get(bestCandidate.lane) ?? 0) + 1);
+      zoneUsage.set(bestCandidate.zoneId, (zoneUsage.get(bestCandidate.zoneId) ?? 0) + 1);
     }
 
     return selected;
@@ -755,6 +1019,127 @@ export class EnemyManager {
     const noiseRng = new DeterministicRng(deriveSubSeed(waveSeed, `adaptive-score:${pickIndex}:${candidate.nodeId}`));
     score += noiseRng.range(-0.45, 0.45);
     return score;
+  }
+
+  private scoreInitialSpawnCandidate(
+    candidate: AdaptiveSpawnCandidate,
+    selected: readonly AdaptiveSpawnCandidate[],
+    laneUsage: ReadonlyMap<TacticalLane, number>,
+    zoneUsage: ReadonlyMap<string, number>,
+    waveSeed: number,
+    pickIndex: number,
+    laneTargets: ReadonlyMap<TacticalLane, number>,
+  ): number {
+    let score = candidate.distanceToPlayerM * 0.14;
+    score += candidate.node.coverScore * 3.4;
+    score += candidate.node.flankScore * 0.7;
+
+    switch (candidate.nodeType) {
+      case "spawn_cover":
+        score += 4.8;
+        break;
+      case "cover_cluster":
+      case "hall_entry":
+      case "connector_entry":
+        score += 3.6;
+        break;
+      case "breach":
+      case "pre_peek":
+        score += 1.1;
+        break;
+      case "open_node":
+        score -= 6.5;
+        break;
+      case "zone_center":
+      default:
+        score += 0.2;
+        break;
+    }
+
+    const laneTarget = laneTargets.get(candidate.lane) ?? 0;
+    const laneCount = laneUsage.get(candidate.lane) ?? 0;
+    if (laneCount < laneTarget) {
+      score += (laneTarget - laneCount) * 0.35;
+    }
+
+    score -= (zoneUsage.get(candidate.zoneId) ?? 0) * 2.6;
+
+    let nearestSelectedM = Number.POSITIVE_INFINITY;
+    for (const other of selected) {
+      nearestSelectedM = Math.min(nearestSelectedM, distanceM(candidate.spawnX, candidate.spawnZ, other.spawnX, other.spawnZ));
+    }
+    if (nearestSelectedM < ADAPTIVE_RESPAWN_TIGHT_CLUSTER_M) {
+      score -= 8.5;
+    } else if (nearestSelectedM < ADAPTIVE_RESPAWN_NEAR_CLUSTER_M) {
+      score -= 3.9;
+    } else if (nearestSelectedM < 10) {
+      score -= 1.4;
+    }
+
+    if (candidate.distanceToPlayerM < 24) {
+      score -= 3.5;
+    }
+
+    const noiseRng = new DeterministicRng(deriveSubSeed(waveSeed, `initial-score:${pickIndex}:${candidate.nodeId}`));
+    score += noiseRng.range(-0.2, 0.2);
+    return score;
+  }
+
+  private isStrictlyHiddenInitialCandidate(
+    candidate: AdaptiveSpawnCandidate,
+    playerPos: { x: number; y: number; z: number },
+    worldColliders: WorldColliders,
+  ): boolean {
+    const samplePoints = [
+      { x: candidate.spawnX, z: candidate.spawnZ },
+      { x: candidate.node.x, z: candidate.node.z },
+      { x: candidate.node.x - 0.75, z: candidate.node.z },
+      { x: candidate.node.x + 0.75, z: candidate.node.z },
+      { x: candidate.node.x, z: candidate.node.z - 0.75 },
+      { x: candidate.node.x, z: candidate.node.z + 0.75 },
+    ];
+
+    return samplePoints.every((sample) => {
+      const hiddenFromPlayerView = !hasLineOfSight(
+        playerPos,
+        PLAYER_EYE_HEIGHT_M,
+        { x: sample.x, y: 0, z: sample.z },
+        ENEMY_EYE_HEIGHT_M,
+        worldColliders,
+        NO_RESPAWN_BLOCKERS,
+        this.respawnLosScratch,
+      );
+      const hiddenFromEnemyAim = !hasLineOfSight(
+        { x: sample.x, y: 0, z: sample.z },
+        ENEMY_EYE_HEIGHT_M,
+        playerPos,
+        ENEMY_EYE_HEIGHT_M,
+        worldColliders,
+        NO_RESPAWN_BLOCKERS,
+        this.respawnLosScratch,
+      );
+      return hiddenFromPlayerView && hiddenFromEnemyAim;
+    });
+  }
+
+  private resolveRequestedPlayerSpawnZoneId(
+    playerPos: { x: number; y: number; z: number },
+    playerSpawnId: RuntimeSpawnId | undefined,
+  ): string | null {
+    const pointZoneId = findZoneForPoint(this.tacticalGraph, playerPos.x, playerPos.z)?.id ?? null;
+    if (pointZoneId) {
+      return pointZoneId;
+    }
+    if (!this.tacticalGraph || !playerSpawnId) {
+      return null;
+    }
+    const spawnToken = playerSpawnId === "B" ? "SPAWN_B" : "SPAWN_A";
+    for (const zone of this.tacticalGraph.zoneById.values()) {
+      if (zone.type === "spawn_plaza" && zone.id.includes(spawnToken)) {
+        return zone.id;
+      }
+    }
+    return null;
   }
 
   private getJitteredSpawn(
@@ -847,10 +1232,17 @@ export class EnemyManager {
     }
     this.targetsScratch.length = targetCount;
 
+    const currentPlayerZone = findZoneForPoint(this.tacticalGraph, playerPos.x, playerPos.z);
+    if (!this.assumedPlayerSpawnZoneId && currentPlayerZone?.type === "spawn_plaza") {
+      this.assumedPlayerSpawnZoneId = currentPlayerZone.id;
+    }
     const tierProfile = resolveEnemyTierProfile(this.blackboard.currentTier);
     const huntPressure = Math.min(1.0, Math.max(0, (this.waveElapsedS - HUNT_ACTIVATION_S) / (HUNT_FULL_S - HUNT_ACTIVATION_S)));
     const pressureProfile = this.resolvePressureProfile(huntPressure);
+    this.searchPhase = this.resolveSearchPhase();
     this.flushSharedReports();
+    this.refreshSearchBeliefs();
+    this.squadTaskByEnemyId.clear();
     const laneAssignments = new Map<TacticalLane, number>([
       ["west", 0],
       ["main", 0],
@@ -888,6 +1280,7 @@ export class EnemyManager {
         this.handleEnemyShot,
         onFootstep,
         (event) => {
+          if (this.isPlayerIntelSuppressed()) return;
           if (event.kind === "seen-player") {
             const contact = this.createContactEstimate(event.position, "visual", 1.2, 1.0, event.enemyId, true, false);
             this.blackboard.lastSeenPlayer = contact;
@@ -929,7 +1322,15 @@ export class EnemyManager {
 
       if (controller.isFiring()) {
         visual.triggerShotFx();
-        this.weaponAudio?.playAk47ShotQuiet(0.25);
+        const distanceToPlayerM = distanceM(pos.x, pos.z, playerTarget.position.x, playerTarget.position.z);
+        const distanceNorm = clamp01(
+          (distanceToPlayerM - AK47_AUDIO_TUNING.enemy.distanceMinM)
+            / Math.max(0.001, AK47_AUDIO_TUNING.enemy.distanceMaxM - AK47_AUDIO_TUNING.enemy.distanceMinM),
+        );
+        this.weaponAudio?.playAk47ShotQuiet({
+          layerGainScale: 1,
+          distanceNorm,
+        });
       }
       visual.updateFx(deltaSeconds);
     }
@@ -956,6 +1357,8 @@ export class EnemyManager {
     const currentLane = currentNode?.lane ?? laneFromPosition(controllerPos.x);
     const playerDistance = distanceM(controllerPos.x, controllerPos.z, playerTarget.position.x, playerTarget.position.z);
     const hasDirectSight =
+      !this.isPlayerIntelSuppressed()
+      &&
       playerDistance <= tierProfile.visionRangeM
       && controller.canSeeTarget(playerTarget, worldColliders, this.aabbScratch);
 
@@ -970,9 +1373,20 @@ export class EnemyManager {
         tierProfile,
         pressureProfile,
       );
+    const searchBelief = !knowledge && this.searchPhase !== "caution"
+      ? this.pickSearchBelief(controller.id, activeRole, currentNode?.zoneId ?? null)
+      : null;
     const knowledgeAgeS = knowledge ? this.waveElapsedS - knowledge.timeS : Number.POSITIVE_INFINITY;
-    const scoringMode = this.resolveScoringMode(knowledge, hasDirectSight, pressureProfile, knowledgeAgeS);
-    const contactZoneDistances = knowledge?.zoneId ? this.buildZoneDistanceMap(knowledge.zoneId) : null;
+    const scoringMode = knowledge
+      ? this.resolveScoringMode(knowledge, hasDirectSight, pressureProfile, knowledgeAgeS)
+      : searchBelief
+        ? (searchBelief.phase === "probe" ? "search" : searchBelief.phase === "sweep" ? "contain" : "collapse")
+        : "caution";
+    const contactZoneDistances = knowledge?.zoneId
+      ? this.buildZoneDistanceMap(knowledge.zoneId)
+      : searchBelief?.zoneId
+        ? this.buildZoneDistanceMap(searchBelief.zoneId)
+        : null;
 
     let selection: NodeSelection;
     if (controller.isReloading() || (tierProfile.mandatoryReloadFallback && controller.getMag() <= 6 && controller.getReserve() > 0)) {
@@ -993,6 +1407,7 @@ export class EnemyManager {
         controllerPos.x,
         controllerPos.z,
         knowledge,
+        searchBelief,
         laneAssignments,
         tierProfile,
         pressureProfile,
@@ -1007,6 +1422,8 @@ export class EnemyManager {
     let allowFire = false;
     let debugReason = knowledge
       ? `${knowledge.source} ${scoringMode}`
+      : searchBelief
+        ? `${searchBelief.taskKind} ${searchBelief.reason}`
       : activeRole === "anchor"
         ? "default lane hold"
         : "default rotation";
@@ -1035,6 +1452,21 @@ export class EnemyManager {
       state = atTargetNode ? "OVERWATCH" : "ROTATE";
       allowFire = atTargetNode;
       debugReason = "direct long sight overwatch";
+    } else if (!knowledge && searchBelief) {
+      if (activeRole === "anchor") {
+        state = atTargetNode
+          ? (searchBelief.phase === "probe" ? "HOLD" : "INVESTIGATE")
+          : "ROTATE";
+      } else if (activeRole === "flanker") {
+        state = atTargetNode
+          ? (searchBelief.phase === "probe" ? "INVESTIGATE" : "PRESSURE")
+          : "ROTATE";
+      } else {
+        state = atTargetNode
+          ? (searchBelief.phase === "pinch" ? "PRESSURE" : "INVESTIGATE")
+          : "ROTATE";
+      }
+      allowFire = atTargetNode && hasDirectSight;
     } else if (!knowledge) {
       state = atTargetNode ? "HOLD" : "ROTATE";
       debugReason = activeRole === "anchor" ? "default lane hold" : "default rotation";
@@ -1105,8 +1537,8 @@ export class EnemyManager {
     const previous = this.directiveMemoryByEnemyId.get(controller.id) ?? null;
     const forceHuntReplan = Boolean(
       previous
-      && knowledge
       && effectiveCollapse
+      && (knowledge || searchBelief)
       && this.waveElapsedS - previous.startedAtS >= pressureProfile.overdueCollapseS,
     );
     if (previous && this.waveElapsedS < previous.commitUntilS && !forceHuntReplan) {
@@ -1162,6 +1594,15 @@ export class EnemyManager {
       commitUntilS,
       hadDirectSight: hasDirectSight,
     });
+    this.registerSearchProgress(
+      controller.id,
+      searchBelief,
+      targetNode?.zoneId ?? null,
+      atTargetNode,
+      hasDirectSight,
+      state,
+      startedAtS,
+    );
 
     return {
       role: activeRole,
@@ -1199,6 +1640,210 @@ export class EnemyManager {
       y: 1.5,
       z: targetNode.z + Math.cos(targetNode.exposureYawRad) * 8,
     };
+  }
+
+  private initializeSearchState(): void {
+    this.zoneSearchStateByZoneId.clear();
+    if (!this.tacticalGraph) return;
+
+    for (const zoneId of this.tacticalGraph.zoneAdjacency.keys()) {
+      this.zoneSearchStateByZoneId.set(zoneId, {
+        zoneId,
+        belief: 0,
+        reason: zoneSearchSeedReason("caution", "idle"),
+        lastClearedAtS: null,
+        lastAssignedAtS: null,
+        lastAssignedEnemyId: null,
+      });
+    }
+  }
+
+  private resolveSearchPhase(): SearchPhase {
+    if (this.waveElapsedS < HUNT_ACTIVATION_S) return "caution";
+    if (this.waveElapsedS < 90) return "probe";
+    if (this.waveElapsedS < 150) return "sweep";
+    if (this.waveElapsedS < 210) return "collapse";
+    return "pinch";
+  }
+
+  private refreshSearchBeliefs(): void {
+    if (!this.tacticalGraph) return;
+
+    const spawnDistances = this.assumedPlayerSpawnZoneId
+      ? this.buildZoneDistanceMap(this.assumedPlayerSpawnZoneId)
+      : null;
+    const recentContact = [this.blackboard.lastSeenPlayer, this.blackboard.lastHeardPlayer]
+      .filter((contact): contact is BlackboardContact => Boolean(contact))
+      .sort((a, b) => b.timeS - a.timeS)[0] ?? null;
+    const contactDistances = recentContact?.zoneId ? this.buildZoneDistanceMap(recentContact.zoneId) : null;
+
+    for (const state of this.zoneSearchStateByZoneId.values()) {
+      const zone = this.tacticalGraph.zoneById.get(state.zoneId);
+      if (!zone) continue;
+
+      let belief = 0.04;
+      let reason = zoneSearchSeedReason(this.searchPhase, "ambient");
+
+      if (spawnDistances) {
+        const steps = spawnDistances.get(state.zoneId) ?? Number.POSITIVE_INFINITY;
+        const expectedStep =
+          this.searchPhase === "probe"
+            ? 1
+            : this.searchPhase === "sweep"
+              ? 2
+              : this.searchPhase === "collapse"
+                ? 2.5
+                : this.searchPhase === "pinch"
+                  ? 3
+                  : 0;
+        const stepScore = this.searchPhase === "caution"
+          ? (steps === 0 ? 0.95 : steps === 1 ? 0.32 : 0)
+          : Math.max(0, 0.95 - Math.abs(steps - expectedStep) * 0.28);
+        belief += stepScore;
+        if (stepScore > 0.1) {
+          reason = zoneSearchSeedReason(this.searchPhase, `spawn-${steps}`);
+        }
+      }
+
+      if (zone.type === "connector") belief += this.searchPhase === "probe" ? 0.14 : 0.06;
+      if (zone.type === "side_hall") belief += this.searchPhase === "probe" ? 0.12 : this.searchPhase === "sweep" || this.searchPhase === "collapse" ? 0.34 : 0.26;
+      if (zone.type === "cut") belief += this.searchPhase === "collapse" || this.searchPhase === "pinch" ? 0.12 : 0.02;
+
+      if (recentContact && contactDistances) {
+        const age = this.waveElapsedS - recentContact.timeS;
+        const freshness = clamp01(1 - age / (recentContact.source === "visual" ? 12 : 18));
+        const stepsToContact = contactDistances.get(state.zoneId) ?? Number.POSITIVE_INFINITY;
+        const contactScore = Math.max(0, 1.15 - stepsToContact * 0.34) * freshness * (recentContact.confidence + (recentContact.source === "visual" ? 0.2 : 0));
+        belief += contactScore;
+        if (contactScore > 0.12) {
+          reason = zoneSearchSeedReason(this.searchPhase, recentContact.source);
+        }
+      }
+
+      if (state.lastAssignedAtS !== null && this.waveElapsedS - state.lastAssignedAtS < 6) {
+        belief += 0.14;
+      }
+
+      if (state.lastClearedAtS !== null) {
+        const clearAgeS = this.waveElapsedS - state.lastClearedAtS;
+        if (clearAgeS < 18) {
+          belief *= 0.12;
+          reason = zoneSearchSeedReason(this.searchPhase, "recent-clear");
+        } else if (clearAgeS < 40) {
+          belief *= 0.45;
+        } else if (clearAgeS < 80) {
+          belief *= 0.75;
+        }
+      }
+
+      state.belief = clamp01(belief);
+      state.reason = reason;
+    }
+  }
+
+  private pickSearchBelief(
+    enemyId: string,
+    role: EnemyRole,
+    currentZoneId: string | null,
+  ): SearchBelief | null {
+    if (!this.tacticalGraph || this.searchPhase === "caution") return null;
+
+    const ranked = Array.from(this.zoneSearchStateByZoneId.values())
+      .filter((zone) => zone.belief >= 0.16)
+      .sort((a, b) => b.belief - a.belief || a.zoneId.localeCompare(b.zoneId));
+    if (ranked.length === 0) return null;
+
+    const primary = ranked[0]!;
+    const primaryZone = this.tacticalGraph.zoneById.get(primary.zoneId);
+    const primaryLane = primaryZone ? laneFromPosition(zoneCenter(primaryZone).x) : laneFromPosition(25);
+    const existingTasks = Array.from(this.squadTaskByEnemyId.values());
+    const primaryDistances = this.buildZoneDistanceMap(primary.zoneId);
+
+    let chosen = primary;
+    let taskKind: SquadTask["kind"] = role === "anchor" ? "contain" : role === "flanker" ? "flank" : "clear";
+
+    let bestScore = Number.NEGATIVE_INFINITY;
+    for (const candidate of ranked.slice(0, 6)) {
+      const zone = this.tacticalGraph.zoneById.get(candidate.zoneId);
+      if (!zone) continue;
+      const lane = laneFromPosition(zoneCenter(zone).x);
+      const zoneTaskCount = existingTasks.filter((task) => task.zoneId === candidate.zoneId).length;
+      const laneTaskCount = existingTasks.filter((task) => task.lane === lane).length;
+      const stepFromPrimary = primaryDistances.get(candidate.zoneId) ?? Number.POSITIVE_INFINITY;
+      const candidateTaskKind: SquadTask["kind"] = role === "anchor" ? "contain" : role === "flanker" ? "flank" : "clear";
+
+      let score = candidate.belief;
+      score -= zoneTaskCount * 0.42;
+      score -= laneTaskCount * 0.18;
+
+      if (role === "anchor") {
+        if (stepFromPrimary === 1) score += 0.32;
+        if (candidate.zoneId === primary.zoneId) score -= 0.18;
+      } else if (role === "flanker") {
+        if (lane !== primaryLane) score += 0.28;
+        if (candidate.zoneId === currentZoneId) score -= 0.22;
+      } else {
+        if (candidate.zoneId === primary.zoneId) score += 0.18;
+        if (stepFromPrimary === 1) score += 0.08;
+      }
+
+      if (candidate.zoneId === currentZoneId) score -= 0.08;
+      if (score > bestScore) {
+        bestScore = score;
+        chosen = candidate;
+        taskKind = candidateTaskKind;
+      }
+    }
+
+    const zone = this.tacticalGraph.zoneById.get(chosen.zoneId);
+    if (!zone) return null;
+    const center = zoneCenter(zone);
+    const lane = laneFromPosition(center.x);
+    this.squadTaskByEnemyId.set(enemyId, {
+      enemyId,
+      kind: taskKind,
+      zoneId: chosen.zoneId,
+      lane,
+      reason: chosen.reason,
+    });
+    chosen.lastAssignedAtS = this.waveElapsedS;
+    chosen.lastAssignedEnemyId = enemyId;
+
+    return {
+      zoneId: chosen.zoneId,
+      lane,
+      x: center.x,
+      z: center.z,
+      score: chosen.belief,
+      reason: chosen.reason,
+      phase: this.searchPhase,
+      taskKind,
+    };
+  }
+
+  private registerSearchProgress(
+    enemyId: string,
+    searchBelief: SearchBelief | null,
+    targetZoneId: string | null,
+    atTargetNode: boolean,
+    hasDirectSight: boolean,
+    state: EnemyState,
+    startedAtS: number,
+  ): void {
+    if (!searchBelief || !targetZoneId) return;
+    const zoneState = this.zoneSearchStateByZoneId.get(targetZoneId);
+    if (!zoneState) return;
+
+    zoneState.lastAssignedEnemyId = enemyId;
+    zoneState.lastAssignedAtS = this.waveElapsedS;
+
+    if (hasDirectSight || !atTargetNode) return;
+    if (state !== "INVESTIGATE" && state !== "ROTATE" && state !== "HOLD") return;
+    if (this.waveElapsedS - startedAtS < 1.35) return;
+    if (zoneState.lastClearedAtS !== null && this.waveElapsedS - zoneState.lastClearedAtS < 4) return;
+
+    zoneState.lastClearedAtS = this.waveElapsedS;
+    zoneState.reason = zoneSearchSeedReason(this.searchPhase, "cleared");
   }
 
   private resolvePressureProfile(huntPressure: number): PressureProfile {
@@ -1519,6 +2164,7 @@ export class EnemyManager {
     currentX: number,
     currentZ: number,
     knowledge: BlackboardContact | null,
+    searchBelief: SearchBelief | null,
     laneAssignments: Map<TacticalLane, number>,
     tierProfile: ReturnType<typeof resolveEnemyTierProfile>,
     pressureProfile: PressureProfile,
@@ -1527,9 +2173,9 @@ export class EnemyManager {
   ): NodeSelection {
     if (!this.tacticalGraph) return { node: null, score: Number.NEGATIVE_INFINITY };
 
-    const playerLane = knowledge?.lane ?? currentLane;
+    const playerLane = knowledge?.lane ?? searchBelief?.lane ?? currentLane;
     const dynamicLaneStack = tierProfile.maxLaneStack + (pressureProfile.collapseWeight >= 0.82 ? 1 : 0);
-    const contactZoneId = knowledge?.zoneId ?? null;
+    const contactZoneId = knowledge?.zoneId ?? searchBelief?.zoneId ?? null;
     const currentZoneDistance = currentZoneId && contactZoneDistances
       ? contactZoneDistances.get(currentZoneId) ?? Number.POSITIVE_INFINITY
       : Number.POSITIVE_INFINITY;
@@ -1601,6 +2247,31 @@ export class EnemyManager {
           if (entryNode || node.tags.includes("connector") || node.tags.includes("cut")) score += 1.2;
           if (adjacentZone) score += 0.9;
         }
+      } else if (searchBelief) {
+        if (Number.isFinite(zoneDistance)) {
+          score += progressTowardContact * (searchBelief.phase === "probe" ? 1.0 : searchBelief.phase === "sweep" ? 1.35 : 1.8);
+          if (sameZone) score += searchBelief.phase === "probe" ? 0.85 : searchBelief.phase === "sweep" ? 1.45 : 2.05;
+          if (adjacentZone) score += searchBelief.phase === "probe" ? 0.6 : 0.95;
+          if (entryNode && (sameZone || adjacentZone)) score += searchBelief.taskKind === "clear" ? 1.15 : 0.8;
+        }
+        score += searchBelief.score * 0.9;
+        score += entryControl * (searchBelief.taskKind === "contain" ? 1.25 : 0.95);
+        score += cutoffValue * (searchBelief.taskKind === "contain" ? 1.25 : 0.65);
+
+        if (role === "anchor") {
+          if (searchBelief.taskKind === "contain" && adjacentZone) score += 1.15;
+          if (sameZone && searchBelief.phase !== "pinch") score -= 0.35;
+          if (node.nodeType === "spawn_cover" && searchBelief.phase === "probe") score += 0.85;
+        } else if (role === "rifler") {
+          if (node.lane === playerLane || node.lane === "main") score += 0.9;
+          if (entryNode) score += 0.45;
+        } else if (role === "flanker") {
+          if (node.lane !== playerLane && node.lane !== "main") score += 1.55;
+          if (entryNode || node.tags.includes("cut") || node.tags.includes("side_hall")) score += 1.45;
+        } else {
+          if (entryNode || node.tags.includes("connector") || node.tags.includes("cut")) score += 1.15;
+          if (adjacentZone) score += 0.85;
+        }
       } else {
         if (role === "anchor" && node.nodeType === "spawn_cover") score += 2.4;
         if (role === "roamer" && (node.tags.includes("connector") || node.tags.includes("cut") || node.tags.includes("entry-node"))) score += 1.5;
@@ -1642,6 +2313,25 @@ export class EnemyManager {
       eliminated += 1;
     }
     return eliminated;
+  }
+
+  resetKnowledgeForDebug(): void {
+    this.blackboard.lastSeenPlayer = null;
+    this.blackboard.lastHeardPlayer = null;
+    this.localKnowledgeByEnemyId.clear();
+    this.sharedKnowledgeByEnemyId.clear();
+    this.pendingSharedReports.length = 0;
+    this.squadTaskByEnemyId.clear();
+    this.initializeSearchState();
+    this.refreshSearchBeliefs();
+  }
+
+  suppressPlayerIntelForDebug(durationMs: number): void {
+    this.debugPlayerIntelSuppressedUntilS = Math.max(
+      this.debugPlayerIntelSuppressedUntilS,
+      this.waveElapsedS + Math.max(0, durationMs) / 1000,
+    );
+    this.resetKnowledgeForDebug();
   }
 
   getPlayerHealthDelta(): number {
@@ -1700,6 +2390,7 @@ export class EnemyManager {
     this.sharedKnowledgeByEnemyId.clear();
     this.pendingSharedReports.length = 0;
     this.lastSpawnTelemetry = null;
+    this.debugPlayerIntelSuppressedUntilS = 0;
   }
 
   fullDispose(scene: Scene): void {
@@ -1715,5 +2406,9 @@ export class EnemyManager {
       return;
     }
     this.preventedFriendlyFireCount += 1;
+  }
+
+  private isPlayerIntelSuppressed(): boolean {
+    return this.waveElapsedS < this.debugPlayerIntelSuppressedUntilS;
   }
 }

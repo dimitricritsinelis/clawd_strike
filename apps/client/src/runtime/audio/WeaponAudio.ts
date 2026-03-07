@@ -5,27 +5,81 @@ const AUDIO_EXTENSIONS = [".mp3", ".ogg", ".wav"] as const;
 const FALLBACK_NOISE_SECONDS = 0.22;
 const EVENT_NOISE_POOL_SIZE = 4;
 
+export const AK47_AUDIO_TUNING = {
+  player: {
+    layerGainScale: 0.7,
+    postGain: 0.1,
+    transientAttackMs: 2.4,
+    transientDrive: 1.1,
+    lowShelfDb: 4.1,
+    highShelfHz: 3800,
+    highShelfDb: 0.85,
+  },
+  enemy: {
+    layerGainScale: 0.7,
+    postGain: 0.1,
+    transientAttackMs: 3.1,
+    transientDrive: 0.95,
+    lowShelfDb: 3.9,
+    highShelfHz: 3400,
+    closeHighShelfDb: 0.45,
+    farHighShelfDb: -2.6,
+    distanceMinM: 8,
+    distanceMaxM: 42,
+    minGain: 0.28,
+    closeLowpassHz: 18000,
+    farLowpassHz: 1700,
+  },
+} as const;
+
 type LoadedLayer = {
   buffer: AudioBuffer | null;
   resolvedUrl: string | null;
   triedUrls: string[];
 };
 
-function createDriveCurve(samples: number): Float32Array {
+export type EnemyAk47ShotOptions = {
+  layerGainScale: number;
+  distanceNorm: number;
+};
+
+type Ak47BufferPlaybackOptions = {
+  destination?: AudioNode;
+  attackSeconds?: number;
+  lowShelfGainDb?: number;
+  highShelfFrequencyHz?: number;
+  highShelfGainDb?: number;
+  driveCurve?: Float32Array;
+  lowpassFrequencyHz?: number;
+};
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function lerp(start: number, end: number, t: number): number {
+  return start + (end - start) * t;
+}
+
+function createDriveCurve(samples: number, amount: number): Float32Array {
   const curve = new Float32Array(samples);
   for (let i = 0; i < samples; i += 1) {
     const x = (i / (samples - 1)) * 2 - 1;
-    curve[i] = Math.tanh(x * 1.35);
+    curve[i] = Math.tanh(x * amount);
   }
   return curve;
 }
 
-const DRIVE_CURVE = createDriveCurve(512);
+const DRIVE_CURVE = createDriveCurve(512, 1.35);
+const PLAYER_AK47_DRIVE_CURVE = createDriveCurve(512, AK47_AUDIO_TUNING.player.transientDrive);
+const ENEMY_AK47_DRIVE_CURVE = createDriveCurve(512, AK47_AUDIO_TUNING.enemy.transientDrive);
 
 export class WeaponAudio {
   private audioContext: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
+  private playerGunGain: GainNode | null = null;
+  private enemyGunGain: GainNode | null = null;
 
   private closeBuffer: AudioBuffer | null = null;
   private tailBuffer: AudioBuffer | null = null;
@@ -85,7 +139,8 @@ export class WeaponAudio {
 
   playAk47Shot(): void {
     const ctx = this.ensureAudioGraph();
-    if (!ctx || !this.masterGain || !this.compressor) return;
+    if (!ctx || !this.masterGain || !this.compressor || !this.playerGunGain) return;
+    const tuning = AK47_AUDIO_TUNING.player;
 
     this.ensureBuffersLoaded();
 
@@ -96,9 +151,22 @@ export class WeaponAudio {
     const now = ctx.currentTime;
 
     if (this.closeBuffer) {
-      this.playBuffer(this.closeBuffer, now, this.randRange(0.985, 1.015), this.randRange(0.78, 0.9));
+      this.playBuffer(
+        this.closeBuffer,
+        now,
+        this.randRange(0.985, 1.015),
+        this.randRange(0.78, 0.9) * tuning.layerGainScale,
+        {
+          destination: this.playerGunGain,
+          attackSeconds: tuning.transientAttackMs / 1000,
+          lowShelfGainDb: tuning.lowShelfDb,
+          highShelfFrequencyHz: tuning.highShelfHz,
+          highShelfGainDb: tuning.highShelfDb,
+          driveCurve: PLAYER_AK47_DRIVE_CURVE,
+        },
+      );
     } else {
-      this.playFallbackCrack(now);
+      this.playFallbackCrack(now, tuning.layerGainScale, this.playerGunGain);
     }
 
     if (this.tailBuffer) {
@@ -106,26 +174,51 @@ export class WeaponAudio {
         this.tailBuffer,
         now + this.randRange(0.012, 0.024),
         this.randRange(0.99, 1.01),
-        this.randRange(0.36, 0.52),
+        this.randRange(0.36, 0.52) * tuning.layerGainScale,
+        {
+          destination: this.playerGunGain,
+          attackSeconds: tuning.transientAttackMs / 1000,
+          lowShelfGainDb: tuning.lowShelfDb,
+          highShelfFrequencyHz: tuning.highShelfHz,
+          highShelfGainDb: tuning.highShelfDb,
+          driveCurve: PLAYER_AK47_DRIVE_CURVE,
+        },
       );
     }
   }
 
-  playAk47ShotQuiet(gainScale: number): void {
+  playAk47ShotQuiet(options: EnemyAk47ShotOptions): void {
     const ctx = this.ensureAudioGraph();
-    if (!ctx || !this.masterGain || !this.compressor) return;
+    if (!ctx || !this.masterGain || !this.compressor || !this.enemyGunGain) return;
+    const tuning = AK47_AUDIO_TUNING.enemy;
 
     this.ensureBuffersLoaded();
 
     if (ctx.state === "suspended") return;
 
     const now = ctx.currentTime;
-    const g = Math.max(0, Math.min(1, gainScale));
+    const distanceNorm = clamp01(options.distanceNorm);
+    const distanceGain = lerp(1, tuning.minGain, distanceNorm);
+    const lowpassFrequencyHz = lerp(tuning.closeLowpassHz, tuning.farLowpassHz, distanceNorm);
+    const highShelfGainDb = lerp(tuning.closeHighShelfDb, tuning.farHighShelfDb, distanceNorm);
+    const g = Math.max(0, options.layerGainScale) * tuning.layerGainScale * distanceGain;
 
     if (this.closeBuffer) {
-      this.playBuffer(this.closeBuffer, now,
+      this.playBuffer(
+        this.closeBuffer,
+        now,
         this.randRange(0.985, 1.015),
-        this.randRange(0.78, 0.9) * g);
+        this.randRange(0.78, 0.9) * g,
+        {
+          destination: this.enemyGunGain,
+          attackSeconds: tuning.transientAttackMs / 1000,
+          lowShelfGainDb: tuning.lowShelfDb,
+          highShelfFrequencyHz: tuning.highShelfHz,
+          highShelfGainDb,
+          driveCurve: ENEMY_AK47_DRIVE_CURVE,
+          lowpassFrequencyHz,
+        },
+      );
     }
     // No fallback for enemy shots — silence is fine if audio hasn't loaded yet
 
@@ -135,6 +228,15 @@ export class WeaponAudio {
         now + this.randRange(0.012, 0.024),
         this.randRange(0.99, 1.01),
         this.randRange(0.36, 0.52) * g,
+        {
+          destination: this.enemyGunGain,
+          attackSeconds: tuning.transientAttackMs / 1000,
+          lowShelfGainDb: tuning.lowShelfDb,
+          highShelfFrequencyHz: tuning.highShelfHz,
+          highShelfGainDb,
+          driveCurve: ENEMY_AK47_DRIVE_CURVE,
+          lowpassFrequencyHz,
+        },
       );
     }
   }
@@ -557,9 +659,13 @@ export class WeaponAudio {
 
     this.masterGain?.disconnect();
     this.compressor?.disconnect();
+    this.playerGunGain?.disconnect();
+    this.enemyGunGain?.disconnect();
 
     this.masterGain = null;
     this.compressor = null;
+    this.playerGunGain = null;
+    this.enemyGunGain = null;
 
     if (this.audioContext) {
       const ctx = this.audioContext;
@@ -590,13 +696,21 @@ export class WeaponAudio {
 
     const masterGain = ctx.createGain();
     masterGain.gain.value = 0.1;
+    const playerGunGain = ctx.createGain();
+    playerGunGain.gain.value = AK47_AUDIO_TUNING.player.postGain;
+    const enemyGunGain = ctx.createGain();
+    enemyGunGain.gain.value = AK47_AUDIO_TUNING.enemy.postGain;
 
+    playerGunGain.connect(compressor);
+    enemyGunGain.connect(compressor);
     compressor.connect(masterGain);
     masterGain.connect(ctx.destination);
 
     this.audioContext = ctx;
     this.compressor = compressor;
     this.masterGain = masterGain;
+    this.playerGunGain = playerGunGain;
+    this.enemyGunGain = enemyGunGain;
     return ctx;
   }
 
@@ -667,15 +781,29 @@ export class WeaponAudio {
     };
   }
 
-  private playBuffer(buffer: AudioBuffer, startTime: number, playbackRate: number, gain: number): void {
+  private playBuffer(
+    buffer: AudioBuffer,
+    startTime: number,
+    playbackRate: number,
+    gain: number,
+    options: Ak47BufferPlaybackOptions = {},
+  ): void {
     if (!this.audioContext || !this.compressor) return;
+    const destination = options.destination ?? (this.compressor as AudioNode);
 
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.value = playbackRate;
 
     const gainNode = this.audioContext.createGain();
-    gainNode.gain.value = gain;
+    const peakGain = Math.max(0.0001, gain);
+    const attackSeconds = Math.max(0, options.attackSeconds ?? 0);
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    if (attackSeconds > 0) {
+      gainNode.gain.exponentialRampToValueAtTime(peakGain, startTime + attackSeconds);
+    } else {
+      gainNode.gain.setValueAtTime(peakGain, startTime);
+    }
 
     const highpass = this.audioContext.createBiquadFilter();
     highpass.type = "highpass";
@@ -685,23 +813,42 @@ export class WeaponAudio {
     const lowShelf = this.audioContext.createBiquadFilter();
     lowShelf.type = "lowshelf";
     lowShelf.frequency.value = 120;
-    lowShelf.gain.value = this.randRange(3.5, 5.5);
+    lowShelf.gain.value = options.lowShelfGainDb ?? this.randRange(3.5, 5.5);
 
     const highShelf = this.audioContext.createBiquadFilter();
     highShelf.type = "highshelf";
-    highShelf.frequency.value = this.randRange(3500, 4800);
-    highShelf.gain.value = this.randRange(1.2, 2.8);
+    highShelf.frequency.value = options.highShelfFrequencyHz ?? this.randRange(3500, 4800);
+    highShelf.gain.value = options.highShelfGainDb ?? this.randRange(1.2, 2.8);
 
     const drive = this.audioContext.createWaveShaper();
-    drive.curve = DRIVE_CURVE as Float32Array<ArrayBuffer>;
+    drive.curve = new Float32Array(options.driveCurve ?? DRIVE_CURVE);
     drive.oversample = "2x";
+
+    const lowpassFrequencyHz = options.lowpassFrequencyHz;
+    const lowpass =
+      lowpassFrequencyHz === undefined
+        ? null
+        : this.audioContext.createBiquadFilter();
+    if (lowpass) {
+      lowpass.type = "lowpass";
+      const resolvedLowpassFrequencyHz = lowpassFrequencyHz;
+      if (resolvedLowpassFrequencyHz !== undefined) {
+        lowpass.frequency.value = resolvedLowpassFrequencyHz;
+      }
+      lowpass.Q.value = 0.72;
+    }
 
     source.connect(gainNode);
     gainNode.connect(highpass);
     highpass.connect(lowShelf);
     lowShelf.connect(highShelf);
     highShelf.connect(drive);
-    drive.connect(this.compressor);
+    if (lowpass) {
+      drive.connect(lowpass);
+      lowpass.connect(destination);
+    } else {
+      drive.connect(destination);
+    }
 
     source.start(startTime);
     source.onended = () => {
@@ -711,22 +858,31 @@ export class WeaponAudio {
       lowShelf.disconnect();
       highShelf.disconnect();
       drive.disconnect();
+      lowpass?.disconnect();
     };
   }
 
-  private playFallbackCrack(startTime: number): void {
+  private playFallbackCrack(
+    startTime: number,
+    gainScale = 1,
+    destination: AudioNode = this.compressor as AudioNode,
+  ): void {
     if (!this.audioContext || !this.compressor) return;
 
     if (!this.fallbackNoiseBuffer) {
       this.fallbackNoiseBuffer = this.createNoiseBuffer(this.audioContext, FALLBACK_NOISE_SECONDS);
     }
 
-    this.playFallbackTransientLayer(startTime);
-    this.playFallbackBodyLayer(startTime);
-    this.playFallbackTailLayer(startTime + this.randRange(0.01, 0.02));
+    this.playFallbackTransientLayer(startTime, gainScale, destination);
+    this.playFallbackBodyLayer(startTime, gainScale, destination);
+    this.playFallbackTailLayer(startTime + this.randRange(0.01, 0.02), gainScale, destination);
   }
 
-  private playFallbackTransientLayer(startTime: number): void {
+  private playFallbackTransientLayer(
+    startTime: number,
+    gainScale = 1,
+    destination: AudioNode = this.compressor as AudioNode,
+  ): void {
     if (!this.audioContext || !this.compressor || !this.fallbackNoiseBuffer) return;
 
     const source = this.audioContext.createBufferSource();
@@ -743,12 +899,12 @@ export class WeaponAudio {
     const decay = this.randRange(0.05, 0.072);
 
     gainNode.gain.setValueAtTime(0.0001, startTime);
-    gainNode.gain.exponentialRampToValueAtTime(this.randRange(0.85, 1.05), startTime + attack);
+    gainNode.gain.exponentialRampToValueAtTime(this.randRange(0.85, 1.05) * gainScale, startTime + attack);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + decay);
 
     source.connect(highpass);
     highpass.connect(gainNode);
-    gainNode.connect(this.compressor);
+    gainNode.connect(destination);
 
     source.start(startTime);
     source.stop(startTime + decay + 0.02);
@@ -759,7 +915,11 @@ export class WeaponAudio {
     };
   }
 
-  private playFallbackBodyLayer(startTime: number): void {
+  private playFallbackBodyLayer(
+    startTime: number,
+    gainScale = 1,
+    destination: AudioNode = this.compressor as AudioNode,
+  ): void {
     if (!this.audioContext || !this.compressor) return;
 
     const osc = this.audioContext.createOscillator();
@@ -774,12 +934,12 @@ export class WeaponAudio {
 
     const gainNode = this.audioContext.createGain();
     gainNode.gain.setValueAtTime(0.0001, startTime);
-    gainNode.gain.exponentialRampToValueAtTime(this.randRange(0.26, 0.38), startTime + 0.004);
+    gainNode.gain.exponentialRampToValueAtTime(this.randRange(0.26, 0.38) * gainScale, startTime + 0.004);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.11);
 
     osc.connect(lowpass);
     lowpass.connect(gainNode);
-    gainNode.connect(this.compressor);
+    gainNode.connect(destination);
 
     osc.start(startTime);
     osc.stop(startTime + 0.12);
@@ -790,7 +950,11 @@ export class WeaponAudio {
     };
   }
 
-  private playFallbackTailLayer(startTime: number): void {
+  private playFallbackTailLayer(
+    startTime: number,
+    gainScale = 1,
+    destination: AudioNode = this.compressor as AudioNode,
+  ): void {
     if (!this.audioContext || !this.compressor || !this.fallbackNoiseBuffer) return;
 
     const source = this.audioContext.createBufferSource();
@@ -804,12 +968,12 @@ export class WeaponAudio {
 
     const gainNode = this.audioContext.createGain();
     gainNode.gain.setValueAtTime(0.0001, startTime);
-    gainNode.gain.exponentialRampToValueAtTime(this.randRange(0.08, 0.12), startTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(this.randRange(0.08, 0.12) * gainScale, startTime + 0.01);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.16);
 
     source.connect(bandpass);
     bandpass.connect(gainNode);
-    gainNode.connect(this.compressor);
+    gainNode.connect(destination);
 
     source.start(startTime);
     source.stop(startTime + 0.17);

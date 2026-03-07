@@ -1,9 +1,11 @@
 import { attachDatabasePool } from "@vercel/functions";
 import { Pool, type PoolConfig } from "pg";
 import {
+  HIGH_SCORE_MAP_ID_MAX_LENGTH,
   SITEWIDE_CHAMPION_BOARD_KEY,
   createSharedChampion,
   normalizeScoreHalfPoints,
+  sanitizeSharedChampionMapId,
   sanitizeSharedChampionName,
   type SharedChampion,
   type SharedChampionControlMode,
@@ -47,6 +49,40 @@ const RATE_LIMIT_CLEANUP_SQL = `
   DELETE FROM champion_submissions_log WHERE submitted_at < NOW() - INTERVAL '1 hour';
 `;
 
+const CREATE_RUN_TOKEN_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS shared_champion_run_tokens (
+    run_id UUID PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    player_name VARCHAR(15) NOT NULL,
+    control_mode TEXT NOT NULL CHECK (control_mode IN ('human', 'agent')),
+    map_id VARCHAR(${HIGH_SCORE_MAP_ID_MAX_LENGTH}) NOT NULL,
+    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    claimed_at TIMESTAMPTZ,
+    created_ip_hash TEXT,
+    created_user_agent TEXT,
+    claim_ip_hash TEXT,
+    claim_user_agent TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_shared_champion_run_tokens_expires_at
+    ON shared_champion_run_tokens (expires_at);
+`;
+
+const CREATE_AUDIT_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS shared_champion_run_audit (
+    id BIGSERIAL PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    run_id UUID,
+    ip_hash TEXT,
+    user_agent TEXT,
+    reason TEXT,
+    payload JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`;
+
 const SELECT_CHAMPION_SQL = `
   SELECT score_half_points, holder_name, holder_mode, updated_at
   FROM shared_champion_scores
@@ -82,6 +118,53 @@ const UPSERT_CHAMPION_SQL = `
   LIMIT 1;
 `;
 
+const INSERT_RUN_TOKEN_SQL = `
+  INSERT INTO shared_champion_run_tokens (
+    run_id,
+    token_hash,
+    player_name,
+    control_mode,
+    map_id,
+    expires_at,
+    created_ip_hash,
+    created_user_agent
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  RETURNING run_id, player_name, control_mode, map_id, issued_at, expires_at, claimed_at;
+`;
+
+const CLAIM_RUN_TOKEN_SQL = `
+  UPDATE shared_champion_run_tokens
+  SET
+    claimed_at = NOW(),
+    claim_ip_hash = $2,
+    claim_user_agent = $3
+  WHERE token_hash = $1
+    AND claimed_at IS NULL
+    AND expires_at > NOW()
+  RETURNING run_id, player_name, control_mode, map_id, issued_at, expires_at, claimed_at;
+`;
+
+const SELECT_RUN_TOKEN_SQL = `
+  SELECT run_id, player_name, control_mode, map_id, issued_at, expires_at, claimed_at
+  FROM shared_champion_run_tokens
+  WHERE token_hash = $1
+  LIMIT 1;
+`;
+
+const INSERT_AUDIT_EVENT_SQL = `
+  INSERT INTO shared_champion_run_audit (
+    event_type,
+    outcome,
+    run_id,
+    ip_hash,
+    user_agent,
+    reason,
+    payload
+  )
+  VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb);
+`;
+
 type ChampionRow = {
   score_half_points: number;
   holder_name: string;
@@ -93,6 +176,36 @@ type ChampionMutationRow = ChampionRow & {
   updated: boolean;
 };
 
+type RunTokenRow = {
+  run_id: string;
+  player_name: string;
+  control_mode: SharedChampionControlMode;
+  map_id: string;
+  issued_at: Date;
+  expires_at: Date;
+  claimed_at: Date | null;
+};
+
+export type SharedChampionRunTokenRecord = {
+  runId: string;
+  playerName: string;
+  controlMode: SharedChampionControlMode;
+  mapId: string;
+  issuedAt: string;
+  expiresAt: string;
+  claimedAt: string | null;
+};
+
+export type SharedChampionAuditEvent = {
+  eventType: string;
+  outcome: "accepted" | "rejected";
+  runId?: string | null;
+  ipHash?: string | null;
+  userAgent?: string | null;
+  reason?: string | null;
+  payload?: unknown;
+};
+
 export type SharedChampionStore = {
   getChampion: () => Promise<SharedChampion | null>;
   submitCandidate: (input: SharedChampionPostRequest) => Promise<{
@@ -101,6 +214,29 @@ export type SharedChampionStore = {
   }>;
   isRateLimited: (clientIp: string) => Promise<boolean>;
   logSubmission: (clientIp: string) => Promise<void>;
+  issueRunToken: (input: {
+    runId: string;
+    tokenHash: string;
+    playerName: string;
+    controlMode: SharedChampionControlMode;
+    mapId: string;
+    expiresAt: Date;
+    clientIpHash: string | null;
+    userAgent: string | null;
+  }) => Promise<SharedChampionRunTokenRecord>;
+  consumeRunToken: (input: {
+    tokenHash: string;
+    clientIpHash: string | null;
+    userAgent: string | null;
+  }) => Promise<{
+    status: "consumed" | "missing" | "expired" | "used";
+    record: SharedChampionRunTokenRecord | null;
+  }>;
+  recordAuditEvent: (event: SharedChampionAuditEvent) => Promise<void>;
+};
+
+type InMemoryRunTokenRecord = SharedChampionRunTokenRecord & {
+  tokenHash: string;
 };
 
 function mapRowToChampion(row: ChampionRow): SharedChampion {
@@ -112,17 +248,53 @@ function mapRowToChampion(row: ChampionRow): SharedChampion {
   });
 }
 
+function mapRunTokenRow(row: RunTokenRow): SharedChampionRunTokenRecord {
+  return {
+    runId: row.run_id,
+    playerName: row.player_name,
+    controlMode: row.control_mode,
+    mapId: row.map_id,
+    issuedAt: row.issued_at.toISOString(),
+    expiresAt: row.expires_at.toISOString(),
+    claimedAt: row.claimed_at ? row.claimed_at.toISOString() : null,
+  };
+}
+
 function normalizeSubmission(input: SharedChampionPostRequest): SharedChampionPostRequest {
   return {
     playerName: sanitizeSharedChampionName(input.playerName, input.controlMode),
     scoreHalfPoints: normalizeScoreHalfPoints(input.scoreHalfPoints),
     controlMode: input.controlMode,
-    telemetry: input.telemetry,
+    ...(input.telemetry ? { telemetry: input.telemetry } : {}),
+  };
+}
+
+function normalizeRunTokenInput(input: {
+  runId: string;
+  tokenHash: string;
+  playerName: string;
+  controlMode: SharedChampionControlMode;
+  mapId: string;
+  expiresAt: Date;
+  clientIpHash: string | null;
+  userAgent: string | null;
+}) {
+  return {
+    runId: input.runId,
+    tokenHash: input.tokenHash.trim(),
+    playerName: sanitizeSharedChampionName(input.playerName, input.controlMode),
+    controlMode: input.controlMode,
+    mapId: sanitizeSharedChampionMapId(input.mapId),
+    expiresAt: input.expiresAt,
+    clientIpHash: input.clientIpHash,
+    userAgent: input.userAgent?.trim() ? input.userAgent.trim().slice(0, 512) : null,
   };
 }
 
 export function createInMemorySharedChampionStore(): SharedChampionStore {
   let champion: SharedChampion | null = null;
+  const runTokens = new Map<string, InMemoryRunTokenRecord>();
+  const auditEvents: SharedChampionAuditEvent[] = [];
 
   return {
     async getChampion() {
@@ -156,6 +328,87 @@ export function createInMemorySharedChampionStore(): SharedChampionStore {
     },
     async logSubmission() {
       // No-op in dev/test
+    },
+    async issueRunToken(input) {
+      const normalized = normalizeRunTokenInput(input);
+      const issuedAt = new Date();
+      const record: InMemoryRunTokenRecord = {
+        runId: normalized.runId,
+        tokenHash: normalized.tokenHash,
+        playerName: normalized.playerName,
+        controlMode: normalized.controlMode,
+        mapId: normalized.mapId,
+        issuedAt: issuedAt.toISOString(),
+        expiresAt: normalized.expiresAt.toISOString(),
+        claimedAt: null,
+      };
+      runTokens.set(normalized.tokenHash, record);
+      return {
+        runId: record.runId,
+        playerName: record.playerName,
+        controlMode: record.controlMode,
+        mapId: record.mapId,
+        issuedAt: record.issuedAt,
+        expiresAt: record.expiresAt,
+        claimedAt: record.claimedAt,
+      };
+    },
+    async consumeRunToken(input) {
+      const tokenHash = input.tokenHash.trim();
+      const record = runTokens.get(tokenHash) ?? null;
+      if (!record) {
+        return {
+          status: "missing" as const,
+          record: null,
+        };
+      }
+
+      if (record.claimedAt !== null) {
+        return {
+          status: "used" as const,
+          record: {
+            runId: record.runId,
+            playerName: record.playerName,
+            controlMode: record.controlMode,
+            mapId: record.mapId,
+            issuedAt: record.issuedAt,
+            expiresAt: record.expiresAt,
+            claimedAt: record.claimedAt,
+          },
+        };
+      }
+
+      if (Date.parse(record.expiresAt) <= Date.now()) {
+        return {
+          status: "expired" as const,
+          record: {
+            runId: record.runId,
+            playerName: record.playerName,
+            controlMode: record.controlMode,
+            mapId: record.mapId,
+            issuedAt: record.issuedAt,
+            expiresAt: record.expiresAt,
+            claimedAt: record.claimedAt,
+          },
+        };
+      }
+
+      record.claimedAt = new Date().toISOString();
+      return {
+        status: "consumed" as const,
+        record: {
+          runId: record.runId,
+          playerName: record.playerName,
+          controlMode: record.controlMode,
+          mapId: record.mapId,
+          issuedAt: record.issuedAt,
+          expiresAt: record.expiresAt,
+          claimedAt: record.claimedAt,
+        },
+      };
+    },
+    async recordAuditEvent(event) {
+      auditEvents.push(event);
     },
   };
 }
@@ -222,6 +475,8 @@ async function ensureSchemaReady(): Promise<void> {
     await p.query(CREATE_HIGH_SCORE_TABLE_SQL);
     await p.query(CREATE_SUBMISSIONS_LOG_TABLE_SQL);
     await p.query(CREATE_SUBMISSIONS_LOG_INDEX_SQL);
+    await p.query(CREATE_RUN_TOKEN_TABLE_SQL);
+    await p.query(CREATE_AUDIT_TABLE_SQL);
   })().catch((error) => {
     schemaReadyPromise = null;
     throw error;
@@ -268,6 +523,81 @@ export function createPostgresSharedChampionStore(): SharedChampionStore {
       await getPool().query(RATE_LIMIT_INSERT_SQL, [clientIp]);
       // Best-effort cleanup of old entries
       getPool().query(RATE_LIMIT_CLEANUP_SQL).catch(() => {});
+    },
+    async issueRunToken(input) {
+      await ensureSchemaReady();
+      const normalized = normalizeRunTokenInput(input);
+      const result = await getPool().query<RunTokenRow>(INSERT_RUN_TOKEN_SQL, [
+        normalized.runId,
+        normalized.tokenHash,
+        normalized.playerName,
+        normalized.controlMode,
+        normalized.mapId,
+        normalized.expiresAt,
+        normalized.clientIpHash,
+        normalized.userAgent,
+      ]);
+      const row = result.rows[0];
+      if (!row) {
+        throw new Error("Failed to issue shared champion run token.");
+      }
+      return mapRunTokenRow(row);
+    },
+    async consumeRunToken(input) {
+      await ensureSchemaReady();
+      const normalizedTokenHash = input.tokenHash.trim();
+      const result = await getPool().query<RunTokenRow>(CLAIM_RUN_TOKEN_SQL, [
+        normalizedTokenHash,
+        input.clientIpHash,
+        input.userAgent?.trim() ? input.userAgent.trim().slice(0, 512) : null,
+      ]);
+      const consumed = result.rows[0];
+      if (consumed) {
+        return {
+          status: "consumed" as const,
+          record: mapRunTokenRow(consumed),
+        };
+      }
+
+      const lookup = await getPool().query<RunTokenRow>(SELECT_RUN_TOKEN_SQL, [normalizedTokenHash]);
+      const row = lookup.rows[0] ?? null;
+      if (!row) {
+        return {
+          status: "missing" as const,
+          record: null,
+        };
+      }
+
+      if (row.claimed_at !== null) {
+        return {
+          status: "used" as const,
+          record: mapRunTokenRow(row),
+        };
+      }
+
+      if (row.expires_at.getTime() <= Date.now()) {
+        return {
+          status: "expired" as const,
+          record: mapRunTokenRow(row),
+        };
+      }
+
+      return {
+        status: "used" as const,
+        record: mapRunTokenRow(row),
+      };
+    },
+    async recordAuditEvent(event) {
+      await ensureSchemaReady();
+      await getPool().query(INSERT_AUDIT_EVENT_SQL, [
+        event.eventType,
+        event.outcome,
+        event.runId ?? null,
+        event.ipHash ?? null,
+        event.userAgent ?? null,
+        event.reason ?? null,
+        JSON.stringify(event.payload ?? null),
+      ]);
     },
   };
 }

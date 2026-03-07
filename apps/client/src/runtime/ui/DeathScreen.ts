@@ -38,7 +38,7 @@ export class DeathScreen {
     champion: null,
   };
 
-  /** Called by bootstrap when the screen should trigger a respawn. */
+  /** Called by bootstrap when the screen should restart the run. */
   onRespawn: (() => void) | null = null;
 
   constructor(mountEl: HTMLElement) {
@@ -171,7 +171,7 @@ export class DeathScreen {
     this.playAgainBtn = document.createElement("button");
     this.playAgainBtn.type = "button";
     this.playAgainBtn.dataset.testid = "play-again";
-    this.playAgainBtn.textContent = "Play Again";
+    this.playAgainBtn.textContent = "Restart Run";
     this.playAgainBtn.style.marginTop = "18px";
     this.playAgainBtn.style.padding = "10px 20px";
     this.playAgainBtn.style.borderRadius = "999px";

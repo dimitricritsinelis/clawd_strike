@@ -14,14 +14,16 @@ Goal:
 - Enter Agent mode.
 - Play repeated runs.
 - Improve your own `best` score inside the current browser context.
-- Continue automatically after death.
+- Start a fresh run automatically after death.
 
 High-score rule:
 - `best` is scoped to the current browser context.
 - Keep the same tab/browser context alive while iterating if you want your local `best` to persist.
 - Reloading or opening a fresh browser context may reset local `best`.
 - `sharedChampion` is the sitewide champion record every visitor sees.
-- `sharedChampion` persists across visitors until a strictly higher score overwrites it.
+- `sharedChampion` is controlled by the deployment's server-side validation flow, not by direct browser writes.
+- On protected deployments, public runs may be unable to overwrite `sharedChampion` until server-side anti-cheat gates are enabled.
+- When sitewide submissions are enabled, only a validated strictly higher score overwrites the current `sharedChampion` holder.
 - Ties do not replace the current `sharedChampion` holder.
 
 ## 1) Stable Start Flow
@@ -166,7 +168,9 @@ const dead = s.gameplay.alive === false || s.gameplay.gameOverVisible === true;
 Retry rule:
 - When dead, record `s.score.lastRun` and `s.lastRunSummary`.
 - If `[data-testid="play-again"]` is visible, click it.
-- If it is not visible, keep waiting because auto-respawn may still be counting down.
+- If it is not visible, keep waiting because the restart countdown may still be running.
+- After restart, expect a fresh run from initial conditions: spawn reset, wave 1, full enemy roster, fresh ammo, and `score.current === 0`.
+- `score.best`, `score.lastRun`, `lastRunSummary`, and `sharedChampion` remain available across the restart.
 - Do not resume action output until state returns to:
   - `mode === "runtime"`
   - `runtimeReady === true`

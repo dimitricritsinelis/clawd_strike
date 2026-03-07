@@ -111,6 +111,15 @@ export class HitMarker {
     }
   }
 
+  clear(): void {
+    this.timerS = 0;
+    this.scalePop = 0;
+    this.root.style.opacity = "0";
+    this.root.style.transform = "scale(0.85)";
+    this.ring.style.display = "none";
+    this.ring.style.opacity = "0";
+  }
+
   dispose(): void {
     this.root.remove();
   }

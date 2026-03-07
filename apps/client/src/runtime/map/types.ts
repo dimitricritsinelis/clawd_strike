@@ -196,7 +196,7 @@ function parseVec3(value: unknown, source: string): { x: number; y: number; z: n
 
 const DEFAULT_WALL_THICKNESS_M = 0.25;
 const DEFAULT_WALL_DETAIL_DENSITY = 0.48;
-const DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M = 0.15;
+const DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M = 0.30;
 
 function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDetailOptions {
   if (typeof value === "undefined") {
@@ -224,7 +224,7 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
       : DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M;
 
   const density = Math.max(0, Math.min(1.25, densityRaw));
-  const maxProtrusion = Math.max(0.02, Math.min(0.2, maxProtrusionRaw));
+  const maxProtrusion = Math.max(0.02, Math.min(0.4, maxProtrusionRaw));
 
   const resolved: RuntimeWallDetailOptions = {
     enabled: typeof obj.enabled === "undefined" ? true : asBoolean(obj.enabled, `${source}.enabled`),

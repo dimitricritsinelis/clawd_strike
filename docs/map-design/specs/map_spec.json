@@ -33,7 +33,7 @@
     "enabled": true,
     "style": "bazaar",
     "density": 0.38,
-    "maxProtrusion": 0.15,
+    "maxProtrusion": 0.30,
     "facade_overrides": [
       {
         "zoneId": "BZ_M1",

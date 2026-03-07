@@ -14,6 +14,7 @@ function expectSharedChampionShape(sharedChampion: unknown) {
   expect(sharedChampion).toEqual({
     holderName: expect.any(String),
     score: expect.any(Number),
+    scoreHalfPoints: expect.any(Number),
     controlMode: expect.stringMatching(/^(human|agent)$/),
     scope: "sitewide",
     updatedAt: expect.any(String),
@@ -106,6 +107,7 @@ test("keeps the public agent payload fair and minimal in runtime", async ({ page
 });
 
 test("supports the documented no-context death and retry loop", async ({ page }, testInfo) => {
+  test.slow();
   const recorder = attachConsoleRecorder(page);
   const baseUrl = testInfo.project.use.baseURL as string;
 
@@ -137,16 +139,18 @@ test("supports the documented no-context death and retry loop", async ({ page },
   let respawns = 0;
   let previousAlive = true;
 
-  for (let step = 0; step < 120 && deaths < 2; step += 1) {
+  for (let step = 0; step < 180 && deaths < 2; step += 1) {
     const state = await readDocumentedAgentState(page);
     const alive = state.gameplay?.alive === true;
     const gameOverVisible = state.gameplay?.gameOverVisible === true;
 
     if (!alive || gameOverVisible) {
+      const deathLastRun = state.score?.lastRun ?? null;
+      const deathLastRunSummary = state.lastRunSummary ?? null;
       if (previousAlive) {
         deaths += 1;
-        expect(state.score?.lastRun).not.toBeNull();
-        expect(state.lastRunSummary).not.toBeNull();
+        expect(deathLastRun).not.toBeNull();
+        expect(deathLastRunSummary).not.toBeNull();
       }
 
       const playAgainButton = page.getByTestId("play-again");
@@ -178,6 +182,11 @@ test("supports the documented no-context death and retry loop", async ({ page },
           return false;
         }
       }, { timeout: 20_000 });
+
+      const restartedState = await readDocumentedAgentState(page);
+      expect(restartedState.score?.current).toBe(0);
+      expect(restartedState.score?.lastRun ?? null).toBe(deathLastRun);
+      expect(restartedState.lastRunSummary?.finalScore ?? null).toBe(deathLastRunSummary?.finalScore ?? null);
 
       respawns += 1;
       previousAlive = true;

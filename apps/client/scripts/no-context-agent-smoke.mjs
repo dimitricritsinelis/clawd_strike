@@ -125,13 +125,15 @@ try {
     const gameOverVisible = state.gameplay?.gameOverVisible === true;
 
     if (!alive || gameOverVisible) {
+      const deathLastRun = state.score?.lastRun ?? null;
+      const deathLastRunSummary = state.lastRunSummary ?? null;
       if (previousAlive) {
         summary.runtime.deathsObserved += 1;
         summary.runtime.cycles.push({
           deathIndex: summary.runtime.deathsObserved,
-          lastRun: state.score?.lastRun ?? null,
+          lastRun: deathLastRun,
           best: state.score?.best ?? null,
-          lastRunSummary: state.lastRunSummary ?? null,
+          lastRunSummary: deathLastRunSummary,
         });
         await page.screenshot({
           path: path.join(OUTPUT_DIR, `death-${sanitizeFileSegment(String(summary.runtime.deathsObserved))}.png`),
@@ -144,6 +146,26 @@ try {
       }
 
       await waitForRespawn(page);
+      const restartedState = await readDocumentedAgentState(page);
+      if ((restartedState.score?.current ?? null) !== 0) {
+        throw new Error(`Restarted run score should reset to 0, got ${restartedState.score?.current ?? "n/a"}`);
+      }
+      if ((restartedState.score?.lastRun ?? null) !== deathLastRun) {
+        throw new Error(
+          `Restarted run should preserve score.lastRun=${deathLastRun ?? "null"}, got ${restartedState.score?.lastRun ?? "null"}`,
+        );
+      }
+      if ((restartedState.lastRunSummary?.finalScore ?? null) !== (deathLastRunSummary?.finalScore ?? null)) {
+        throw new Error(
+          `Restarted run should preserve lastRunSummary.finalScore=${deathLastRunSummary?.finalScore ?? "null"}, got ${restartedState.lastRunSummary?.finalScore ?? "null"}`,
+        );
+      }
+      const activeCycle = summary.runtime.cycles[summary.runtime.cycles.length - 1] ?? null;
+      if (activeCycle) {
+        activeCycle.restartedCurrentScore = restartedState.score?.current ?? null;
+        activeCycle.restartedLastRun = restartedState.score?.lastRun ?? null;
+        activeCycle.restartedLastRunSummary = restartedState.lastRunSummary ?? null;
+      }
       summary.runtime.respawnsObserved += 1;
       await page.screenshot({
         path: path.join(OUTPUT_DIR, `respawn-${sanitizeFileSegment(String(summary.runtime.respawnsObserved))}.png`),

@@ -142,6 +142,14 @@ export class DamageNumbers {
     }
   }
 
+  clear(): void {
+    while (this.entries.length > 0) {
+      const entry = this.entries.pop()!;
+      entry.el.remove();
+      this.freeEls.push(entry.el);
+    }
+  }
+
   dispose(): void {
     for (const entry of this.entries) {
       entry.el.remove();

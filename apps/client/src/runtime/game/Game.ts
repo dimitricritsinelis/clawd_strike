@@ -106,6 +106,7 @@ type SpawnPose = {
   x: number;
   z: number;
   yawRad: number;
+  zoneId: string | null;
 };
 
 export class Game {
@@ -663,6 +664,25 @@ export class Game {
     return this.enemyManager?.eliminateAllForDebug() ?? 0;
   }
 
+  debugSetPlayerPose(position: { x: number; y: number; z: number }, yawRad?: number): void {
+    this.playerController.setSpawn(position.x, position.y, position.z);
+    if (typeof yawRad === "number") {
+      this.setLookAngles(yawRad, 0);
+    } else {
+      this.updateCameraFromPlayer();
+    }
+    this.playerHealth = 100;
+    this.isDead = false;
+  }
+
+  resetBotKnowledgeForDebug(): void {
+    this.enemyManager?.resetKnowledgeForDebug();
+  }
+
+  suppressBotIntelForDebug(durationMs: number): void {
+    this.enemyManager?.suppressPlayerIntelForDebug(durationMs);
+  }
+
   setEnemyAudio(audio: WeaponAudio): void {
     this.enemyManager?.setAudio(audio);
   }
@@ -766,22 +786,41 @@ export class Game {
     }
   }
 
-  respawn(): void {
+  restartRun(): void {
     this.playerHealth = 100;
     this.isDead = false;
+    this.wasGrounded = true;
     this.shakeX = 0; this.shakeXVel = 0;
     this.shakeY = 0; this.shakeYVel = 0;
-    this.weapon.cancelTrigger();
     this.resetInputState();
+    this.weapon.reset();
+    this.resetWeaponDebugState();
 
-    if (this.blockoutSpec && this.spawnPoseCache) {
-      const pose = this.spawnPoseCache;
+    if (this.blockoutSpec && this.worldColliders && this.enemyManager) {
+      const spawnPose = this.selectSpawnPose(this.blockoutSpec, this.spawn);
+      this.spawnPoseCache = spawnPose;
       this.playerController.setSpawn(
-        pose.x,
+        spawnPose.x,
         this.blockoutSpec.defaults.floor_height,
-        pose.z,
+        spawnPose.z,
       );
-      this.setLookAngles(pose.yawRad, 0);
+      this.setLookAngles(spawnPose.yawRad, 0);
+      this.enemyManager.fullDispose(this.scene);
+      this.enemyManager.setTacticalContext(this.blockoutSpec, this.anchorsSpec ?? null);
+      this.enemyManager.spawn(this.worldColliders, {
+        mode: "initial",
+        playerPos: {
+          x: spawnPose.x,
+          y: this.blockoutSpec.defaults.floor_height,
+          z: spawnPose.z,
+        },
+        playerSpawnId: this.spawn,
+      });
+    } else if (this.blockoutSpec) {
+      this.rebuildWorld();
+    }
+
+    if (!this.restorePlayerToSpawn()) {
       this.updateCameraFromPlayer();
     }
   }
@@ -1021,6 +1060,7 @@ export class Game {
         x: selected.rect.x + selected.rect.w * 0.5,
         z: selected.rect.y + selected.rect.h * 0.5,
         yawRad: spawn === "B" ? 0 : Math.PI,
+        zoneId: selected.id,
       };
     }
 
@@ -1028,6 +1068,7 @@ export class Game {
       x: spec.playable_boundary.x + spec.playable_boundary.w * 0.5,
       z: spec.playable_boundary.y + spec.playable_boundary.h * 0.5,
       yawRad: spawn === "B" ? 0 : Math.PI,
+      zoneId: null,
     };
   }
 
@@ -1098,17 +1139,47 @@ export class Game {
     this.runtimeColliders = [...builtBlockout.colliders, ...this.propColliders].sort((a, b) => a.id.localeCompare(b.id));
     this.worldColliders = new WorldColliders(this.runtimeColliders, blockoutSpec.playable_boundary);
     this.playerController.setWorld(this.worldColliders);
-    this.enemyManager?.fullDispose(this.scene);
-    this.enemyManager?.setTacticalContext(blockoutSpec, this.anchorsSpec ?? null);
-    this.enemyManager?.spawn(this.worldColliders, { mode: "initial" });
-
     const spawnPose = this.selectSpawnPose(blockoutSpec, this.spawn);
     this.spawnPoseCache = spawnPose;
     this.playerController.setSpawn(spawnPose.x, blockoutSpec.defaults.floor_height, spawnPose.z);
     this.setLookAngles(spawnPose.yawRad, 0);
+    this.enemyManager?.fullDispose(this.scene);
+    this.enemyManager?.setTacticalContext(blockoutSpec, this.anchorsSpec ?? null);
+    this.enemyManager?.spawn(this.worldColliders, {
+      mode: "initial",
+      playerPos: {
+        x: spawnPose.x,
+        y: blockoutSpec.defaults.floor_height,
+        z: spawnPose.z,
+      },
+      playerSpawnId: this.spawn,
+    });
     if (!this.freezeInput) {
       this.updateCameraFromPlayer();
     }
+  }
+
+  private restorePlayerToSpawn(): boolean {
+    if (!this.blockoutSpec) return false;
+    const pose = this.spawnPoseCache ?? this.selectSpawnPose(this.blockoutSpec, this.spawn);
+    this.spawnPoseCache = pose;
+    this.playerController.setSpawn(
+      pose.x,
+      this.blockoutSpec.defaults.floor_height,
+      pose.z,
+    );
+    this.setLookAngles(pose.yawRad, 0);
+    this.updateCameraFromPlayer();
+    return true;
+  }
+
+  private resetWeaponDebugState(): void {
+    this.weaponShotsFiredLastFrame = 0;
+    this.weaponShotIndex = 0;
+    this.weaponSpreadDeg = 0;
+    this.weaponBloomDeg = 0;
+    this.weaponLastShotRecoilPitchDeg = 0;
+    this.weaponLastShotRecoilYawDeg = 0;
   }
 
   private clearBlockout(): void {

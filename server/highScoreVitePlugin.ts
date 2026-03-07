@@ -1,10 +1,25 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect, Plugin, ViteDevServer } from "vite";
 import { handleSharedChampionRequest } from "./highScoreApi";
+import {
+  handleSharedChampionRunFinishRequest,
+  handleSharedChampionRunStartRequest,
+} from "./highScoreRunApi";
 import { createInMemorySharedChampionStore } from "./highScoreStore";
 import { handleSessionRequest } from "./sessionToken";
 
 const devStore = createInMemorySharedChampionStore();
+
+type SharedChampionRouteHandler = (
+  request: Request,
+  store: typeof devStore,
+) => Promise<Response>;
+
+const routeHandlers = new Map<string, SharedChampionRouteHandler>([
+  ["/api/high-score", handleSharedChampionRequest],
+  ["/api/run/start", handleSharedChampionRunStartRequest],
+  ["/api/run/finish", handleSharedChampionRunFinishRequest],
+]);
 
 async function readRequestBody(request: IncomingMessage): Promise<string | undefined> {
   if (request.method === "GET" || request.method === "HEAD") {
@@ -76,14 +91,15 @@ export function createSharedChampionDevPlugin(): Plugin {
           return;
         }
 
-        if (pathname !== "/api/high-score") {
+        const handler = routeHandlers.get(pathname);
+        if (!handler) {
           next();
           return;
         }
 
         try {
           const webRequest = await toWebRequest(request);
-          const webResponse = await handleSharedChampionRequest(webRequest, devStore);
+          const webResponse = await handler(webRequest, devStore);
           await writeWebResponse(webResponse, response);
         } catch (error) {
           console.error("[shared-champion] dev middleware failed", error);

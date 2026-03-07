@@ -6,7 +6,11 @@ import {
   validateTelemetry,
   type SharedChampionPostRequest,
 } from "../apps/shared/highScore.js";
-import type { SharedChampionStore } from "./highScoreStore.js";
+import {
+  getSharedChampionAdminToken,
+  protectJsonWriteRequest,
+} from "./highScoreSecurity.js";
+import type { SharedChampionAuditEvent, SharedChampionStore } from "./highScoreStore.js";
 import { verifySessionToken } from "./sessionToken.js";
 
 const MAX_POST_BODY_BYTES = 1024;
@@ -58,6 +62,17 @@ function extractClientIp(request: Request): string {
   return "unknown";
 }
 
+async function recordAuditEvent(
+  store: SharedChampionStore,
+  event: SharedChampionAuditEvent,
+): Promise<void> {
+  try {
+    await store.recordAuditEvent(event);
+  } catch (error) {
+    console.warn("[shared-champion] failed to record audit event", error);
+  }
+}
+
 export async function handleSharedChampionRequest(
   request: Request,
   store: SharedChampionStore | null,
@@ -102,12 +117,49 @@ export async function handleSharedChampionRequest(
         return errorResponse(429, "Too many submissions. Try again later.");
       }
 
-      // ── Parse body ──────────────────────────────────────────────────────
+      const writeCheck = protectJsonWriteRequest(request, {
+        rateLimitNamespace: "shared-champion-admin-write",
+        maxRequests: 6,
+        windowMs: 60_000,
+        requireSameOrigin: false,
+      });
+      if (!writeCheck.ok) {
+        await recordAuditEvent(store, {
+          eventType: "champion-direct-write",
+          outcome: "rejected",
+          ipHash: writeCheck.clientIpHash,
+          userAgent: writeCheck.userAgent,
+          reason: writeCheck.error,
+        });
+        return errorResponse(writeCheck.status, writeCheck.error);
+      }
+
+      const configuredAdminToken = getSharedChampionAdminToken();
+      const providedAdminToken = request.headers.get("x-shared-champion-admin-token")?.trim() ?? "";
+      if (!configuredAdminToken || providedAdminToken !== configuredAdminToken) {
+        await recordAuditEvent(store, {
+          eventType: "champion-direct-write",
+          outcome: "rejected",
+          ipHash: writeCheck.clientIpHash,
+          userAgent: writeCheck.userAgent,
+          reason: "Direct shared champion writes are internal-only.",
+        });
+        return errorResponse(403, "Direct shared champion writes are internal-only.");
+      }
+
+
       let body: unknown;
       try {
         body = await request.json();
       } catch {
         console.log(`[champion-submit] ip=${clientIp} result=rejected reason=invalid-json`);
+        await recordAuditEvent(store, {
+          eventType: "champion-direct-write",
+          outcome: "rejected",
+          ipHash: writeCheck.clientIpHash,
+          userAgent: writeCheck.userAgent,
+          reason: "Invalid JSON body.",
+        });
         return errorResponse(400, "Invalid JSON body.");
       }
 
@@ -124,10 +176,21 @@ export async function handleSharedChampionRequest(
       const parsedBody = parseSubmissionBody(body);
       if (!parsedBody) {
         console.log(`[champion-submit] ip=${clientIp} result=rejected reason=invalid-payload`);
+        await recordAuditEvent(store, {
+          eventType: "champion-direct-write",
+          outcome: "rejected",
+          ipHash: writeCheck.clientIpHash,
+          userAgent: writeCheck.userAgent,
+          reason: "Expected { playerName, scoreHalfPoints, controlMode, telemetry, sessionToken }.",
+        });
         return errorResponse(400, "Expected { playerName, scoreHalfPoints, controlMode, telemetry, sessionToken }.");
       }
 
       // ── Telemetry validation ────────────────────────────────────────────
+      if (!parsedBody.telemetry) {
+        console.log(`[champion-submit] ip=${clientIp} result=rejected reason=missing-telemetry`);
+        return errorResponse(400, "Missing telemetry.");
+      }
       const telemetryResult = validateTelemetry(parsedBody.scoreHalfPoints, parsedBody.telemetry);
       if (!telemetryResult.valid) {
         console.log(
@@ -146,6 +209,18 @@ export async function handleSharedChampionRequest(
         `[champion-submit] ip=${clientIp} name=${parsedBody.playerName} score=${parsedBody.scoreHalfPoints} mode=${parsedBody.controlMode} result=${result.updated ? "accepted" : "not-higher"}`,
       );
 
+      await recordAuditEvent(store, {
+        eventType: "champion-direct-write",
+        outcome: "accepted",
+        ipHash: writeCheck.clientIpHash,
+        userAgent: writeCheck.userAgent,
+        payload: {
+          playerName: parsedBody.playerName,
+          scoreHalfPoints: parsedBody.scoreHalfPoints,
+          controlMode: parsedBody.controlMode,
+          updated: result.updated,
+        },
+      });
       return jsonResponse(result);
     }
 
