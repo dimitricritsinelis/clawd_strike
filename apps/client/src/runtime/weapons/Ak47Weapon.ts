@@ -10,7 +10,7 @@ import {
 
 const MAG_CAPACITY = 30;
 const RESERVE_START = 90;
-const RELOAD_TIME_S = 2.45;
+const RELOAD_TIME_S = 1.225;
 
 export type Ak47AmmoSnapshot = {
   mag: number;
@@ -47,6 +47,7 @@ export class Ak47Weapon {
   // Callbacks for audio events
   onReloadStart: (() => void) | null = null;
   onReloadEnd: (() => void) | null = null;
+  onReloadCancel: (() => void) | null = null;
   onDryFire: (() => void) | null = null;
 
   // Dry-fire rate-limiting: only click once per trigger pull
@@ -62,10 +63,11 @@ export class Ak47Weapon {
   }
 
   reset(): void {
+    if (this.reloading) {
+      this.cancelReload(true);
+    }
     this.mag = MAG_CAPACITY;
     this.reserve = RESERVE_START;
-    this.reloading = false;
-    this.reloadTimerS = 0;
     this.reloadQueued = false;
     this.dryFireCooldownS = 0;
     this.wasFireHeld = false;
@@ -99,8 +101,7 @@ export class Ak47Weapon {
 
       // Reload cancel: if trigger is pulled mid-reload and mag has bullets, interrupt
       if (input.fireHeld && !this.wasFireHeld && this.mag > 0) {
-        this.reloading = false;
-        this.reloadTimerS = 0;
+        this.cancelReload(true);
         this.wasFireHeld = input.fireHeld;
         return this.forwardToFireController(input, input.fireHeld, this.mag, onShot);
       }
@@ -176,6 +177,15 @@ export class Ak47Weapon {
     this.fireController.cancelTrigger();
     this.onReloadStart?.();
     return true;
+  }
+
+  private cancelReload(emitCallback: boolean): void {
+    if (!this.reloading) return;
+    this.reloading = false;
+    this.reloadTimerS = 0;
+    if (emitCallback) {
+      this.onReloadCancel?.();
+    }
   }
 
   private completeReload(): void {

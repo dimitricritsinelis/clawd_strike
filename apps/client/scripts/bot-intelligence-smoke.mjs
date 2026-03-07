@@ -418,11 +418,9 @@ try {
 
   const checkpoints = [
     { id: "t0", advanceMs: 0 },
-    { id: "t25", advanceMs: 25_000 },
-    { id: "t50", advanceMs: 25_000 },
-    { id: "t90", advanceMs: 40_000 },
-    { id: "t135", advanceMs: 45_000 },
-    { id: "t180", advanceMs: 45_000 },
+    { id: "t15", advanceMs: 15_000 },
+    { id: "t30", advanceMs: 15_000 },
+    { id: "t60", advanceMs: 30_000 },
   ];
 
   for (const checkpoint of checkpoints) {
@@ -463,7 +461,7 @@ try {
   await enforceHiddenPlayerPose(page, { suppressIntelMs: 55_000 });
   summary.zeroContact.checkpoints.push(await captureCheckpoint(page, zeroContactOutputDir, consoleRecorder, "post-teleport"));
 
-  const zeroContactTargetsS = [45, 90, 150, 210];
+  const zeroContactTargetsS = [15, 30, 60, 90];
   let zeroContactDeathAtS = null;
   for (const targetS of zeroContactTargetsS) {
     consoleRecorder.clear();
@@ -500,7 +498,7 @@ try {
   consoleRecorder.clear();
   summary.hiddenSearch.checkpoints.push(await captureCheckpoint(page, hiddenOutputDir, consoleRecorder, "post-route"));
 
-  const hiddenTargetsS = [60, 90, 135, 180, 225];
+  const hiddenTargetsS = [30, 60, 90];
   let hiddenDeathAtS = null;
   for (const targetS of hiddenTargetsS) {
     consoleRecorder.clear();
@@ -563,33 +561,32 @@ try {
   const zeroContactCheckpointMap = new Map(summary.zeroContact.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint.state]));
   const hiddenCheckpointMap = new Map(summary.hiddenSearch.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint.state]));
   const t0 = checkpointMap.get("t0");
-  const t25 = checkpointMap.get("t25");
-  const t50 = checkpointMap.get("t50");
-  const t135 = checkpointMap.get("t135");
-  const t180 = checkpointMap.get("t180");
+  const t15 = checkpointMap.get("t15");
+  const t30 = checkpointMap.get("t30");
+  const t60 = checkpointMap.get("t60");
   const zeroContactPostTeleport = zeroContactCheckpointMap.get("post-teleport");
-  const zeroContactT45 = zeroContactCheckpointMap.get("t45");
-  const zeroContactT210 = zeroContactCheckpointMap.get("t210");
+  const zeroContactT15 = zeroContactCheckpointMap.get("t15");
+  const zeroContactT30 = zeroContactCheckpointMap.get("t30");
+  const zeroContactT90 = zeroContactCheckpointMap.get("t90");
   const hiddenPostRoute = hiddenCheckpointMap.get("post-route");
+  const hiddenT30 = hiddenCheckpointMap.get("t30");
   const hiddenT60 = hiddenCheckpointMap.get("t60");
-  const hiddenT135 = hiddenCheckpointMap.get("t135");
-  const hiddenT180 = hiddenCheckpointMap.get("t180");
-  const hiddenT225 = hiddenCheckpointMap.get("t225");
+  const hiddenT90 = hiddenCheckpointMap.get("t90");
   const respawnState = summary.respawnScenario.checkpoint?.state ?? null;
   const respawnTelemetry = respawnState?.bots?.lastSpawn ?? null;
-  if (!t0 || !t25 || !t50 || !t135 || !t180 || !zeroContactPostTeleport || !zeroContactT45 || !zeroContactT210 || !hiddenPostRoute || !hiddenT60 || !hiddenT135 || !hiddenT180 || !hiddenT225 || !respawnState || !respawnTelemetry) {
+  if (!t0 || !t15 || !t30 || !t60 || !zeroContactPostTeleport || !zeroContactT15 || !zeroContactT30 || !zeroContactT90 || !hiddenPostRoute || !hiddenT30 || !hiddenT60 || !hiddenT90 || !respawnState || !respawnTelemetry) {
     fail("Missing one or more checkpoint states");
   }
   const initialTelemetry = t0.bots.lastSpawn ?? null;
   const initialLaneCounts = laneCounts(t0);
-  const settledAtT50 = countSettledEnemies(t50);
-  const stableAimAtT50 = countStableAimEnemies(t50);
+  const settledAtT30 = countSettledEnemies(t30);
+  const stableAimAtT30 = countStableAimEnemies(t30);
   const respawnMinDistance = minimumDistanceToPlayer(respawnState);
 
   const assertions = [
     {
-      label: "starts on wave 1 tier 0",
-      passed: t0.bots.waveNumber === 1 && t0.bots.tier === 0,
+      label: "starts on wave 1 tier 1",
+      passed: t0.bots.waveNumber === 1 && t0.bots.tier === 1,
       detail: `wave=${t0.bots.waveNumber} tier=${t0.bots.tier}`,
     },
     {
@@ -627,42 +624,45 @@ try {
       detail: `minDistance=${minimumDistanceToPlayer(t0).toFixed(2)}`,
     },
     {
-      label: "tier increases at 25s",
-      passed: t25.bots.tier === 0,
-      detail: `tier=${t25.bots.tier} elapsed=${t25.bots.waveElapsedS}`,
+      label: "wave 1 stays on tier 1 through 15s",
+      passed: t15.bots.tier === 1,
+      detail: `tier=${t15.bots.tier} elapsed=${t15.bots.waveElapsedS}`,
     },
     {
-      label: "tier increases again at 50s",
-      passed: t50.bots.tier === 1,
-      detail: `tier=${t50.bots.tier} elapsed=${t50.bots.waveElapsedS}`,
+      label: "wave 1 reaches tier 2 at 30s",
+      passed: t30.bots.tier === 2,
+      detail: `tier=${t30.bots.tier} elapsed=${t30.bots.waveElapsedS}`,
+    },
+    {
+      label: "wave 1 reaches tier 3 at 60s",
+      passed: t60.bots.tier === 3,
+      detail: `tier=${t60.bots.tier} elapsed=${t60.bots.waveElapsedS}`,
     },
     {
       label: "friendly fire stays disabled",
       passed:
         t0.bots.preventedFriendlyFireCount === 0
-        && t25.bots.preventedFriendlyFireCount === 0
-        && t50.bots.preventedFriendlyFireCount === 0,
-      detail: `counts=${[t0.bots.preventedFriendlyFireCount, t25.bots.preventedFriendlyFireCount, t50.bots.preventedFriendlyFireCount].join("/")}`,
+        && t15.bots.preventedFriendlyFireCount === 0
+        && t30.bots.preventedFriendlyFireCount === 0
+        && t60.bots.preventedFriendlyFireCount === 0,
+      detail: `counts=${[t0.bots.preventedFriendlyFireCount, t15.bots.preventedFriendlyFireCount, t30.bots.preventedFriendlyFireCount, t60.bots.preventedFriendlyFireCount].join("/")}`,
     },
     {
-      label: "bots rotate into positions by 25s",
-      passed: countMovedEnemies(t0, t25, 0.75) >= 4,
-      detail: `moved=${countMovedEnemies(t0, t25, 0.75)}`,
+      label: "bots rotate into positions by 15s",
+      passed: countMovedEnemies(t0, t15, 0.75) >= 4,
+      detail: `moved=${countMovedEnemies(t0, t15, 0.75)}`,
     },
     {
-      label: "holding pattern forms by 50s",
-      passed: countSettledEnemies(t50) >= 3,
-      detail: `settled=${countSettledEnemies(t50)}`,
+      label: "full hunt is active and closing by 30s",
+      passed:
+        t30.bots.searchPhase === "pinch"
+        && averageDistanceToPlayer(t30) <= averageDistanceToPlayer(t15) - 1.5,
+      detail: `phase=${t30.bots.searchPhase} avgDist=${averageDistanceToPlayer(t15).toFixed(2)}->${averageDistanceToPlayer(t30).toFixed(2)}`,
     },
     {
-      label: "idle hunt materially closes distance by 135s",
-      passed: averageDistanceToPlayer(t135) <= averageDistanceToPlayer(t50) - 3,
-      detail: `avgDist=${averageDistanceToPlayer(t50).toFixed(2)}->${averageDistanceToPlayer(t135).toFixed(2)}`,
-    },
-    {
-      label: "idle full hunt keeps closing by 180s",
-      passed: averageDistanceToPlayer(t180) <= averageDistanceToPlayer(t50) - 5,
-      detail: `avgDist=${averageDistanceToPlayer(t50).toFixed(2)}->${averageDistanceToPlayer(t180).toFixed(2)}`,
+      label: "pressure keeps closing by 60s",
+      passed: averageDistanceToPlayer(t60) <= averageDistanceToPlayer(t15) - 4,
+      detail: `avgDist=${averageDistanceToPlayer(t15).toFixed(2)}->${averageDistanceToPlayer(t60).toFixed(2)}`,
     },
     {
       label: "long sightline produces overwatch or firing logic",
@@ -673,14 +673,14 @@ try {
       label: "flankers stay gated before T3",
       passed:
         (t0.bots.roleCounts?.flanker ?? 0) === 0
-        && (t25.bots.roleCounts?.flanker ?? 0) === 0
-        && (t50.bots.roleCounts?.flanker ?? 0) === 0,
-      detail: `flankers=${[t0.bots.roleCounts?.flanker ?? 0, t25.bots.roleCounts?.flanker ?? 0, t50.bots.roleCounts?.flanker ?? 0].join("/")}`,
+        && (t15.bots.roleCounts?.flanker ?? 0) === 0
+        && (t30.bots.roleCounts?.flanker ?? 0) === 0,
+      detail: `flankers=${[t0.bots.roleCounts?.flanker ?? 0, t15.bots.roleCounts?.flanker ?? 0, t30.bots.roleCounts?.flanker ?? 0].join("/")}`,
     },
     {
       label: "anti-spazz metrics stay bounded",
-      passed: stableAimAtT50 >= Math.max(3, Math.floor(settledAtT50 * 0.4)),
-      detail: `stableAim=${stableAimAtT50} settled=${settledAtT50}`,
+      passed: stableAimAtT30 >= Math.max(3, Math.floor(settledAtT30 * 0.4)),
+      detail: `stableAim=${stableAimAtT30} settled=${settledAtT30}`,
     },
     {
       label: "zero-contact camper starts hidden and silent",
@@ -691,23 +691,30 @@ try {
       detail: `zone=${zeroContactPostTeleport.player?.zoneId ?? "n/a"} seen=${zeroContactPostTeleport.bots?.lastSeenPlayer ? "yes" : "no"} heard=${zeroContactPostTeleport.bots?.lastHeardPlayer ? "yes" : "no"}`,
     },
     {
-      label: "zero-contact probe fans search tasks across likely lanes by 45s",
+      label: "zero-contact search leaves caution and fans tasks by 15s",
       passed:
-        zeroContactT45.bots?.searchPhase === "probe"
-        && (zeroContactT45.bots?.squadTasks?.length ?? 0) >= 5
-        && new Set((zeroContactT45.bots?.squadTasks ?? []).map((task) => task.zoneId)).size >= 3
-        && (zeroContactT45.bots?.squadTasks ?? []).filter((task) => task.lane === "west").length >= 2,
-      detail: `phase=${zeroContactT45.bots?.searchPhase ?? "n/a"} tasks=${zeroContactT45.bots?.squadTasks?.length ?? 0} westTasks=${(zeroContactT45.bots?.squadTasks ?? []).filter((task) => task.lane === "west").length} uniqueZones=${new Set((zeroContactT45.bots?.squadTasks ?? []).map((task) => task.zoneId)).size}`,
+        zeroContactT15.bots?.searchPhase === "probe"
+        && (zeroContactT15.bots?.squadTasks?.length ?? 0) >= 5
+        && new Set((zeroContactT15.bots?.squadTasks ?? []).map((task) => task.zoneId)).size >= 3
+        && (zeroContactT15.bots?.squadTasks ?? []).filter((task) => task.lane === "west").length >= 2,
+      detail: `phase=${zeroContactT15.bots?.searchPhase ?? "n/a"} tasks=${zeroContactT15.bots?.squadTasks?.length ?? 0} westTasks=${(zeroContactT15.bots?.squadTasks ?? []).filter((task) => task.lane === "west").length} uniqueZones=${new Set((zeroContactT15.bots?.squadTasks ?? []).map((task) => task.zoneId)).size}`,
     },
     {
-      label: "zero-contact hunt kills or hard-pins by 210s",
+      label: "zero-contact full hunt is active by 30s",
       passed:
-        (summary.zeroContact.deathAtS !== null && summary.zeroContact.deathAtS <= 210)
+        zeroContactT30.bots?.searchPhase === "pinch"
+        && (zeroContactT30.bots?.squadTasks?.length ?? 0) >= 5,
+      detail: `phase=${zeroContactT30.bots?.searchPhase ?? "n/a"} tasks=${zeroContactT30.bots?.squadTasks?.length ?? 0}`,
+    },
+    {
+      label: "zero-contact hunt kills or hard-pins by 90s",
+      passed:
+        (summary.zeroContact.deathAtS !== null && summary.zeroContact.deathAtS <= 90)
         || (
-          averageDistanceToPlayer(zeroContactT210) <= 15
-          && countBotsInLane(zeroContactT210, "west") + countBotsInLane(zeroContactT210, "main") >= 6
+          averageDistanceToPlayer(zeroContactT90) <= 15
+          && countBotsInLane(zeroContactT90, "west") + countBotsInLane(zeroContactT90, "main") >= 6
         ),
-      detail: `deathAt=${summary.zeroContact.deathAtS ?? "n/a"} avgDist210=${averageDistanceToPlayer(zeroContactT210).toFixed(2)} westMain210=${countBotsInLane(zeroContactT210, "west") + countBotsInLane(zeroContactT210, "main")}`,
+      detail: `deathAt=${summary.zeroContact.deathAtS ?? "n/a"} avgDist90=${averageDistanceToPlayer(zeroContactT90).toFixed(2)} westMain90=${countBotsInLane(zeroContactT90, "west") + countBotsInLane(zeroContactT90, "main")}`,
     },
     {
       label: "hidden route reaches the west hall",
@@ -718,7 +725,18 @@ try {
       detail: `zones=${summary.hiddenSearch.route?.zonesVisited?.join("/") ?? "n/a"} finalZone=${hiddenPostRoute.player?.zoneId ?? "n/a"}`,
     },
     {
-      label: "hidden-player search commits before the first kill window",
+      label: "hidden-player search commits by 30s",
+      passed:
+        (summary.hiddenSearch.deathAtS !== null && summary.hiddenSearch.deathAtS <= 30)
+        || (
+          hiddenT30.player?.zoneId === "SH_W"
+          && countBotsInLane(hiddenT30, "west") >= 3
+          && averageDistanceToPlayer(hiddenT30) <= averageDistanceToPlayer(hiddenPostRoute) - 4
+        ),
+      detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} west30=${countBotsInLane(hiddenT30, "west")} avgDist=${averageDistanceToPlayer(hiddenPostRoute).toFixed(2)}->${averageDistanceToPlayer(hiddenT30).toFixed(2)} zone30=${hiddenT30.player?.zoneId ?? "n/a"}`,
+    },
+    {
+      label: "hidden-player search keeps collapsing by 60s",
       passed:
         (summary.hiddenSearch.deathAtS !== null && summary.hiddenSearch.deathAtS <= 60)
         || (
@@ -729,19 +747,12 @@ try {
       detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} west60=${countBotsInLane(hiddenT60, "west")} avgDist=${averageDistanceToPlayer(hiddenPostRoute).toFixed(2)}->${averageDistanceToPlayer(hiddenT60).toFixed(2)} zone60=${hiddenT60.player?.zoneId ?? "n/a"}`,
     },
     {
-      label: "no stale overwatch survives late hidden search",
-      passed:
-        (summary.hiddenSearch.deathAtS !== null && summary.hiddenSearch.deathAtS <= 180)
-        || countNoSightOverwatch(hiddenT180) === 0,
-      detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} staleOverwatch=${countNoSightOverwatch(hiddenT180)}`,
-    },
-    {
-      label: "full hunt kills a hidden idle player by 225s",
+      label: "full hunt kills a hidden idle player by 90s",
       passed:
         summary.hiddenSearch.deathAtS !== null
-        && summary.hiddenSearch.deathAtS <= 225
-        && (hiddenT225.gameplay?.alive === false || hiddenT225.gameOver?.visible === true || summary.hiddenSearch.deathAtS <= 225),
-      detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} alive225=${hiddenT225.gameplay?.alive}`,
+        && summary.hiddenSearch.deathAtS <= 90
+        && (hiddenT90.gameplay?.alive === false || hiddenT90.gameOver?.visible === true || summary.hiddenSearch.deathAtS <= 90),
+      detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} alive90=${hiddenT90.gameplay?.alive}`,
     },
     {
       label: "respawn route leaves the authored opening",
@@ -754,9 +765,9 @@ try {
       detail: `eliminated=${summary.respawnScenario.eliminated}`,
     },
     {
-      label: "wave 2 uses adaptive respawn mode",
-      passed: respawnState.bots.waveNumber === 2 && respawnTelemetry.mode === "adaptive",
-      detail: `wave=${respawnState.bots.waveNumber} mode=${respawnTelemetry.mode}`,
+      label: "wave 2 uses adaptive respawn mode under the new tier schedule",
+      passed: respawnState.bots.waveNumber === 2 && respawnState.bots.tier === 1 && respawnTelemetry.mode === "adaptive",
+      detail: `wave=${respawnState.bots.waveNumber} tier=${respawnState.bots.tier} mode=${respawnTelemetry.mode}`,
     },
     {
       label: "adaptive respawn keeps the far-distance floor",

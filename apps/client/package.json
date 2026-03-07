@@ -10,6 +10,7 @@
     "capture:shots": "node scripts/capture-map-shots.mjs",
     "bot:smoke": "node scripts/bot-intelligence-smoke.mjs",
     "smoke:headshot-kill-perf": "node scripts/headshot-kill-perf-smoke.mjs",
+    "smoke:wave-ammo-reset": "node scripts/wave-ammo-reset-smoke.mjs",
     "smoke:no-context": "node scripts/no-context-agent-smoke.mjs",
     "verify:skills-contract": "node scripts/verify-skills-contract.mjs",
     "qa:completion": "node scripts/qa-completion-gate.mjs && node scripts/bot-intelligence-smoke.mjs",

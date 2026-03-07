@@ -24,12 +24,14 @@ import { TimerHud } from "./ui/TimerHud";
 import { DamageNumbers } from "./ui/DamageNumbers";
 import { PauseMenu } from "./ui/PauseMenu";
 import { FadeOverlay } from "./ui/FadeOverlay";
+import { HeadshotBanner } from "./ui/HeadshotBanner";
 import { parseRuntimeUrlParams, sanitizeRuntimePlayerName, type RuntimeControlMode } from "./utils/UrlParams";
 import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
 import type { RuntimeWarmupAssets } from "./warmup";
 import {
   getSharedChampionSnapshot,
   loadSharedChampion,
+  loadSharedChampionWithMeta,
   startSharedChampionRunSession,
   submitSharedChampionRunSession,
   type SharedChampionRunSession,
@@ -94,6 +96,22 @@ type DebugCombatFeedbackPayload = {
   damage?: number;
   enemyName?: string;
 };
+
+function shouldReplaceSharedChampion(
+  currentChampion: SharedChampion | null,
+  nextChampion: SharedChampion | null,
+): boolean {
+  if (nextChampion === null) {
+    return currentChampion === null;
+  }
+  if (currentChampion === null) {
+    return true;
+  }
+  if (nextChampion.scoreHalfPoints !== currentChampion.scoreHalfPoints) {
+    return nextChampion.scoreHalfPoints > currentChampion.scoreHalfPoints;
+  }
+  return nextChampion.updatedAt >= currentChampion.updatedAt;
+}
 
 function collectScenePerfSnapshot(worldScene: { traverse: (cb: (node: unknown) => void) => void }, viewModelScene: { traverse: (cb: (node: unknown) => void) => void } | null): ScenePerfSnapshot {
   const materials = new Set<unknown>();
@@ -718,6 +736,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   });
   const roundEndScreen = new RoundEndScreen(runtimeRoot);
   const timerHud = new TimerHud(runtimeRoot);
+  const headshotBanner = new HeadshotBanner(runtimeRoot);
   const damageNumbers = new DamageNumbers(runtimeRoot);
   const pauseMenu = new PauseMenu(runtimeRoot);
   const fadeOverlay = new FadeOverlay(runtimeRoot);
@@ -1037,6 +1056,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   game.setWeaponCallbacks({
     onReloadStart: () => weaponAudio.playReloadStart(),
     onReloadEnd: () => weaponAudio.playReloadEnd(),
+    onReloadCancel: () => weaponAudio.stopReload(),
     onDryFire: () => weaponAudio.playDryFire(),
   });
 
@@ -1093,11 +1113,12 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       roundEndScreen.hide();
       roundEndShowing = false;
       killFeed.clear();
+      headshotBanner.clear();
       hitMarker.clear();
       hitVignette.clear();
       damageNumbers.clear();
       scoreHud.reset();
-      submittedSharedChampionForCurrentRun = false;
+      sharedChampionFinalizedForCurrentRun = false;
       waveElapsedS = 0;
       timerHud.reset();
       timerHud.start();
@@ -1255,11 +1276,17 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let bestScore = readBestScore(scoreStorageKey);
   scoreHud.setBestScore(bestScore);
   let sharedChampionSnapshot: SharedChampionSnapshot = getSharedChampionSnapshot();
-  let submittedSharedChampionForCurrentRun = false;
+  let sharedChampionFinalizedForCurrentRun = false;
   const applySharedChampionSnapshot = (snapshot: SharedChampionSnapshot): void => {
-    sharedChampionSnapshot = snapshot;
-    scoreHud.setSharedChampion(snapshot);
-    deathScreen.setSharedChampion(snapshot);
+    const nextChampion = shouldReplaceSharedChampion(sharedChampionSnapshot.champion, snapshot.champion)
+      ? snapshot.champion
+      : sharedChampionSnapshot.champion;
+    sharedChampionSnapshot = {
+      status: nextChampion ? "ready" : snapshot.status,
+      champion: nextChampion,
+    };
+    scoreHud.setSharedChampion(sharedChampionSnapshot);
+    deathScreen.setSharedChampion(sharedChampionSnapshot);
   };
   applySharedChampionSnapshot(sharedChampionSnapshot);
   void loadSharedChampion().then((snapshot) => {
@@ -1279,6 +1306,31 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       if (disposed || requestSerial !== sharedChampionRunRequestSerial) return;
       activeSharedChampionRun = session;
     });
+  };
+  const finalizeSharedChampionForDeath = async (input: {
+    lastRunScore: number;
+    sharedChampionRunSummary: SharedChampionRunSummary;
+    runSession: SharedChampionRunSession | null;
+  }): Promise<void> => {
+    const refreshed = await loadSharedChampionWithMeta({ force: true });
+    if (!disposed) {
+      applySharedChampionSnapshot(refreshed.snapshot);
+    }
+
+    const candidateHalfPoints = scoreValueToHalfPoints(input.lastRunScore);
+    const shouldSubmitSharedChampion = !refreshed.loadedFromNetwork
+      || refreshed.snapshot.status === "idle"
+      || refreshed.snapshot.status === "loading"
+      || refreshed.snapshot.status === "unavailable"
+      || isBetterSharedChampionCandidate(refreshed.snapshot.champion, candidateHalfPoints);
+
+    if (!shouldSubmitSharedChampion || !input.runSession) {
+      return;
+    }
+
+    const { snapshot } = await submitSharedChampionRunSession(input.runSession, input.sharedChampionRunSummary);
+    if (disposed) return;
+    applySharedChampionSnapshot(snapshot);
   };
   let lastRunScore: number | null = null;
   let lastRunSummary: PublicAgentRunSummary | null = null;
@@ -1346,6 +1398,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     for (const event of queued) {
       switch (event.type) {
         case "hit": {
+          if (event.isHeadshot) {
+            headshotBanner.trigger();
+          }
           hitMarker.trigger(event.isHeadshot);
           weaponAudio.playHitThud();
           break;
@@ -1644,24 +1699,15 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         writeBestScore(scoreStorageKey, bestScore);
         scoreHud.setBestScore(bestScore);
       }
-      if (!submittedSharedChampionForCurrentRun) {
-        submittedSharedChampionForCurrentRun = true;
-        const candidateHalfPoints = scoreValueToHalfPoints(lastRunScore);
-        const shouldSubmitSharedChampion = sharedChampionSnapshot.status === "idle"
-          || sharedChampionSnapshot.status === "loading"
-          || sharedChampionSnapshot.status === "unavailable"
-          || isBetterSharedChampionCandidate(sharedChampionSnapshot.champion, candidateHalfPoints);
-
-        if (shouldSubmitSharedChampion) {
-          const runSession = activeSharedChampionRun;
-          activeSharedChampionRun = null;
-          if (runSession) {
-            void submitSharedChampionRunSession(runSession, sharedChampionRunSummary).then(({ snapshot }) => {
-              if (disposed) return;
-              applySharedChampionSnapshot(snapshot);
-            });
-          }
-        }
+      if (!sharedChampionFinalizedForCurrentRun) {
+        sharedChampionFinalizedForCurrentRun = true;
+        const runSession = activeSharedChampionRun;
+        activeSharedChampionRun = null;
+        void finalizeSharedChampionForDeath({
+          lastRunScore,
+          sharedChampionRunSummary,
+          runSession,
+        });
       }
     }
     wasAlive = aliveNow;
@@ -1746,6 +1792,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     deathScreen.update(dt);
     scoreHud.update(dt);
     killFeed.update(dt);
+    headshotBanner.update(dt);
     hitMarker.update(dt);
     damageNumbers.update(dt);
 
@@ -1970,6 +2017,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     hitVignette.dispose();
     deathScreen.dispose();
     killFeed.dispose();
+    headshotBanner.dispose();
     hitMarker.dispose();
     scoreHud.dispose();
     roundEndScreen.dispose();

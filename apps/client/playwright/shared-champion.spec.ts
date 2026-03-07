@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type APIResponse } from "@playwright/test";
+import { expect, test, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
 import {
   advanceRuntime,
   gotoAgentRuntimeViaUi,
@@ -7,6 +7,22 @@ import {
 
 function formatScoreHalfPoints(scoreHalfPoints: number): string {
   return (scoreHalfPoints / 2).toLocaleString("en-US");
+}
+
+function createChampion(
+  holderName: string,
+  scoreHalfPoints: number,
+  controlMode: "human" | "agent",
+  updatedAt = "2026-03-07T12:00:00.000Z",
+) {
+  return {
+    holderName,
+    score: scoreHalfPoints / 2,
+    scoreHalfPoints,
+    controlMode,
+    scope: "sitewide" as const,
+    updatedAt,
+  };
 }
 
 function computeFinalScore(kills: number, headshots: number): number {
@@ -193,6 +209,48 @@ async function completeValidatedRun(
     finished,
     summary,
   };
+}
+
+async function forcePositiveScoreViaDebug(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const debugWindow = window as typeof window & {
+      __debug_eliminate_all_bots?: () => number;
+    };
+    if (typeof debugWindow.__debug_eliminate_all_bots !== "function") {
+      throw new Error("Expected __debug_eliminate_all_bots to be available on localhost.");
+    }
+    debugWindow.__debug_eliminate_all_bots();
+  });
+  await advanceRuntime(page, 500);
+  await expect.poll(async () => {
+    const state = await readDocumentedAgentState(page);
+    return state.score?.current ?? 0;
+  }, { timeout: 10_000 }).toBeGreaterThan(0);
+}
+
+async function driveUntilDeath(page: Page): Promise<void> {
+  for (let step = 0; step < 180; step += 1) {
+    const state = await readDocumentedAgentState(page);
+    if (state.gameplay?.alive === false || state.gameplay?.gameOverVisible === true) {
+      return;
+    }
+
+    await page.evaluate(({ stepIndex }) => {
+      const fire = stepIndex % 10 === 0;
+      const moveX = stepIndex % 60 < 30 ? 0.25 : -0.2;
+      const lookYawDelta = stepIndex % 2 === 0 ? 1.35 : -0.7;
+      window.agent_apply_action?.({
+        moveX,
+        moveZ: 1,
+        sprint: true,
+        lookYawDelta,
+        fire,
+      });
+    }, { stepIndex: step });
+    await advanceRuntime(page, 500);
+  }
+
+  throw new Error("Timed out waiting for death.");
 }
 
 test("api blocks raw writes and only accepts validated run submissions", async ({ request }, testInfo) => {
@@ -422,6 +480,174 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
     await contextA.close();
     await contextB.close();
   }
+});
+
+test("refreshes the death-time champion and skips finish when the remote record is already higher", async ({ page }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL as string;
+  const callSequence: string[] = [];
+  let highScoreGetCount = 0;
+  let finishCount = 0;
+  const championAtBoot = createChampion("BootChampion", 40, "agent", "2026-03-07T12:00:00.000Z");
+  const championAtDeath = createChampion("RemoteLeader", 2_000, "human", "2026-03-07T12:05:00.000Z");
+
+  await page.route("**/api/high-score", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    highScoreGetCount += 1;
+    callSequence.push(`GET-high-score-${highScoreGetCount}`);
+    const champion = highScoreGetCount === 1 ? championAtBoot : championAtDeath;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ champion }),
+    });
+  });
+
+  await page.route("**/api/run/start", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({
+        runToken: "death-refresh-no-submit",
+        issuedAt: "2026-03-07T12:00:01.000Z",
+        expiresAt: "2026-03-07T12:30:01.000Z",
+        ruleset: "wave-score-v1-k10-hs2_5",
+      }),
+    });
+  });
+
+  await page.route("**/api/run/finish", async (route) => {
+    finishCount += 1;
+    callSequence.push("POST-run-finish");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({
+        accepted: true,
+        updated: false,
+        champion: championAtDeath,
+        reason: null,
+      }),
+    });
+  });
+
+  await gotoAgentRuntimeViaUi(page, {
+    baseUrl,
+    agentName: "RefreshSkip",
+  });
+
+  await expect(page.getByTestId("hud-world-champion-name")).toHaveText("BOOTCHAMPION");
+  await forcePositiveScoreViaDebug(page);
+  await driveUntilDeath(page);
+
+  await expect(page.getByTestId("death-world-champion-name")).toHaveText("REMOTELEADER");
+  await expect(page.getByTestId("death-world-champion-score")).toHaveText(formatScoreHalfPoints(championAtDeath.scoreHalfPoints));
+  await expect(page.getByTestId("death-world-champion-mode")).toHaveText("HUMAN");
+
+  const state = await readDocumentedAgentState(page);
+  expect(state.gameplay?.gameOverVisible).toBe(true);
+  expect(state.sharedChampion).toEqual(championAtDeath);
+  expect(highScoreGetCount).toBe(2);
+  expect(finishCount).toBe(0);
+  expect(callSequence).toEqual(["GET-high-score-1", "GET-high-score-2"]);
+});
+
+test("refreshes the death-time champion before finish and overwrites when the final score is higher", async ({ page }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL as string;
+  const callSequence: string[] = [];
+  let highScoreGetCount = 0;
+  let finishCount = 0;
+  const championAtBoot = createChampion("BootChampion", 40, "agent", "2026-03-07T12:00:00.000Z");
+  const championAtDeath = createChampion("RemoteLeader", 50, "human", "2026-03-07T12:05:00.000Z");
+
+  await page.route("**/api/high-score", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    highScoreGetCount += 1;
+    callSequence.push(`GET-high-score-${highScoreGetCount}`);
+    const champion = highScoreGetCount === 1 ? championAtBoot : championAtDeath;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ champion }),
+    });
+  });
+
+  await page.route("**/api/run/start", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({
+        runToken: "death-refresh-submit",
+        issuedAt: "2026-03-07T12:00:01.000Z",
+        expiresAt: "2026-03-07T12:30:01.000Z",
+        ruleset: "wave-score-v1-k10-hs2_5",
+      }),
+    });
+  });
+
+  await page.route("**/api/run/finish", async (route) => {
+    finishCount += 1;
+    callSequence.push("POST-run-finish");
+    const payload = route.request().postDataJSON() as {
+      runToken: string;
+      summary?: { finalScore?: number };
+    };
+    expect(payload.runToken).toBe("death-refresh-submit");
+
+    const finalScore = Number(payload.summary?.finalScore ?? 0);
+    const finalScoreHalfPoints = Math.round(finalScore * 2);
+    const submittedChampion = createChampion(
+      "RefreshWinner",
+      finalScoreHalfPoints,
+      "agent",
+      "2026-03-07T12:06:00.000Z",
+    );
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({
+        accepted: true,
+        updated: true,
+        champion: submittedChampion,
+        reason: null,
+      }),
+    });
+  });
+
+  await gotoAgentRuntimeViaUi(page, {
+    baseUrl,
+    agentName: "RefreshWinner",
+  });
+
+  await expect(page.getByTestId("hud-world-champion-name")).toHaveText("BOOTCHAMPION");
+  await forcePositiveScoreViaDebug(page);
+  await driveUntilDeath(page);
+
+  await expect(page.getByTestId("death-world-champion-name")).toHaveText("REFRESHWINNER");
+  const state = await readDocumentedAgentState(page);
+  expect(state.gameplay?.gameOverVisible).toBe(true);
+  expect(state.sharedChampion).toEqual({
+    holderName: "RefreshWinner",
+    score: expect.any(Number),
+    scoreHalfPoints: expect.any(Number),
+    controlMode: "agent",
+    scope: "sitewide",
+    updatedAt: "2026-03-07T12:06:00.000Z",
+  });
+  expect((state.sharedChampion?.score ?? 0)).toBeGreaterThan(championAtDeath.score);
+  expect(highScoreGetCount).toBe(2);
+  expect(finishCount).toBe(1);
+  expect(callSequence.indexOf("GET-high-score-2")).toBeGreaterThan(-1);
+  expect(callSequence.indexOf("POST-run-finish")).toBeGreaterThan(-1);
+  expect(callSequence.indexOf("GET-high-score-2")).toBeLessThan(callSequence.indexOf("POST-run-finish"));
 });
 
 test("keeps the game bootable when the shared champion API is unavailable", async ({ page }, testInfo) => {

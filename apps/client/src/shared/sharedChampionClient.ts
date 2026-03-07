@@ -20,9 +20,14 @@ export type SharedChampionRunSession = {
   expiresAt: string;
 };
 
+export type LoadSharedChampionResult = {
+  snapshot: SharedChampionSnapshot;
+  loadedFromNetwork: boolean;
+};
+
 let status: SharedChampionSnapshotStatus = "idle";
 let champion: SharedChampion | null = null;
-let pendingLoad: Promise<SharedChampionSnapshot> | null = null;
+let pendingLoad: Promise<LoadSharedChampionResult> | null = null;
 
 function snapshot(): SharedChampionSnapshot {
   return {
@@ -35,9 +40,12 @@ export function getSharedChampionSnapshot(): SharedChampionSnapshot {
   return snapshot();
 }
 
-export async function loadSharedChampion(options: { force?: boolean } = {}): Promise<SharedChampionSnapshot> {
+export async function loadSharedChampionWithMeta(options: { force?: boolean } = {}): Promise<LoadSharedChampionResult> {
   if (!options.force && status === "ready") {
-    return snapshot();
+    return {
+      snapshot: snapshot(),
+      loadedFromNetwork: false,
+    };
   }
   if (pendingLoad) {
     return pendingLoad;
@@ -60,18 +68,29 @@ export async function loadSharedChampion(options: { force?: boolean } = {}): Pro
 
       champion = parsed.champion;
       status = "ready";
-      return snapshot();
+      return {
+        snapshot: snapshot(),
+        loadedFromNetwork: true,
+      };
     })
     .catch((error) => {
       console.warn("[shared-champion] failed to load", error);
       status = champion ? "ready" : "unavailable";
-      return snapshot();
+      return {
+        snapshot: snapshot(),
+        loadedFromNetwork: false,
+      };
     })
     .finally(() => {
       pendingLoad = null;
     });
 
   return pendingLoad;
+}
+
+export async function loadSharedChampion(options: { force?: boolean } = {}): Promise<SharedChampionSnapshot> {
+  const result = await loadSharedChampionWithMeta(options);
+  return result.snapshot;
 }
 
 export async function startSharedChampionRunSession(

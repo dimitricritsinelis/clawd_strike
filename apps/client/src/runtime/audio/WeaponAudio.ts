@@ -1,9 +1,13 @@
 const AK47_CLOSE_BASENAME = "/assets/audio/weapons/ak47/fire_close_01";
 const AK47_TAIL_BASENAME = "/assets/audio/weapons/ak47/fire_tail_01";
+const AK47_RELOAD_BASENAME = "/assets/audio/weapons/ak47/reload";
+const KILL_DING_BASENAME = "/assets/audio/ui/kill_ding";
 // Prefer mp3 first: the deployed site ships mp3, and probing for ogg first creates noisy 404s in the console.
 const AUDIO_EXTENSIONS = [".mp3", ".ogg", ".wav"] as const;
 const FALLBACK_NOISE_SECONDS = 0.22;
 const EVENT_NOISE_POOL_SIZE = 4;
+const KILL_DING_TRIM_START_S = 0.26;
+const PLAYER_RELOAD_AUDIO_TARGET_DURATION_S = 1.2;
 
 export const AK47_AUDIO_TUNING = {
   player: {
@@ -51,6 +55,7 @@ type Ak47BufferPlaybackOptions = {
   highShelfGainDb?: number;
   driveCurve?: Float32Array;
   lowpassFrequencyHz?: number;
+  offsetSeconds?: number;
 };
 
 function clamp01(value: number): number {
@@ -73,6 +78,7 @@ function createDriveCurve(samples: number, amount: number): Float32Array {
 const DRIVE_CURVE = createDriveCurve(512, 1.35);
 const PLAYER_AK47_DRIVE_CURVE = createDriveCurve(512, AK47_AUDIO_TUNING.player.transientDrive);
 const ENEMY_AK47_DRIVE_CURVE = createDriveCurve(512, AK47_AUDIO_TUNING.enemy.transientDrive);
+const KILL_DING_DRIVE_CURVE = createDriveCurve(512, 1.05);
 
 export class WeaponAudio {
   private audioContext: AudioContext | null = null;
@@ -83,6 +89,8 @@ export class WeaponAudio {
 
   private closeBuffer: AudioBuffer | null = null;
   private tailBuffer: AudioBuffer | null = null;
+  private reloadBuffer: AudioBuffer | null = null;
+  private killDingBuffer: AudioBuffer | null = null;
   private fallbackNoiseBuffer: AudioBuffer | null = null;
 
   private loadPromise: Promise<void> | null = null;
@@ -96,6 +104,8 @@ export class WeaponAudio {
 
   private footstepNoiseBuffer: AudioBuffer | null = null;
   private footstepAlt = false;
+  private activeReloadSource: AudioBufferSourceNode | null = null;
+  private activeReloadCleanup: (() => void) | null = null;
 
   // Ambient audio: low wind loop
   private ambientSource: AudioBufferSourceNode | null = null;
@@ -287,8 +297,8 @@ export class WeaponAudio {
   }
 
   /**
-   * Satisfying metallic "ding" played on a confirmed enemy kill.
-   * Synthesized: sine wave at ~1200Hz with exponential decay (~220ms).
+   * Kill-confirm cue played on a confirmed enemy kill.
+   * Prefers the shipped sample and falls back to the older synthesized ding if the asset fails to load.
    */
   playKillDing(): void {
     const ctx = this.ensureAudioGraph();
@@ -296,6 +306,25 @@ export class WeaponAudio {
     if (ctx.state === "suspended") return;
 
     const now = ctx.currentTime;
+    if (this.killDingBuffer) {
+      this.playBuffer(
+        this.killDingBuffer,
+        now,
+        this.randRange(0.99, 1.01),
+        1.2,
+        {
+          attackSeconds: 0,
+          lowShelfGainDb: 0,
+          highShelfFrequencyHz: 3400,
+          highShelfGainDb: -1.5,
+          driveCurve: KILL_DING_DRIVE_CURVE,
+          lowpassFrequencyHz: 10000,
+          offsetSeconds: KILL_DING_TRIM_START_S,
+        },
+      );
+      return;
+    }
+
     const FREQ = this.randRange(1180, 1260); // slight pitch variation
     const DURATION_S = 0.22;
 
@@ -435,9 +464,15 @@ export class WeaponAudio {
   playReloadStart(): void {
     const ctx = this.ensureAudioGraph();
     if (!ctx || !this.compressor) return;
+    this.ensureBuffersLoaded();
     if (ctx.state === "suspended") return;
 
     const now = ctx.currentTime;
+    if (this.reloadBuffer) {
+      this.playReloadClip(now);
+      return;
+    }
+
     const DURATION_S = 0.12;
     if (!this.reloadStartNoisePool) {
       this.reloadStartNoisePool = this.buildNoisePool(ctx, DURATION_S);
@@ -490,6 +525,11 @@ export class WeaponAudio {
     const ctx = this.ensureAudioGraph();
     if (!ctx || !this.compressor) return;
     if (ctx.state === "suspended") return;
+
+    if (this.reloadBuffer) {
+      this.stopReload();
+      return;
+    }
 
     const now = ctx.currentTime;
 
@@ -546,6 +586,24 @@ export class WeaponAudio {
       osc.disconnect();
       oscGain.disconnect();
     };
+  }
+
+  stopReload(): void {
+    if (this.activeReloadSource) {
+      this.activeReloadSource.onended = null;
+      try {
+        this.activeReloadSource.stop();
+      } catch {
+        // Source may have already ended.
+      }
+      this.activeReloadSource.disconnect();
+      this.activeReloadSource = null;
+    }
+
+    if (this.activeReloadCleanup) {
+      this.activeReloadCleanup();
+      this.activeReloadCleanup = null;
+    }
   }
 
   /**
@@ -648,8 +706,11 @@ export class WeaponAudio {
     }
     this.ambientRunning = false;
     this.loadPromise = null;
+    this.stopReload();
     this.closeBuffer = null;
     this.tailBuffer = null;
+    this.reloadBuffer = null;
+    this.killDingBuffer = null;
     this.fallbackNoiseBuffer = null;
     this.hitThudNoisePool = null;
     this.dryFireNoisePool = null;
@@ -721,13 +782,17 @@ export class WeaponAudio {
     if (!ctx) return;
 
     this.loadPromise = (async () => {
-      const [closeLayer, tailLayer] = await Promise.all([
+      const [closeLayer, tailLayer, reloadLayer, killDingLayer] = await Promise.all([
         this.loadLayerWithExtensions(ctx, AK47_CLOSE_BASENAME),
         this.loadLayerWithExtensions(ctx, AK47_TAIL_BASENAME),
+        this.loadLayerWithExtensions(ctx, AK47_RELOAD_BASENAME),
+        this.loadLayerWithExtensions(ctx, KILL_DING_BASENAME),
       ]);
 
       this.closeBuffer = closeLayer.buffer;
       this.tailBuffer = tailLayer.buffer;
+      this.reloadBuffer = reloadLayer.buffer;
+      this.killDingBuffer = killDingLayer.buffer;
 
       if (!this.didLogMissingAssetWarning && !closeLayer.buffer) {
         console.warn(
@@ -850,7 +915,8 @@ export class WeaponAudio {
       drive.connect(destination);
     }
 
-    source.start(startTime);
+    const offsetSeconds = Math.max(0, options.offsetSeconds ?? 0);
+    source.start(startTime, Math.min(offsetSeconds, Math.max(0, buffer.duration - 0.001)));
     source.onended = () => {
       source.disconnect();
       gainNode.disconnect();
@@ -860,6 +926,62 @@ export class WeaponAudio {
       drive.disconnect();
       lowpass?.disconnect();
     };
+  }
+
+  private playReloadClip(startTime: number): void {
+    if (!this.audioContext || !this.playerGunGain || !this.reloadBuffer) return;
+
+    this.stopReload();
+
+    const source = this.audioContext.createBufferSource();
+    source.buffer = this.reloadBuffer;
+    source.playbackRate.value = Math.max(
+      0.85,
+      Math.min(1.05, this.reloadBuffer.duration / PLAYER_RELOAD_AUDIO_TARGET_DURATION_S),
+    );
+
+    const highpass = this.audioContext.createBiquadFilter();
+    highpass.type = "highpass";
+    highpass.frequency.value = 80;
+    highpass.Q.value = 0.7;
+
+    const lowShelf = this.audioContext.createBiquadFilter();
+    lowShelf.type = "lowshelf";
+    lowShelf.frequency.value = 140;
+    lowShelf.gain.value = 1.8;
+
+    const highShelf = this.audioContext.createBiquadFilter();
+    highShelf.type = "highshelf";
+    highShelf.frequency.value = 3600;
+    highShelf.gain.value = -0.8;
+
+    const gainNode = this.audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.72, startTime);
+
+    source.connect(highpass);
+    highpass.connect(lowShelf);
+    lowShelf.connect(highShelf);
+    highShelf.connect(gainNode);
+    gainNode.connect(this.playerGunGain);
+
+    const cleanup = (): void => {
+      source.disconnect();
+      highpass.disconnect();
+      lowShelf.disconnect();
+      highShelf.disconnect();
+      gainNode.disconnect();
+      if (this.activeReloadCleanup === cleanup) {
+        this.activeReloadCleanup = null;
+      }
+      if (this.activeReloadSource === source) {
+        this.activeReloadSource = null;
+      }
+    };
+
+    this.activeReloadSource = source;
+    this.activeReloadCleanup = cleanup;
+    source.onended = cleanup;
+    source.start(startTime);
   }
 
   private playFallbackCrack(

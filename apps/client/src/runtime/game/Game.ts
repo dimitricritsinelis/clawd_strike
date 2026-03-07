@@ -692,7 +692,10 @@ export class Game {
   }
 
   setEnemyNewWaveCallback(cb: (wave: number) => void): void {
-    this.enemyManager?.setNewWaveCallback(cb);
+    this.enemyManager?.setNewWaveCallback((wave) => {
+      this.weapon.reset();
+      cb(wave);
+    });
   }
 
   reportPlayerGunshot(): void {
@@ -719,10 +722,12 @@ export class Game {
   setWeaponCallbacks(cbs: {
     onReloadStart?: () => void;
     onReloadEnd?: () => void;
+    onReloadCancel?: () => void;
     onDryFire?: () => void;
   }): void {
     if (cbs.onReloadStart !== undefined) this.weapon.onReloadStart = cbs.onReloadStart;
     if (cbs.onReloadEnd !== undefined) this.weapon.onReloadEnd = cbs.onReloadEnd;
+    if (cbs.onReloadCancel !== undefined) this.weapon.onReloadCancel = cbs.onReloadCancel;
     if (cbs.onDryFire !== undefined) this.weapon.onDryFire = cbs.onDryFire;
   }
 

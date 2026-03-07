@@ -45,9 +45,10 @@ Last updated: 2026-03-07
 - Keep agent-only deploy or debug bundles outside the repo root unless agent-driven deploy or debug becomes an explicit repo workflow requirement.
 
 ## DEC-008: Hunt pressure prevents indefinite round stalling
-- Bot behavior includes a "hunt pressure" system (`HUNT_ACTIVATION_S = 45`, `HUNT_FULL_S = 180`) that forces progressively more aggressive behavior over time within a round.
+- Bot behavior includes a "hunt pressure" system (`HUNT_ACTIVATION_S = 10`, `HUNT_FULL_S = 30`) that forces progressively more aggressive behavior over time within a round.
 - Hunt pressure is independent of tier/difficulty — it ensures that no round can stall indefinitely regardless of how low the current difficulty is.
-- Effects ramp continuously from 45s to 180s: OVERWATCH hold distance shrinks (18m → 1.8m), flank budgets grow, shared-knowledge trust rises, collapse scoring strengthens, and directive commit windows shorten.
+- Effects ramp continuously from 10s to 30s: OVERWATCH hold distance shrinks (18m → 1.8m), flank budgets grow, shared-knowledge trust rises, collapse scoring strengthens, and directive commit windows shorten.
+- The search-phase ladder now compresses with that same window: caution before 10s, probe/sweep/collapse during the 10-30s ramp, and pinch at 30s full hunt.
 - Hunt uses uncertain zone/node estimates with delayed squad sharing rather than exact player-coordinate injection. Full hunt must replan destinations into likely contact zones, not just relabel states.
 - Zero-contact rounds must still bootstrap a believable search from enemy-spawn inference, cleared-zone elimination, and coordinated lane tasks; the squad may not wait forever for first sight or sound before beginning the hunt.
 - This guarantees that idle or hidden players are eventually collapsed on without wallhack-like omniscience, which is required for both human gameplay feel and RL agent training signal.

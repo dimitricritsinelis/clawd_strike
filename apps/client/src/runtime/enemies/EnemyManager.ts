@@ -53,8 +53,8 @@ const INITIAL_SPAWN_MAX_PER_LANE = 4;
 const TACTICAL_LANES: readonly TacticalLane[] = ["west", "main", "east"] as const;
 
 /** Hunt pressure: forces increasingly aggressive behavior over time to prevent stalling. */
-const HUNT_ACTIVATION_S = 45;
-const HUNT_FULL_S = 180;
+const HUNT_ACTIVATION_S = 10;
+const HUNT_FULL_S = 30;
 
 const STATE_COMMIT_S: Record<EnemyState, number> = {
   HOLD: 1.0,
@@ -308,7 +308,7 @@ function zoneSearchSeedReason(phase: SearchPhase, source: string): string {
 }
 
 export function resolveEnemyTier(waveNumber: number, waveElapsedS: number): number {
-  const baseTier = Math.min(Math.max(0, Math.floor((waveNumber - 1) / 2)), 3);
+  const baseTier = Math.min(Math.max(0, Math.floor((waveNumber - 1) / 2) + 1), 4);
   const timeBonus = (waveElapsedS >= 30 ? 1 : 0) + (waveElapsedS >= 60 ? 1 : 0);
   return clampEnemyTier(baseTier + timeBonus);
 }
@@ -1346,7 +1346,9 @@ export class EnemyManager {
   ): EnemyDirective {
     const role = this.blackboard.assignedRoleByEnemyId.get(controller.id) ?? "rifler";
     const roleRank = this.blackboard.roleRankByEnemyId.get(controller.id) ?? 0;
-    const effectiveActiveFlankers = Math.max(tierProfile.activeFlankers, pressureProfile.flankBudget);
+    const effectiveActiveFlankers = tierProfile.activeFlankers > 0
+      ? Math.max(tierProfile.activeFlankers, pressureProfile.flankBudget)
+      : 0;
     const activeRole: EnemyRole =
       role === "flanker" && roleRank >= effectiveActiveFlankers
         ? "rifler"
@@ -1660,9 +1662,10 @@ export class EnemyManager {
 
   private resolveSearchPhase(): SearchPhase {
     if (this.waveElapsedS < HUNT_ACTIVATION_S) return "caution";
-    if (this.waveElapsedS < 90) return "probe";
-    if (this.waveElapsedS < 150) return "sweep";
-    if (this.waveElapsedS < 210) return "collapse";
+    const normalizedPressure = Math.min(1.0, Math.max(0, (this.waveElapsedS - HUNT_ACTIVATION_S) / (HUNT_FULL_S - HUNT_ACTIVATION_S)));
+    if (normalizedPressure < (1 / 3)) return "probe";
+    if (normalizedPressure < (7 / 9)) return "sweep";
+    if (normalizedPressure < 1) return "collapse";
     return "pinch";
   }
 

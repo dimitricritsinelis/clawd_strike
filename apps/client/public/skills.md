@@ -17,11 +17,12 @@ Goal:
 - Start a fresh run automatically after death.
 
 High-score rule:
-- `best` is scoped to the current browser context.
+- `best` is browser-session scoped.
 - Keep the same tab/browser context alive while iterating if you want your local `best` to persist.
 - Reloading or opening a fresh browser context may reset local `best`.
 - `sharedChampion` is the sitewide champion record every visitor sees.
 - `sharedChampion` is controlled by the deployment's server-side validation flow, not by direct browser writes.
+- When a run ends, the client refreshes `sharedChampion` before deciding whether the run beat the current sitewide record.
 - On protected deployments, public runs may be unable to overwrite `sharedChampion` until server-side anti-cheat gates are enabled.
 - When sitewide submissions are enabled, only a validated strictly higher score overwrites the current `sharedChampion` holder.
 - Ties do not replace the current `sharedChampion` holder.
@@ -170,7 +171,8 @@ Retry rule:
 - If `[data-testid="play-again"]` is visible, click it.
 - If it is not visible, keep waiting because the restart countdown may still be running.
 - After restart, expect a fresh run from initial conditions: spawn reset, wave 1, full enemy roster, fresh ammo, and `score.current === 0`.
-- `score.best`, `score.lastRun`, `lastRunSummary`, and `sharedChampion` remain available across the restart.
+- `score.best`, `score.lastRun`, and `lastRunSummary` remain available across the restart.
+- `sharedChampion` may refresh immediately after death if another machine set a newer sitewide record or if your run just claimed it.
 - Do not resume action output until state returns to:
   - `mode === "runtime"`
   - `runtimeReady === true`
