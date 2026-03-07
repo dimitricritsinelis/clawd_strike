@@ -131,7 +131,7 @@ try {
   const initialAmmo = initialState.ammo;
   const initialWaveNumber = initialState.bots?.waveNumber ?? 0;
   assert(initialAmmo?.mag === 30, `Expected initial magazine to be 30, got ${initialAmmo?.mag ?? "n/a"}`);
-  assert(initialAmmo?.reserve === 90, `Expected initial reserve to be 90, got ${initialAmmo?.reserve ?? "n/a"}`);
+  assert(initialAmmo?.reserve === 120, `Expected initial reserve to be 120, got ${initialAmmo?.reserve ?? "n/a"}`);
 
   await applyAction(page, { fire: true });
   const spentAmmoState = await waitFor(
@@ -154,7 +154,7 @@ try {
   const reloadCompletedState = await readAmmoWaveState(page);
   assert(
     reloadCompletedState.ammo?.reloading === false &&
-      (reloadCompletedState.ammo?.reserve ?? 90) < 90 &&
+      (reloadCompletedState.ammo?.reserve ?? 120) < 120 &&
       reloadCompletedState.ammo?.mag === 30,
     `Expected reload to finish within ${FAST_RELOAD_ASSERTION_WINDOW_S}s, got ` +
       `${reloadCompletedState.ammo?.mag ?? "n/a"}/${reloadCompletedState.ammo?.reserve ?? "n/a"} ` +
@@ -192,7 +192,7 @@ try {
   await page.screenshot({ path: path.join(OUTPUT_DIR, "next-wave-ammo-reset.png") });
 
   assert(nextWaveState.ammo?.mag === 30, `Expected new-wave mag to reset to 30, got ${nextWaveState.ammo?.mag ?? "n/a"}`);
-  assert(nextWaveState.ammo?.reserve === 90, `Expected new-wave reserve to reset to 90, got ${nextWaveState.ammo?.reserve ?? "n/a"}`);
+  assert(nextWaveState.ammo?.reserve === 120, `Expected new-wave reserve to reset to 120, got ${nextWaveState.ammo?.reserve ?? "n/a"}`);
   assert(nextWaveState.ammo?.reloading === false, "Expected new-wave ammo to cancel any active reload");
 
   if (consoleRecorder.counts().errorCount > 0) {
