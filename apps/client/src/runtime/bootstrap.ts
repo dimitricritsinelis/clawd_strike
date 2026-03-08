@@ -23,6 +23,7 @@ import { RoundEndScreen, type RoundStats } from "./ui/RoundEndScreen";
 import { TimerHud } from "./ui/TimerHud";
 import { DamageNumbers } from "./ui/DamageNumbers";
 import { PauseMenu } from "./ui/PauseMenu";
+import { ControlsOverlay } from "./ui/ControlsOverlay";
 import { FadeOverlay } from "./ui/FadeOverlay";
 import { HeadshotBanner } from "./ui/HeadshotBanner";
 import { parseRuntimeUrlParams, sanitizeRuntimePlayerName, type RuntimeControlMode } from "./utils/UrlParams";
@@ -754,6 +755,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const headshotBanner = new HeadshotBanner(runtimeRoot);
   const damageNumbers = new DamageNumbers(runtimeRoot);
   const pauseMenu = new PauseMenu(runtimeRoot);
+  const controlsOverlay = new ControlsOverlay(runtimeRoot);
   const fadeOverlay = new FadeOverlay(runtimeRoot);
   killFeed.prewarm(4);
   damageNumbers.prewarm(4);
@@ -1085,6 +1087,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     const lobbyUrl = `${window.location.origin}${window.location.pathname}`;
     window.location.href = lobbyUrl;
   };
+  pauseMenu.onShowControls = () => {
+    controlsOverlay.show();
+  };
 
   // Wire kill feed
   // Wire kill events → feed + ding + score counter
@@ -1154,6 +1159,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       beginSharedChampionRun();
       game.setFreezeInput(false);
       pauseMenu.hide();
+      controlsOverlay.hide();
       if (runtimeParams.controlMode === "human") {
         void renderer.canvas.requestPointerLock();
       }
@@ -1671,8 +1677,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     const renderFrame = options.renderFrame ?? true;
     applyQueuedAgentActions();
 
-    // Freeze game input when pause menu is open (death-freeze is managed inside Game.ts)
-    if (pauseMenu.isVisible()) {
+    // Freeze game input when pause menu or controls overlay is open (death-freeze is managed inside Game.ts)
+    if (pauseMenu.isVisible() || controlsOverlay.isVisible()) {
       game.setFreezeInput(true);
     } else if (!game.getIsDead() && !inputFrozen) {
       game.setFreezeInput(false);
@@ -1785,8 +1791,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       healthHud.update({ health: currentHealth }, dt);
     }
 
-    // Update pause menu
+    // Update pause menu and controls overlay
     pauseMenu.update(dt);
+    controlsOverlay.update(dt);
 
     // ── Timer: pause while dead or round-end showing ─────────────────────────
     if (game.getIsDead() || roundEndShowing) {
@@ -1947,6 +1954,12 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (e.code !== "Escape") return;
     if (game.getIsDead()) return; // ignore Esc on death screen
     if (inputFrozen) return;
+    // If controls overlay is open, close it (pause menu stays visible)
+    if (controlsOverlay.isVisible()) {
+      controlsOverlay.hide();
+      controlsOverlay.onClose?.();
+      return;
+    }
     // When Escape is pressed, pointer lock exits first (browser default),
     // then we show the pause menu.
     // If we're already showing pause, hide it and try to re-lock.
@@ -2039,6 +2052,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     timerHud.dispose();
     damageNumbers.dispose();
     pauseMenu.dispose();
+    controlsOverlay.dispose();
     fadeOverlay.dispose();
     window.removeEventListener("keydown", onKeyDownPause);
     propModels?.dispose();
