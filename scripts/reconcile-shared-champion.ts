@@ -108,12 +108,12 @@ async function main(): Promise<void> {
       console.log(
         `champion row: ${report.championDrift.championHolderName} `
         + `(${report.championDrift.championHolderMode}) `
-        + `${report.championDrift.championScoreHalfPoints}`,
+        + `${report.championDrift.championScore}`,
       );
       console.log(
         `best run: ${report.championDrift.bestRunHolderName} `
         + `(${report.championDrift.bestRunHolderMode}) `
-        + `${report.championDrift.bestRunScoreHalfPoints} `
+        + `${report.championDrift.bestRunScore} `
         + `[${report.championDrift.bestRunId}]`,
       );
     }

@@ -220,6 +220,11 @@ const CREATE_NAME_ROLLUPS_VIEW_SQL = `
   GROUP BY player_name_key;
 `;
 
+const DROP_ROLLUPS_VIEWS_SQL = `
+  DROP VIEW IF EXISTS shared_champion_daily_rollups_v1;
+  DROP VIEW IF EXISTS shared_champion_name_rollups_v1;
+`;
+
 const SELECT_CHAMPION_SQL = `
   SELECT score, holder_name, holder_mode, updated_at
   FROM shared_champion_scores
@@ -1452,8 +1457,43 @@ async function queryColumnExists(client: QueryableClient, tableName: string, col
   return result.rows[0]?.exists === true;
 }
 
+async function migrateLegacyHalfPointScoreColumn(
+  client: QueryableClient,
+  tableName: "shared_champion_scores" | "shared_champion_runs",
+): Promise<void> {
+  const hasScoreColumn = await queryColumnExists(client, tableName, "score");
+  const hasLegacyScoreColumn = await queryColumnExists(client, tableName, "score_half_points");
+  if (!hasLegacyScoreColumn) {
+    return;
+  }
+
+  if (!hasScoreColumn) {
+    await client.query(`
+      ALTER TABLE ${tableName}
+        ADD COLUMN score INTEGER;
+    `);
+  }
+
+  await client.query(`
+    UPDATE ${tableName}
+    SET score = GREATEST(0, ROUND(score_half_points / 2.0)::INTEGER)
+    WHERE score IS NULL;
+  `);
+
+  await client.query(`
+    ALTER TABLE ${tableName}
+      ALTER COLUMN score SET NOT NULL;
+  `);
+
+  await client.query(`
+    ALTER TABLE ${tableName}
+      DROP COLUMN IF EXISTS score_half_points;
+  `);
+}
+
 export async function runSharedChampionSchemaMaintenance(client: QueryableClient): Promise<void> {
   await client.query(CREATE_HIGH_SCORE_TABLE_SQL);
+  await migrateLegacyHalfPointScoreColumn(client, "shared_champion_scores");
 
   await client.query(CREATE_SUBMISSIONS_LOG_TABLE_SQL);
   await client.query(ALTER_SUBMISSIONS_LOG_TABLE_SQL);
@@ -1473,6 +1513,8 @@ export async function runSharedChampionSchemaMaintenance(client: QueryableClient
   await client.query(DROP_LEGACY_AUDIT_COLUMNS_SQL);
 
   await client.query(CREATE_RUNS_TABLE_SQL);
+  await client.query(DROP_ROLLUPS_VIEWS_SQL);
+  await migrateLegacyHalfPointScoreColumn(client, "shared_champion_runs");
   await client.query(CREATE_RUNS_INDEX_SQL);
 
   await client.query(CREATE_DAILY_ROLLUPS_VIEW_SQL);

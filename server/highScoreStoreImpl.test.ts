@@ -103,9 +103,23 @@ test("production admin stats auth fails closed when token is missing", () => {
 test("schema maintenance includes shared_champion_runs and rollup views", async () => {
   const statements: string[] = [];
   const mockClient = {
-    async query<T extends Record<string, unknown>>(text: string): Promise<{ rows: T[] }> {
+    async query<T extends Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
       statements.push(text);
       if (text.includes("information_schema.columns")) {
+        const tableName = values?.[0];
+        const columnName = values?.[1];
+        if (tableName === "shared_champion_scores" && columnName === "score") {
+          return { rows: [{ exists: false } as unknown as T] };
+        }
+        if (tableName === "shared_champion_scores" && columnName === "score_half_points") {
+          return { rows: [{ exists: true } as unknown as T] };
+        }
+        if (tableName === "shared_champion_runs" && columnName === "score") {
+          return { rows: [{ exists: false } as unknown as T] };
+        }
+        if (tableName === "shared_champion_runs" && columnName === "score_half_points") {
+          return { rows: [{ exists: true } as unknown as T] };
+        }
         return { rows: [{ exists: false } as unknown as T] };
       }
       return { rows: [] };
@@ -114,6 +128,12 @@ test("schema maintenance includes shared_champion_runs and rollup views", async 
 
   await runSharedChampionSchemaMaintenance(mockClient);
 
+  assert(statements.some((statement) => statement.includes("ALTER TABLE shared_champion_scores") && statement.includes("ADD COLUMN score INTEGER")));
+  assert(statements.some((statement) => statement.includes("UPDATE shared_champion_scores") && statement.includes("score_half_points / 2.0")));
+  assert(statements.some((statement) => statement.includes("DROP COLUMN IF EXISTS score_half_points")));
+  assert(statements.some((statement) => statement.includes("DROP VIEW IF EXISTS shared_champion_daily_rollups_v1")));
+  assert(statements.some((statement) => statement.includes("ALTER TABLE shared_champion_runs") && statement.includes("ADD COLUMN score INTEGER")));
+  assert(statements.some((statement) => statement.includes("UPDATE shared_champion_runs") && statement.includes("score_half_points / 2.0")));
   assert(statements.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS shared_champion_runs")));
   assert(statements.some((statement) => statement.includes("CREATE OR REPLACE VIEW shared_champion_daily_rollups_v1")));
   assert(statements.some((statement) => statement.includes("CREATE OR REPLACE VIEW shared_champion_name_rollups_v1")));

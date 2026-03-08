@@ -7,16 +7,18 @@ Last updated: 2026-03-08
 
 # progress.md — Clawd Strike Status
 
-Original prompt: lets commit and push to origin main, make sure we are fully synced from local to origin
+Original prompt: i want you to trace down this error, fix it, and lets figure out how to make sure it doesnt break again, it feels breaking everytime i redeploy to vercel
 
 ## Active Change Tag
 - `tooling`
 
 ## Current Status (<=10 lines)
-- Local `main` started this task aligned with `origin/main` (`0 ahead / 0 behind`) before staging the current worktree.
-- Pending repo changes bundle shared-champion storage/admin hardening, loading-screen/runtime champion UI polish, a reconciliation script, CI server-test coverage, and supporting docs updates.
-- `progress.md` was refreshed so the branch state matches the actual sync/ship task instead of only the last plaque-only tweak.
-- Validation for the sync task will be `pnpm typecheck`, `pnpm build`, and `pnpm test:server` before commit/push.
+- Traced the production high-score outage to legacy Postgres columns (`score_half_points`) that the current shared-champion runtime no longer migrated before querying `score`.
+- Reproduced the failure locally against pulled production envs: reconcile first failed with `column "score" does not exist`, then with legacy rollup-view dependencies on `score_half_points`.
+- Patched shared-champion schema maintenance to drop/recreate rollup views, migrate legacy half-point columns into integer `score`, and remove the obsolete columns safely.
+- Fixed the `pnpm reconcile:shared-champion` operator script so it no longer references deleted `*HalfPoints` fields.
+- Ran the repaired reconcile against the production database; the live endpoint now returns `200` and the champion payload (`big bossy`, score `573`).
+- Validation: `pnpm test:server`, `pnpm typecheck`, `pnpm build`, plus a live production `GET /api/high-score` verification on `2026-03-08`.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:4174/?map=bazaar-map`
@@ -35,16 +37,16 @@ pnpm --filter @clawd-strike/client exec vite preview --host --port 4174
 ```
 
 ## Last Completed Prompt
-- Title: Prepare the current local change set for sync to `origin/main`
-- Changed: updated branch status tracking in `progress.md`, confirmed remote divergence, and prepared the repo for validation, commit, and push.
-- Files: `progress.md`
-- Validation: `git fetch origin`, divergence check, plus pending `pnpm typecheck`, `pnpm build`, and `pnpm test:server` before push.
+- Title: Restore the Vercel high-score path and harden it against legacy schema drift
+- Changed: traced the production outage to unmigrated half-point score columns, patched runtime schema maintenance and the reconcile tool, and repaired the live production database.
+- Files: `server/highScoreStoreImpl.ts`, `server/highScoreStoreImpl.test.ts`, `scripts/reconcile-shared-champion.ts`, `progress.md`
+- Validation: pulled production envs, reproduced the DB failure locally, ran `pnpm test:server`, `pnpm typecheck`, `pnpm build`, executed `pnpm reconcile:shared-champion -- --env-file .env.production.local --json`, and verified `https://clawd-strike.vercel.app/api/high-score`.
 
 ## Next 3 Tasks
-1. Push the validated local `main` commit to `origin/main`.
-2. Let remote CI confirm the same branch state after the push lands.
-3. If follow-up work is needed, split the next task by a single primary change tag instead of extending this mixed batch.
+1. Push the schema-migration fix so future Vercel redeploys carry the self-healing path in code, not only in the repaired database.
+2. Optionally add a deployment smoke that hits `/api/high-score` right after prod deploy and fails loudly on any non-`200` response.
+3. If score-history semantics matter, decide whether legacy half-point rows should stay rounded integers permanently or get a one-time historical note in internal ops docs.
 
 ## Known Issues / Risks
-- The outgoing commit is a mixed batch spanning runtime, server, docs, and tooling, so the commit message must stay broad enough to describe it honestly.
-- No new user-facing code changes were made in this sync task beyond `progress.md`; validation is being used to guard the already-present worktree changes before push.
+- The live repair rounded legacy half-point values to integer `score` during migration (`1145 -> 573`), which matches the current integer-only contract but slightly changes historical display precision.
+- The admin-stats endpoint itself was not fully exercised in this turn because the ad hoc shell header interpolation failed; the public high-score path and DB schema were verified directly.
