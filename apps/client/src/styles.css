@@ -647,6 +647,9 @@ body {
   #start .logo-wrap {
     top: 28%;
   }
+  #start[data-name-entry-visible="true"] .logo-wrap {
+    top: 24%;
+  }
   #start .logo-img {
     width: min(98vw, 780px);
     max-width: calc(100vw - 18px);
@@ -656,7 +659,7 @@ body {
   }
   #start .actions-buttons {
     gap: 18px;
-    top: 59%;
+    top: 53%;
     width: min(364px, calc(100vw - 26px));
   }
   #start .shared-champion-card {
@@ -664,8 +667,8 @@ body {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
-    width: min(384px, calc(100vw - 24px));
-    bottom: 34px;
+    width: min(320px, calc(100vw - 50px));
+    bottom: 20px;
   }
   #start .shared-champion-name {
     font-size: var(--shared-champion-name-size);
