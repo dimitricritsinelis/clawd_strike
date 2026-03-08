@@ -1,5 +1,5 @@
 import { LoadingAmbientAudio } from "./audio";
-import { preloadCriticalLoadingAssets } from "./assets";
+import { OVERLAY_PRELOAD_TIMEOUT_MS, preloadLoadingScreenAssets } from "./assets";
 import type { LoadingAmbientAudioOptions } from "./audio";
 import type { LoadingScreenHandoff, LoadingScreenMode } from "./types";
 import { createLoadingScreenUI } from "./ui";
@@ -28,6 +28,8 @@ const DEFAULT_AUDIO: LoadingAmbientAudioOptions = {
 const PUBLIC_AGENT_API_VERSION = 1;
 const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
 const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+const OVERLAY_LOADING_BANNER = "Loading menu art...";
+const OVERLAY_FAILURE_BANNER = "Menu art unavailable";
 
 export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = {}): LoadingScreenHandle {
   const isVirtualTime = typeof window.__vt_pending !== "undefined";
@@ -104,13 +106,52 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
   ui.setMuteState(loadingAmbient.isMuted());
   ui.setSharedChampion(sharedChampionSnapshot);
   ui.show();
+  ui.setBackgroundReady(false);
   ui.setAssetReady(false);
   ui.setTransitioning(false);
 
-  void preloadCriticalLoadingAssets().finally(() => {
+  void (async () => {
+    const backgroundPreload = await preloadLoadingScreenAssets("background");
     if (disposed) return;
+    if (backgroundPreload.failedUrls.length > 0) {
+      console.warn(`[loading-screen] background asset preload failed: ${backgroundPreload.failedUrls.join(", ")}`);
+    }
+
+    ui.setBackgroundReady(true);
+    ui.hydrateVisibleOverlayAssets();
+
+    let overlayTimedOut = false;
+    const overlayTimeoutId = window.setTimeout(() => {
+      overlayTimedOut = true;
+      if (disposed) return;
+      console.warn(`[loading-screen] overlay assets still loading after ${OVERLAY_PRELOAD_TIMEOUT_MS}ms`);
+      ui.showBanner(OVERLAY_LOADING_BANNER, { persist: true });
+    }, OVERLAY_PRELOAD_TIMEOUT_MS);
+
+    const overlayPreload = await preloadLoadingScreenAssets("overlay");
+    window.clearTimeout(overlayTimeoutId);
+    if (disposed) return;
+
+    if (overlayPreload.failedUrls.length > 0) {
+      console.warn(`[loading-screen] overlay asset preload failed: ${overlayPreload.failedUrls.join(", ")}`);
+      ui.showBanner(OVERLAY_FAILURE_BANNER, { persist: true });
+      return;
+    }
+
+    const overlayImagesReady = await ui.waitForVisibleOverlayAssets();
+    if (disposed) return;
+    if (!overlayImagesReady) {
+      console.warn("[loading-screen] overlay DOM assets failed to resolve after preload");
+      ui.showBanner(OVERLAY_FAILURE_BANNER, { persist: true });
+      return;
+    }
+
+    if (overlayTimedOut) {
+      ui.hideBanner();
+    }
     ui.setAssetReady(true);
-  });
+    ui.warmLazyAssets();
+  })();
 
   void loadSharedChampion().then((snapshot) => {
     if (disposed) return;
@@ -165,6 +206,7 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
       ui: {
         visible: true,
         startVisible: uiState.startVisible,
+        backgroundReady: uiState.backgroundReady,
         assetsReady: uiState.assetsReady,
         transitioning: uiState.transitioning,
         muteState: loadingAmbient.isMuted() ? "muted" : "unmuted",

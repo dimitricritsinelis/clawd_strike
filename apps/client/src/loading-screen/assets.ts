@@ -1,5 +1,7 @@
 const MOBILE_BREAKPOINT = "(max-width: 820px)";
-const PRELOAD_TIMEOUT_MS = 2500;
+export const OVERLAY_PRELOAD_TIMEOUT_MS = 2500;
+
+export type LoadingScreenAssetPhase = "background" | "overlay";
 
 type DeviceVariant = "mobile" | "desktop";
 
@@ -7,12 +9,20 @@ function getDeviceVariant(): DeviceVariant {
   return window.matchMedia(MOBILE_BREAKPOINT).matches ? "mobile" : "desktop";
 }
 
-function getCriticalAssetUrls(variant: DeviceVariant): string[] {
-  if (variant === "mobile") {
-    return [
+type PhaseUrls = Record<LoadingScreenAssetPhase, Record<DeviceVariant, string[]>>;
+
+const PHASE_URLS: PhaseUrls = {
+  background: {
+    mobile: [
       "/loading-screen/assets/loading-bg-mobile.webp",
+    ],
+    desktop: [
+      "/loading-screen/assets/loading-bg-desktop.webp",
+    ],
+  },
+  overlay: {
+    mobile: [
       "/loading-screen/assets/loading-logo-mobile.webp",
-      "/loading-screen/assets/info_screen.png",
       "/loading-screen/assets/loading-button-human-mobile.webp",
       "/loading-screen/assets/loading-button-agent-mobile.webp",
       "/loading-screen/assets/loading-button-skill-md-mobile.webp",
@@ -20,24 +30,25 @@ function getCriticalAssetUrls(variant: DeviceVariant): string[] {
       "/loading-screen/assets/loading-mute-mobile.webp",
       "/loading-screen/assets/loading-info-mobile.webp",
       "/loading-screen/assets/loading-world-champion-badge.png",
-    ];
-  }
+    ],
+    desktop: [
+      "/loading-screen/assets/loading-logo-desktop.webp",
+      "/loading-screen/assets/loading-button-human-desktop.webp",
+      "/loading-screen/assets/loading-button-agent-desktop.webp",
+      "/loading-screen/assets/loading-button-skill-md-desktop.webp",
+      "/loading-screen/assets/loading-button-enter-agent-mode-desktop.webp",
+      "/loading-screen/assets/loading-mute-desktop.webp",
+      "/loading-screen/assets/loading-info-desktop.webp",
+      "/loading-screen/assets/loading-world-champion-badge.png",
+    ],
+  },
+};
 
-  return [
-    "/loading-screen/assets/loading-bg-desktop.webp",
-    "/loading-screen/assets/loading-logo-desktop.webp",
-    "/loading-screen/assets/info_screen.png",
-    "/loading-screen/assets/loading-button-human-desktop.webp",
-    "/loading-screen/assets/loading-button-agent-desktop.webp",
-    "/loading-screen/assets/loading-button-skill-md-desktop.webp",
-    "/loading-screen/assets/loading-button-enter-agent-mode-desktop.webp",
-    "/loading-screen/assets/loading-mute-desktop.webp",
-    "/loading-screen/assets/loading-info-desktop.webp",
-    "/loading-screen/assets/loading-world-champion-badge.png",
-  ];
+function getPhaseAssetUrls(phase: LoadingScreenAssetPhase, variant: DeviceVariant): string[] {
+  return PHASE_URLS[phase][variant];
 }
 
-function waitForImage(url: string): Promise<void> {
+async function waitForImage(url: string): Promise<boolean> {
   return new Promise((resolve) => {
     const image = new Image();
     image.decoding = "async";
@@ -55,48 +66,55 @@ function waitForImage(url: string): Promise<void> {
         console.warn(`[loading-screen] failed to preload asset: ${url}`);
       }
 
-      resolve();
+      resolve(success);
     };
 
-    const onLoad = () => finish(true);
-    const onError = () => finish(false);
+    const settleDecodedImage = () => {
+      if (typeof image.decode !== "function") {
+        finish(image.naturalWidth > 0 && image.naturalHeight > 0);
+        return;
+      }
+
+      void image.decode().then(
+        () => finish(image.naturalWidth > 0 && image.naturalHeight > 0),
+        () => finish(image.naturalWidth > 0 && image.naturalHeight > 0),
+      );
+    };
+
+    const onLoad = () => {
+      settleDecodedImage();
+    };
+
+    const onError = () => {
+      finish(false);
+    };
 
     image.addEventListener("load", onLoad, { once: true });
     image.addEventListener("error", onError, { once: true });
 
     image.src = url;
 
-    if (typeof image.decode === "function") {
-      void image.decode().then(
-        () => finish(true),
-        () => {
-          // Decode can reject for transient reasons while load still succeeds.
-        },
-      );
+    if (image.complete) {
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+        settleDecodedImage();
+        return;
+      }
+
+      finish(false);
     }
   });
 }
 
-export async function preloadCriticalLoadingAssets(): Promise<void> {
+export type LoadingScreenAssetPreloadResult = {
+  failedUrls: string[];
+};
+
+export async function preloadLoadingScreenAssets(
+  phase: LoadingScreenAssetPhase,
+): Promise<LoadingScreenAssetPreloadResult> {
   const variant = getDeviceVariant();
-  const urls = getCriticalAssetUrls(variant);
-
-  const preloadPromise = Promise.all(urls.map((url) => waitForImage(url))).then(() => undefined);
-
-  let timeoutId = 0;
-  const timeoutPromise = new Promise<"timeout">((resolve) => {
-    timeoutId = window.setTimeout(() => {
-      resolve("timeout");
-    }, PRELOAD_TIMEOUT_MS);
-  });
-
-  const preloadOutcome = preloadPromise.then(() => "preload" as const);
-  const winner = await Promise.race([preloadOutcome, timeoutPromise]);
-
-  if (winner === "preload") {
-    window.clearTimeout(timeoutId);
-    return;
-  }
-
-  console.warn(`[loading-screen] asset preload timed out after ${PRELOAD_TIMEOUT_MS}ms`);
+  const urls = getPhaseAssetUrls(phase, variant);
+  const outcomes = await Promise.all(urls.map((url) => waitForImage(url)));
+  const failedUrls = urls.filter((_, index) => !outcomes[index]);
+  return { failedUrls };
 }

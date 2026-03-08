@@ -9,8 +9,6 @@ const sharedChampionStore = hasConfiguredSharedChampionDatabase("write")
   ? createPostgresSharedChampionStore()
   : null;
 
-export default async function handler(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   return handleSharedChampionStatsOverviewRequest(request, sharedChampionStore);
 }
-
-export const GET = handler;

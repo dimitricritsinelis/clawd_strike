@@ -34,6 +34,7 @@ export type SharedChampionAdminAuthCheck =
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
 const DEV_FALLBACK_PRIVACY_HASH_SECRET = "clawd-strike-dev-privacy-hash-secret-32chars";
 const DEV_FALLBACK_STATS_ADMIN_TOKEN = "clawd-strike-dev-stats-admin-token";
+let warnedMissingStatsAdminToken = false;
 
 function parseBooleanEnv(value: string | undefined): boolean | null {
   if (value === undefined) return null;
@@ -228,22 +229,41 @@ export function protectJsonWriteRequest(
   };
 }
 
-export function getStatsAdminToken(): string {
-  const value = process.env.STATS_ADMIN_TOKEN?.trim() ?? "";
+export function getStatsAdminToken(): string | null {
+  return resolveStatsAdminToken();
+}
+
+export function resolveStatsAdminToken(env: NodeJS.ProcessEnv = process.env): string | null {
+  const value = env.STATS_ADMIN_TOKEN?.trim() ?? "";
   if (value.length > 0) {
     return value;
   }
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
-    console.warn(
-      "[stats-admin] WARNING: STATS_ADMIN_TOKEN is missing. Using dev fallback. "
-      + "Set STATS_ADMIN_TOKEN in Vercel before exposing admin stats routes.",
-    );
+  const productionMode = env.NODE_ENV === "production" || Boolean(env.VERCEL);
+  if (productionMode) {
+    if (env === process.env && !warnedMissingStatsAdminToken) {
+      warnedMissingStatsAdminToken = true;
+      console.warn(
+        "[stats-admin] WARNING: STATS_ADMIN_TOKEN is missing. "
+        + "Admin stats are disabled until it is configured.",
+      );
+    }
+    return null;
   }
   return DEV_FALLBACK_STATS_ADMIN_TOKEN;
 }
 
-export function authorizeStatsAdminRequest(request: Request): SharedChampionAdminAuthCheck {
-  const expectedToken = getStatsAdminToken();
+export function authorizeStatsAdminRequest(
+  request: Request,
+  env: NodeJS.ProcessEnv = process.env,
+): SharedChampionAdminAuthCheck {
+  const expectedToken = resolveStatsAdminToken(env);
+  if (expectedToken === null) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Admin stats are unavailable. Configure STATS_ADMIN_TOKEN.",
+    };
+  }
   const header = request.headers.get("authorization")?.trim() ?? "";
   if (!header.startsWith("Bearer ")) {
     return {

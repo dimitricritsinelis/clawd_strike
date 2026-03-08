@@ -25,8 +25,9 @@ export class ScoreHud {
   private headshots = 0;
   private score = 0;
   private readonly SCORE_BASE = 0;
-  private readonly SCORE_PER_KILL = 10;
-  private readonly SCORE_PER_HEADSHOT = 2.5;
+  private readonly WAVE_ENEMY_COUNT = 9;
+  private readonly KILL_SCORE_BASE = 5;
+  private readonly WAVE_SCORE_INCREMENT = 2;
   private flashTimerS = 0;
   private flashHeadshotActive = false;
   private readonly FLASH_DURATION_S = 0.3;
@@ -261,10 +262,12 @@ export class ScoreHud {
   recordKill(record: ScoreHudKillRecord): void {
     const isHeadshot = record.isHeadshot;
     this.kills += 1;
-    this.score += this.SCORE_PER_KILL;
+    const wave = Math.ceil(this.kills / this.WAVE_ENEMY_COUNT);
+    const killValue = this.KILL_SCORE_BASE + (wave - 1) * this.WAVE_SCORE_INCREMENT;
+    this.score += killValue;
     if (isHeadshot) {
       this.headshots += 1;
-      this.score += this.SCORE_PER_HEADSHOT;
+      this.score += killValue; // headshot bonus = killValue (2× total)
       this.headshotsEl.textContent = String(this.headshots);
     }
     this.killsEl.textContent = String(this.kills);

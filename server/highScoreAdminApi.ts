@@ -37,7 +37,7 @@ function errorResponse(status: number, error: string): Response {
 
 function authorize(request: Request): Response | null {
   const auth = authorizeStatsAdminRequest(request);
-  if (auth.ok) return null;
+  if (auth.ok === true) return null;
   return errorResponse(auth.status, auth.error);
 }
 
@@ -48,7 +48,7 @@ function guardRequest(request: Request, store: SharedChampionStore | null): Resp
   if (store === null) {
     return errorResponse(
       503,
-      "Shared champion storage is unavailable. Configure POSTGRES_WRITE_URL and POSTGRES_READ_URL.",
+      "Shared champion storage is unavailable. Configure supported Postgres write/read env vars.",
     );
   }
   return authorize(request);

@@ -7,9 +7,9 @@ import {
 const AUTO_RESPAWN_S = 3.0;
 const FADE_IN_S = 0.5;
 
-function roundScoreValue(value: number): number {
+function normalizeScore(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.round(value * 2) / 2);
+  return Math.max(0, Math.round(value));
 }
 
 export type DeathScreenSummary = {
@@ -239,8 +239,8 @@ export class DeathScreen {
     this.subtitleEl.textContent = summary?.playerName
       ? `${summary.playerName.toUpperCase()} ELIMINATED`
       : "Run ended";
-    const finalScore = roundScoreValue(summary?.finalScore ?? 0);
-    const bestScore = roundScoreValue(summary?.bestScore ?? 0);
+    const finalScore = normalizeScore(summary?.finalScore ?? 0);
+    const bestScore = normalizeScore(summary?.bestScore ?? 0);
     this.finalScoreEl.textContent = `Final Score ${this.formatScore(finalScore)}`;
     this.sessionBestEl.textContent = `Session Best ${this.formatScore(bestScore)}`;
     this.renderSharedChampion();

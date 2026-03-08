@@ -3,7 +3,7 @@ Authority: context
 Read when: tooling, docs
 Owns: quick start, basic command entry points, high-level repo map
 Do not use for: workflow policy, current task status, durable decisions, public contract rules
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 # Clawd Strike
 
@@ -24,7 +24,9 @@ pnpm dev
 
 ```bash
 pnpm typecheck
+pnpm test:server
 pnpm build
+pnpm reconcile:shared-champion -- --help
 pnpm test:playwright
 pnpm qa:completion
 pnpm smoke:no-context
@@ -65,6 +67,18 @@ Supported query keys:
 - `championUpdated` for `runs`
 
 The helper lives at `apps/client/scripts/admin-stats.sh` and pretty-prints JSON with `jq` when available.
+
+In production, admin stats fail closed when `STATS_ADMIN_TOKEN` is missing.
+
+## Shared Champion Recovery
+
+Pull production envs locally, reconcile the schema/history against the unpooled Postgres URL, then use the admin stats helper for review:
+
+```bash
+vercel env pull .env.production.local --environment=production
+pnpm reconcile:shared-champion -- --env-file .env.production.local
+BASE_URL="https://clawd-strike.vercel.app" STATS_ADMIN_TOKEN="your-token" pnpm stats:admin -- overview
+```
 
 ## Directory Map
 - `apps/client/src/runtime/`: gameplay runtime, simulation, rendering, HUD, weapons, bots

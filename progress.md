@@ -7,44 +7,44 @@ Last updated: 2026-03-08
 
 # progress.md — Clawd Strike Status
 
-Original prompt: notice how the name text isnt perfectly centered on the rectangle its in, also the number should be right aligned and shouldnt show decimals
+Original prompt: lets commit and push to origin main, make sure we are fully synced from local to origin
 
 ## Active Change Tag
-- `ui-flow`
+- `tooling`
 
 ## Current Status (<=10 lines)
-- Tightened the loading-screen world champion name box so max-length names sit visually centered in the left plaque panel instead of drifting left.
-- Added a loading-screen-local integer score formatter, so the plaque shows whole numbers only and no longer renders half-point decimals.
-- Right-aligned the loading-screen score inside the small score panel and tuned the box width/padding so `9999` fits without clipping.
-- Loading-screen Playwright expectations now use the plaque-specific rounded score display while HUD/death-screen champion formatting remains unchanged.
-- `pnpm typecheck`, `pnpm build`, and `pnpm test:playwright` all passed on `2026-03-08`.
-- Live desktop/mobile captures verified the max-length name case and a `9999` score preview on the loading screen.
+- Local `main` started this task aligned with `origin/main` (`0 ahead / 0 behind`) before staging the current worktree.
+- Pending repo changes bundle shared-champion storage/admin hardening, loading-screen/runtime champion UI polish, a reconciliation script, CI server-test coverage, and supporting docs updates.
+- `progress.md` was refreshed so the branch state matches the actual sync/ship task instead of only the last plaque-only tweak.
+- Validation for the sync task will be `pnpm typecheck`, `pnpm build`, and `pnpm test:server` before commit/push.
 
 ## Canonical Playtest URL
-- `http://127.0.0.1:5174/?map=bazaar-map&autostart=human`
+- `http://127.0.0.1:4174/?map=bazaar-map`
 
 ## Map Approval Status
 - `NOT APPROVED`
 
 ## How to Run (real commands only)
 ```bash
-pnpm dev
 pnpm typecheck
 pnpm build
+pnpm test:server
 pnpm test:playwright
+pnpm reconcile:shared-champion -- --help
+pnpm --filter @clawd-strike/client exec vite preview --host --port 4174
 ```
 
 ## Last Completed Prompt
-- Title: Tighten loading-screen champion name centering and right-align the score
-- Changed: narrowed and recentered the plaque name field for max-length names, switched the loading-screen plaque to whole-number score display only, and right-aligned the score so four digits fit cleanly in the score panel.
-- Files: `apps/client/src/loading-screen/ui.ts`, `apps/client/src/styles.css`, `apps/client/playwright/shared-champion.spec.ts`
-- Validation: `pnpm typecheck`, `pnpm build`, `pnpm test:playwright`, plus live desktop/mobile visual captures and a web-game-client screenshot pass on the loading screen.
+- Title: Prepare the current local change set for sync to `origin/main`
+- Changed: updated branch status tracking in `progress.md`, confirmed remote divergence, and prepared the repo for validation, commit, and push.
+- Files: `progress.md`
+- Validation: `git fetch origin`, divergence check, plus pending `pnpm typecheck`, `pnpm build`, and `pnpm test:server` before push.
 
 ## Next 3 Tasks
-1. If the plaque still feels slightly off on non-Latin or unusually narrow/wide names, tune the name field with a small responsive tracking ladder rather than widening it again.
-2. If the loading-screen plaque should mirror production score semantics more explicitly, decide whether rounding or truncation is the intended whole-number rule and document it in code.
-3. If the champion surface gets more polish work, re-check hierarchy against the main logo before increasing text weight or glow again.
+1. Push the validated local `main` commit to `origin/main`.
+2. Let remote CI confirm the same branch state after the push lands.
+3. If follow-up work is needed, split the next task by a single primary change tag instead of extending this mixed batch.
 
 ## Known Issues / Risks
-- The loading-screen plaque now intentionally rounds champion scores to whole numbers locally, which differs from the half-point precision still shown on HUD/death surfaces.
-- Existing unrelated worktree changes remain in place and were not modified by this UI task.
+- The outgoing commit is a mixed batch spanning runtime, server, docs, and tooling, so the commit message must stay broad enough to describe it honestly.
+- No new user-facing code changes were made in this sync task beyond `progress.md`; validation is being used to guard the already-present worktree changes before push.

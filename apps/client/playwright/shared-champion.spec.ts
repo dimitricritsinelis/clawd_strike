@@ -7,96 +7,121 @@ import {
 
 const STATS_ADMIN_TOKEN = process.env.STATS_ADMIN_TOKEN ?? "clawd-strike-dev-stats-admin-token";
 
-function formatScoreHalfPoints(scoreHalfPoints: number): string {
-  return (scoreHalfPoints / 2).toLocaleString("en-US");
+function formatScore(score: number): string {
+  return score.toLocaleString("en-US");
 }
 
-function formatLoadingScoreHalfPoints(scoreHalfPoints: number): string {
-  return Math.round(scoreHalfPoints / 2).toLocaleString("en-US");
+function formatLoadingScore(score: number): string {
+  return score.toLocaleString("en-US");
 }
 
 function createChampion(
   holderName: string,
-  scoreHalfPoints: number,
+  score: number,
   controlMode: "human" | "agent",
   updatedAt = "2026-03-07T12:00:00.000Z",
 ) {
   return {
     holderName,
-    score: scoreHalfPoints / 2,
-    scoreHalfPoints,
+    score,
     controlMode,
     scope: "sitewide" as const,
     updatedAt,
   };
 }
 
-function computeFinalScore(kills: number, headshots: number): number {
-  return (kills * 10) + (headshots * 2.5);
+const ENEMIES_PER_WAVE = 9;
+
+function waveKillValue(wave: number): number {
+  return 5 + (wave - 1) * 2;
+}
+
+function distributeHeadshots(kills: number, headshots: number): number[] {
+  const totalWaves = kills > 0 ? Math.ceil(kills / ENEMIES_PER_WAVE) : 0;
+  const result: number[] = [];
+  let remaining = headshots;
+  for (let w = 1; w <= totalWaves; w++) {
+    const killsInWave = Math.min(ENEMIES_PER_WAVE, kills - (w - 1) * ENEMIES_PER_WAVE);
+    const hsInWave = Math.min(remaining, killsInWave);
+    result.push(hsInWave);
+    remaining -= hsInWave;
+  }
+  return result;
+}
+
+function computeFinalScore(kills: number, headshotsPerWave: number[]): number {
+  const totalWaves = kills > 0 ? Math.ceil(kills / ENEMIES_PER_WAVE) : 0;
+  let score = 0;
+  for (let w = 1; w <= totalWaves; w++) {
+    const killsInWave = Math.min(ENEMIES_PER_WAVE, kills - (w - 1) * ENEMIES_PER_WAVE);
+    const hsInWave = headshotsPerWave[w - 1] ?? 0;
+    const kv = waveKillValue(w);
+    score += killsInWave * kv + hsInWave * kv;
+  }
+  return score;
 }
 
 function buildRunSummary(kills: number, headshots: number) {
   const shotsHit = kills;
   const shotsFired = kills;
   const accuracy = shotsFired > 0 ? Math.round(((shotsHit / shotsFired) * 100) * 10) / 10 : 0;
+  const headshotsPerWave = distributeHeadshots(kills, headshots);
   return {
     survivalTimeS: 0.5,
     kills,
     headshots,
+    headshotsPerWave,
     shotsFired,
     shotsHit,
     accuracy,
-    finalScore: computeFinalScore(kills, headshots),
+    finalScore: computeFinalScore(kills, headshotsPerWave),
     deathCause: "enemy-fire" as const,
   };
 }
 
-function chooseRunAtLeastHalfPoints(minHalfPoints: number): { kills: number; headshots: number; scoreHalfPoints: number } {
-  let units = Math.max(0, Math.ceil(minHalfPoints / 5));
-  while (true) {
-    const kills = Math.ceil(units / 5);
-    const headshots = units - (4 * kills);
-    if (headshots >= 0 && headshots <= kills) {
-      return {
-        kills,
-        headshots,
-        scoreHalfPoints: units * 5,
-      };
+function chooseRunAtLeastScore(minScore: number): { kills: number; headshots: number; score: number } {
+  // Wave-scaled scoring: try increasing kills with headshots to reach target
+  for (let kills = 0; kills <= 500; kills++) {
+    for (let headshots = 0; headshots <= kills; headshots++) {
+      const hpw = distributeHeadshots(kills, headshots);
+      const score = computeFinalScore(kills, hpw);
+      if (score >= minScore) {
+        return { kills, headshots, score };
+      }
     }
-    units += 1;
   }
+  // Fallback: large number
+  const kills = 500;
+  const headshots = 500;
+  const hpw = distributeHeadshots(kills, headshots);
+  return { kills, headshots, score: computeFinalScore(kills, hpw) };
 }
 
-function chooseRunAtMostHalfPoints(maxHalfPoints: number): { kills: number; headshots: number; scoreHalfPoints: number } {
-  let units = Math.max(0, Math.floor(maxHalfPoints / 5));
-  while (units >= 0) {
-    const kills = Math.ceil(units / 5);
-    const headshots = units - (4 * kills);
-    if (headshots >= 0 && headshots <= kills) {
-      return {
-        kills,
-        headshots,
-        scoreHalfPoints: units * 5,
-      };
+function chooseRunAtMostScore(maxScore: number): { kills: number; headshots: number; score: number } {
+  // Wave-scaled scoring: find the largest score <= maxScore
+  let best = { kills: 0, headshots: 0, score: 0 };
+  for (let kills = 0; kills <= 500; kills++) {
+    const hpwNoHs = distributeHeadshots(kills, 0);
+    const baseScore = computeFinalScore(kills, hpwNoHs);
+    if (baseScore > maxScore) break;
+    best = { kills, headshots: 0, score: baseScore };
+    for (let headshots = 1; headshots <= kills; headshots++) {
+      const hpw = distributeHeadshots(kills, headshots);
+      const score = computeFinalScore(kills, hpw);
+      if (score > maxScore) break;
+      best = { kills, headshots, score };
     }
-    units -= 1;
   }
-
-  return {
-    kills: 0,
-    headshots: 0,
-    scoreHalfPoints: 0,
-  };
+  return best;
 }
 
 function expectChampion(
   champion: unknown,
-  expected: { holderName: string; scoreHalfPoints: number; controlMode: "human" | "agent" },
+  expected: { holderName: string; score: number; controlMode: "human" | "agent" },
 ) {
   expect(champion).toEqual({
     holderName: expected.holderName,
-    score: expected.scoreHalfPoints / 2,
-    scoreHalfPoints: expected.scoreHalfPoints,
+    score: expected.score,
     controlMode: expected.controlMode,
     scope: "sitewide",
     updatedAt: expect.any(String),
@@ -152,13 +177,13 @@ async function readAdminStats(
   };
 }
 
-function buildTelemetryForScore(scoreHalfPoints: number) {
-  // Reverse the scoring formula: half_points = kills * 20 + headshots * 5
-  // Use all-headshot kills for simplicity: half_points = kills * 25 → kills = half_points / 25
-  // If not evenly divisible, use non-headshot kills for remainder
-  const killsFromHeadshots = Math.floor(scoreHalfPoints / 25);
-  const remainderHalfPoints = scoreHalfPoints - killsFromHeadshots * 25;
-  const extraKills = Math.floor(remainderHalfPoints / 20);
+function buildTelemetryForScore(score: number) {
+  // Flat telemetry formula: score = kills * 5 + headshots * 5
+  // Use all-headshot kills for simplicity: score = kills * 10 → kills = floor(score / 10)
+  // If not evenly divisible, use body-only kills for remainder
+  const killsFromHeadshots = Math.floor(score / 10);
+  const remainderScore = score - killsFromHeadshots * 10;
+  const extraKills = Math.floor(remainderScore / 5);
   const kills = killsFromHeadshots + extraKills;
   const headshots = killsFromHeadshots;
   return {
@@ -236,7 +261,7 @@ async function completeValidatedRun(
     runToken: expect.any(String),
     issuedAt: expect.any(String),
     expiresAt: expect.any(String),
-    ruleset: "wave-score-v1-k10-hs2_5",
+    ruleset: "wave-score-v3-k5-wi2-hs2x",
   });
 
   const summary = buildRunSummary(options.kills, options.headshots);
@@ -300,7 +325,7 @@ test("api blocks raw writes and only accepts validated run submissions", async (
     failOnStatusCode: false,
     data: {
       playerName: "RawWrite",
-      scoreHalfPoints: 500,
+      score: 500,
       controlMode: "agent",
     },
   });
@@ -341,16 +366,18 @@ test("api blocks raw writes and only accepts validated run submissions", async (
     controlMode: "human",
   });
   expect(hugeRunStart.response.ok()).toBe(true);
+  const hugeHeadshotsPerWave = distributeHeadshots(99_999, 99_999);
   const hugeRun = await finishValidatedRun(request, baseUrl, {
     runToken: hugeRunStart.body.runToken,
     summary: {
       survivalTimeS: 0.5,
       kills: 99_999,
       headshots: 99_999,
+      headshotsPerWave: hugeHeadshotsPerWave,
       shotsFired: 99_999,
       shotsHit: 99_999,
       accuracy: 100,
-      finalScore: computeFinalScore(99_999, 99_999),
+      finalScore: computeFinalScore(99_999, hugeHeadshotsPerWave),
       deathCause: "enemy-fire",
     },
   });
@@ -380,10 +407,10 @@ test("api blocks raw writes and only accepts validated run submissions", async (
 test("validated run submissions keep strict overwrite rules", async ({ request }, testInfo) => {
   const baseUrl = testInfo.project.use.baseURL as string;
   const current = await readSharedChampion(request, baseUrl);
-  const baseScore = typeof current.champion?.scoreHalfPoints === "number" ? current.champion.scoreHalfPoints : 0;
-  const firstRun = chooseRunAtLeastHalfPoints(baseScore + 5);
-  const lowerRun = chooseRunAtMostHalfPoints(Math.max(0, firstRun.scoreHalfPoints - 5));
-  const higherRun = chooseRunAtLeastHalfPoints(firstRun.scoreHalfPoints + 5);
+  const baseScore = typeof current.champion?.score === "number" ? current.champion.score : 0;
+  const firstRun = chooseRunAtLeastScore(baseScore + 5);
+  const lowerRun = chooseRunAtMostScore(Math.max(0, firstRun.score - 5));
+  const higherRun = chooseRunAtLeastScore(firstRun.score + 5);
 
   const first = await completeValidatedRun(request, baseUrl, {
     playerName: "AlphaUnit",
@@ -396,7 +423,7 @@ test("validated run submissions keep strict overwrite rules", async ({ request }
   expect(first.finished.body.updated).toBe(true);
   expectChampion(first.finished.body.champion, {
     holderName: "AlphaUnit",
-    scoreHalfPoints: firstRun.scoreHalfPoints,
+    score: firstRun.score,
     controlMode: "agent",
   });
 
@@ -411,7 +438,7 @@ test("validated run submissions keep strict overwrite rules", async ({ request }
   expect(lower.finished.body.updated).toBe(false);
   expectChampion(lower.finished.body.champion, {
     holderName: "AlphaUnit",
-    scoreHalfPoints: firstRun.scoreHalfPoints,
+    score: firstRun.score,
     controlMode: "agent",
   });
 
@@ -426,7 +453,7 @@ test("validated run submissions keep strict overwrite rules", async ({ request }
   expect(tie.finished.body.updated).toBe(false);
   expectChampion(tie.finished.body.champion, {
     holderName: "AlphaUnit",
-    scoreHalfPoints: firstRun.scoreHalfPoints,
+    score: firstRun.score,
     controlMode: "agent",
   });
 
@@ -441,7 +468,7 @@ test("validated run submissions keep strict overwrite rules", async ({ request }
   expect(higher.finished.body.updated).toBe(true);
   expectChampion(higher.finished.body.champion, {
     holderName: "DeltaLead",
-    scoreHalfPoints: higherRun.scoreHalfPoints,
+    score: higherRun.score,
     controlMode: "human",
   });
 });
@@ -470,8 +497,8 @@ test("admin stats endpoints require auth and expose filtered run history", async
   });
 
   const current = await readSharedChampion(request, baseUrl);
-  const currentHalfPoints = typeof current.champion?.scoreHalfPoints === "number" ? current.champion.scoreHalfPoints : 0;
-  const leaderRun = chooseRunAtLeastHalfPoints(currentHalfPoints + 5);
+  const currentScore = typeof current.champion?.score === "number" ? current.champion.score : 0;
+  const leaderRun = chooseRunAtLeastScore(currentScore + 5);
 
   const leader = await completeValidatedRun(request, baseUrl, {
     playerName: leaderName,
@@ -539,8 +566,8 @@ test("admin stats endpoints require auth and expose filtered run history", async
     playerNameKey: leaderName.toLowerCase(),
     controlMode: "human",
     mapId: "bazaar-map",
-    ruleset: "wave-score-v1-k10-hs2_5",
-    scoreHalfPoints: leaderRun.scoreHalfPoints,
+    ruleset: "wave-score-v3-k5-wi2-hs2x",
+    score: leaderRun.score,
     championUpdated: true,
   });
   expect(typeof leaderRuns.body.items[0].clientIpFingerprint).toBe("string");
@@ -609,16 +636,18 @@ test("validated run stats store only accepted finishes", async ({ request }, tes
   });
   expect(rejectedStart.response.ok()).toBe(true);
 
+  const rejectedHpw = distributeHeadshots(99_999, 99_999);
   const rejectedFinish = await finishValidatedRun(request, baseUrl, {
     runToken: rejectedStart.body.runToken,
     summary: {
       survivalTimeS: 0.5,
       kills: 99_999,
       headshots: 99_999,
+      headshotsPerWave: rejectedHpw,
       shotsFired: 99_999,
       shotsHit: 99_999,
       accuracy: 100,
-      finalScore: computeFinalScore(99_999, 99_999),
+      finalScore: computeFinalScore(99_999, rejectedHpw),
       deathCause: "enemy-fire",
     },
   });
@@ -641,8 +670,7 @@ test("validated run stats store only accepted finishes", async ({ request }, tes
     shotsFired: 2,
     shotsHit: 2,
     accuracyPct: 100,
-    scoreHalfPoints: 45,
-    score: 22.5,
+    score: 15,
     waveReached: 1,
     wavesCleared: 0,
   });
@@ -668,8 +696,8 @@ test("validated run stats store only accepted finishes", async ({ request }, tes
 test("shows the same shared champion across loading, HUD, and death surfaces", async ({ browser, request }, testInfo) => {
   const baseUrl = testInfo.project.use.baseURL as string;
   const current = await readSharedChampion(request, baseUrl);
-  const currentHalfPoints = typeof current.champion?.scoreHalfPoints === "number" ? current.champion.scoreHalfPoints : 0;
-  const nextRun = chooseRunAtLeastHalfPoints(currentHalfPoints + 5);
+  const currentScore = typeof current.champion?.score === "number" ? current.champion.score : 0;
+  const nextRun = chooseRunAtLeastScore(currentScore + 5);
   const holderName = "SiteChampion";
 
   const seeded = await completeValidatedRun(request, baseUrl, {
@@ -693,8 +721,8 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
 
     await expect(pageA.getByTestId("loading-world-champion-name")).toHaveText(holderName.toUpperCase());
     await expect(pageB.getByTestId("loading-world-champion-name")).toHaveText(holderName.toUpperCase());
-    await expect(pageA.getByTestId("loading-world-champion-score")).toHaveText(formatLoadingScoreHalfPoints(nextRun.scoreHalfPoints));
-    await expect(pageB.getByTestId("loading-world-champion-score")).toHaveText(formatLoadingScoreHalfPoints(nextRun.scoreHalfPoints));
+    await expect(pageA.getByTestId("loading-world-champion-score")).toHaveText(formatLoadingScore(nextRun.score));
+    await expect(pageB.getByTestId("loading-world-champion-score")).toHaveText(formatLoadingScore(nextRun.score));
 
     await gotoAgentRuntimeViaUi(pageA, {
       baseUrl,
@@ -702,7 +730,7 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
     });
 
     await expect(pageA.getByTestId("hud-world-champion-name")).toHaveText(holderName.toUpperCase());
-    await expect(pageA.getByTestId("hud-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
+    await expect(pageA.getByTestId("hud-world-champion-score")).toHaveText(formatScore(nextRun.score));
     await expect(pageA.getByTestId("hud-world-champion-mode")).toHaveText("AGENT");
 
     for (let step = 0; step < 120; step += 1) {
@@ -731,7 +759,7 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
     }, { timeout: 20_000 }).toBe(true);
 
     await expect(pageA.getByTestId("death-world-champion-name")).toHaveText(holderName.toUpperCase());
-    await expect(pageA.getByTestId("death-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
+    await expect(pageA.getByTestId("death-world-champion-score")).toHaveText(formatScore(nextRun.score));
     await expect(pageA.getByTestId("death-world-champion-mode")).toHaveText("AGENT");
   } finally {
     await contextA.close();
@@ -771,7 +799,7 @@ test("refreshes the death-time champion and skips finish when the remote record 
         runToken: "death-refresh-no-submit",
         issuedAt: "2026-03-07T12:00:01.000Z",
         expiresAt: "2026-03-07T12:30:01.000Z",
-        ruleset: "wave-score-v1-k10-hs2_5",
+        ruleset: "wave-score-v3-k5-wi2-hs2x",
       }),
     });
   });
@@ -801,7 +829,7 @@ test("refreshes the death-time champion and skips finish when the remote record 
   await driveUntilDeath(page);
 
   await expect(page.getByTestId("death-world-champion-name")).toHaveText("REMOTELEADER");
-  await expect(page.getByTestId("death-world-champion-score")).toHaveText(formatScoreHalfPoints(championAtDeath.scoreHalfPoints));
+  await expect(page.getByTestId("death-world-champion-score")).toHaveText(formatScore(championAtDeath.score));
   await expect(page.getByTestId("death-world-champion-mode")).toHaveText("HUMAN");
 
   const state = await readDocumentedAgentState(page);
@@ -844,7 +872,7 @@ test("refreshes the death-time champion before finish and overwrites when the fi
         runToken: "death-refresh-submit",
         issuedAt: "2026-03-07T12:00:01.000Z",
         expiresAt: "2026-03-07T12:30:01.000Z",
-        ruleset: "wave-score-v1-k10-hs2_5",
+        ruleset: "wave-score-v3-k5-wi2-hs2x",
       }),
     });
   });
@@ -859,10 +887,9 @@ test("refreshes the death-time champion before finish and overwrites when the fi
     expect(payload.runToken).toBe("death-refresh-submit");
 
     const finalScore = Number(payload.summary?.finalScore ?? 0);
-    const finalScoreHalfPoints = Math.round(finalScore * 2);
     const submittedChampion = createChampion(
       "RefreshWinner",
-      finalScoreHalfPoints,
+      finalScore,
       "agent",
       "2026-03-07T12:06:00.000Z",
     );
@@ -894,7 +921,6 @@ test("refreshes the death-time champion before finish and overwrites when the fi
   expect(state.sharedChampion).toEqual({
     holderName: "RefreshWinner",
     score: expect.any(Number),
-    scoreHalfPoints: expect.any(Number),
     controlMode: "agent",
     scope: "sitewide",
     updatedAt: "2026-03-07T12:06:00.000Z",

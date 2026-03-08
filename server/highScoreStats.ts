@@ -3,7 +3,6 @@ import {
   SHARED_CHAMPION_SCORE_RULESET,
   SHARED_CHAMPION_WAVE_ENEMY_COUNT,
   clampSharedChampionName,
-  scoreHalfPointsToValue,
   sanitizeSharedChampionMapId,
   type SharedChampionControlMode,
   type SharedChampionRunDeathCause,
@@ -50,7 +49,6 @@ export type SharedChampionRunRecord = {
   startedAt: string;
   endedAt: string;
   elapsedMs: number;
-  scoreHalfPoints: number;
   score: number;
   kills: number;
   headshots: number;
@@ -73,7 +71,6 @@ export type SharedChampionStatsOverview = {
   uniquePlayerNames: number;
   humanRuns: number;
   agentRuns: number;
-  bestScoreHalfPoints: number | null;
   bestScore: number | null;
   averageScore: number | null;
   averageAccuracyPct: number | null;
@@ -88,7 +85,6 @@ export type SharedChampionStatsNameRollup = {
   championUpdates: number;
   humanRuns: number;
   agentRuns: number;
-  bestScoreHalfPoints: number;
   bestScore: number;
   averageScore: number;
   averageAccuracyPct: number;
@@ -102,7 +98,6 @@ export type SharedChampionStatsDailyRollup = {
   uniquePlayerNames: number;
   humanRuns: number;
   agentRuns: number;
-  bestScoreHalfPoints: number;
   bestScore: number;
   averageScore: number;
   averageAccuracyPct: number;
@@ -144,7 +139,7 @@ export type DerivedSharedChampionRunFields = {
   mapId: string;
   ruleset: typeof SHARED_CHAMPION_SCORE_RULESET;
   elapsedMs: number;
-  scoreHalfPoints: number;
+  score: number;
   accuracyPct: number;
   wavesCleared: number;
   waveReached: number;
@@ -182,7 +177,7 @@ export function deriveRunFields(input: {
   playerName: string;
   mapId: string;
   summary: SharedChampionRunSummary;
-  scoreHalfPoints: number;
+  score: number;
   elapsedMs: number;
   buildId?: string | null;
 }): DerivedSharedChampionRunFields {
@@ -194,7 +189,7 @@ export function deriveRunFields(input: {
     mapId: sanitizeSharedChampionMapId(input.mapId),
     ruleset: SHARED_CHAMPION_SCORE_RULESET,
     elapsedMs: Math.max(0, Math.round(input.elapsedMs)),
-    scoreHalfPoints: Math.max(0, Math.round(input.scoreHalfPoints)),
+    score: Math.max(0, Math.round(input.score)),
     accuracyPct: Math.max(0, Math.round(input.summary.accuracy * 10) / 10),
     wavesCleared: waveProgress.wavesCleared,
     waveReached: waveProgress.waveReached,
@@ -391,6 +386,6 @@ export function toDailyResponse(input: {
   };
 }
 
-export function formatNullableScore(halfPoints: number | null): number | null {
-  return halfPoints === null ? null : scoreHalfPointsToValue(halfPoints);
+export function formatNullableScore(score: number | null): number | null {
+  return score;
 }

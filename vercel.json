@@ -1,4 +1,5 @@
 {
+  "buildCommand": "pnpm typecheck && pnpm build",
   "headers": [
     {
       "source": "/(.*)",

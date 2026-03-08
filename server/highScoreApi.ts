@@ -1,6 +1,6 @@
 import {
   isSharedChampionControlMode,
-  normalizeScoreHalfPoints,
+  normalizeScore,
   parseTelemetry,
   sanitizeSharedChampionName,
   validateTelemetry,
@@ -39,7 +39,7 @@ function parseSubmissionBody(value: unknown): SharedChampionPostRequest | null {
   const record = value as Record<string, unknown>;
   if (!isSharedChampionControlMode(record.controlMode)) return null;
 
-  const parsedScore = Number(record.scoreHalfPoints);
+  const parsedScore = Number(record.score ?? record.scoreHalfPoints);
   if (!Number.isFinite(parsedScore) || parsedScore < 0) return null;
 
   const telemetry = parseTelemetry(record.telemetry);
@@ -47,7 +47,7 @@ function parseSubmissionBody(value: unknown): SharedChampionPostRequest | null {
 
   return {
     playerName: sanitizeSharedChampionName(record.playerName, record.controlMode),
-    scoreHalfPoints: normalizeScoreHalfPoints(parsedScore),
+    score: normalizeScore(parsedScore),
     controlMode: record.controlMode,
     telemetry,
   };
@@ -123,7 +123,7 @@ export async function handleSharedChampionRequest(
         windowMs: 60_000,
         requireSameOrigin: false,
       });
-      if (!writeCheck.ok) {
+      if (writeCheck.ok === false) {
         await recordAuditEvent(store, {
           eventType: "champion-direct-write",
           outcome: "rejected",
@@ -181,9 +181,9 @@ export async function handleSharedChampionRequest(
           outcome: "rejected",
           ipFingerprint: writeCheck.clientIpFingerprint,
           userAgentFingerprint: writeCheck.userAgentFingerprint,
-          reason: "Expected { playerName, scoreHalfPoints, controlMode, telemetry, sessionToken }.",
+          reason: "Expected { playerName, score, controlMode, telemetry, sessionToken }.",
         });
-        return errorResponse(400, "Expected { playerName, scoreHalfPoints, controlMode, telemetry, sessionToken }.");
+        return errorResponse(400, "Expected { playerName, score, controlMode, telemetry, sessionToken }.");
       }
 
       // ── Telemetry validation ────────────────────────────────────────────
@@ -191,10 +191,10 @@ export async function handleSharedChampionRequest(
         console.log(`[champion-submit] ip=${clientIp} result=rejected reason=missing-telemetry`);
         return errorResponse(400, "Missing telemetry.");
       }
-      const telemetryResult = validateTelemetry(parsedBody.scoreHalfPoints, parsedBody.telemetry);
-      if (!telemetryResult.valid) {
+      const telemetryResult = validateTelemetry(parsedBody.score, parsedBody.telemetry);
+      if (telemetryResult.valid === false) {
         console.log(
-          `[champion-submit] ip=${clientIp} name=${parsedBody.playerName} score=${parsedBody.scoreHalfPoints} mode=${parsedBody.controlMode} result=rejected reason=telemetry-${telemetryResult.reason}`,
+          `[champion-submit] ip=${clientIp} name=${parsedBody.playerName} score=${parsedBody.score} mode=${parsedBody.controlMode} result=rejected reason=telemetry-${telemetryResult.reason}`,
         );
         return errorResponse(400, "Score telemetry validation failed.");
       }
@@ -206,7 +206,7 @@ export async function handleSharedChampionRequest(
       await store.logSubmission(clientIp);
 
       console.log(
-        `[champion-submit] ip=${clientIp} name=${parsedBody.playerName} score=${parsedBody.scoreHalfPoints} mode=${parsedBody.controlMode} result=${result.updated ? "accepted" : "not-higher"}`,
+        `[champion-submit] ip=${clientIp} name=${parsedBody.playerName} score=${parsedBody.score} mode=${parsedBody.controlMode} result=${result.updated ? "accepted" : "not-higher"}`,
       );
 
       await recordAuditEvent(store, {
@@ -216,7 +216,7 @@ export async function handleSharedChampionRequest(
         userAgentFingerprint: writeCheck.userAgentFingerprint,
         payload: {
           playerName: parsedBody.playerName,
-          scoreHalfPoints: parsedBody.scoreHalfPoints,
+          score: parsedBody.score,
           controlMode: parsedBody.controlMode,
           updated: result.updated,
         },

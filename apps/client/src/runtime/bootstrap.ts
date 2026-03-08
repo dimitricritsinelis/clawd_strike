@@ -40,7 +40,7 @@ import {
 } from "../shared/sharedChampionClient";
 import {
   isBetterSharedChampionCandidate,
-  scoreValueToHalfPoints,
+  normalizeScore,
   type SharedChampion,
   type SharedChampionRunSummary,
   type SharedChampionSnapshot,
@@ -63,7 +63,7 @@ const RUNTIME_TEXT_API_VERSION = 4;
 const PUBLIC_AGENT_API_VERSION = 1;
 const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
 const SCORE_STORAGE_PREFIX = "clawd-strike:score-best";
-const SCORE_RULESET_KEY = "wave-score-v1-k10-hs2_5";
+const SCORE_RULESET_KEY = "wave-score-v3-k5-wi2-hs2x";
 const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const AGENT_VISIBLE_RENDER_INTERVAL_MS = 1000 / 30;
 const AGENT_BACKGROUND_STEP_INTERVAL_MS = 500;
@@ -111,8 +111,8 @@ function shouldReplaceSharedChampion(
   if (currentChampion === null) {
     return true;
   }
-  if (nextChampion.scoreHalfPoints !== currentChampion.scoreHalfPoints) {
-    return nextChampion.scoreHalfPoints > currentChampion.scoreHalfPoints;
+  if (nextChampion.score !== currentChampion.score) {
+    return nextChampion.score > currentChampion.score;
   }
   return nextChampion.updatedAt >= currentChampion.updatedAt;
 }
@@ -594,9 +594,9 @@ function makeScoreStorageKey(mapId: string): string {
   return `${SCORE_STORAGE_PREFIX}:${mapId}:${SCORE_RULESET_KEY}`;
 }
 
-function roundScoreValue(value: number): number {
+function normalizeScoreValue(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.round(value * 2) / 2);
+  return Math.max(0, Math.round(value));
 }
 
 function splitOverlayMessages(text: string | null | undefined): string[] {
@@ -704,7 +704,7 @@ function readBestScore(storageKey: string): number {
     if (raw === null) return 0;
     const parsed = Number(raw);
     if (!Number.isFinite(parsed)) return 0;
-    return roundScoreValue(parsed);
+    return normalizeScoreValue(parsed);
   } catch {
     return 0;
   }
@@ -712,7 +712,7 @@ function readBestScore(storageKey: string): number {
 
 function writeBestScore(storageKey: string, value: number): void {
   try {
-    window.sessionStorage.setItem(storageKey, String(roundScoreValue(value)));
+    window.sessionStorage.setItem(storageKey, String(normalizeScoreValue(value)));
   } catch {
     // Ignore storage errors in constrained browser contexts.
   }
@@ -1184,6 +1184,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       runStats.shotsFired = 0;
       runStats.shotsHit = 0;
       runStats.headshots = 0;
+      runHeadshotsPerWave = [];
       runStartedAtMs = performance.now();
       lastDamageCause = null;
       previousHealth = game.getPlayerHealth();
@@ -1316,6 +1317,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     shotsHit: 0,
     headshots: 0,
   };
+  let runHeadshotsPerWave: number[] = [];
   let perfMsPerFrame = 16.67;
   let perfFps = 60;
   let perfDrawCalls = 0;
@@ -1375,12 +1377,12 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       applySharedChampionSnapshot(refreshed.snapshot);
     }
 
-    const candidateHalfPoints = scoreValueToHalfPoints(input.lastRunScore);
+    const candidateScore = normalizeScore(input.lastRunScore);
     const shouldSubmitSharedChampion = !refreshed.loadedFromNetwork
       || refreshed.snapshot.status === "idle"
       || refreshed.snapshot.status === "loading"
       || refreshed.snapshot.status === "unavailable"
-      || isBetterSharedChampionCandidate(refreshed.snapshot.champion, candidateHalfPoints);
+      || isBetterSharedChampionCandidate(refreshed.snapshot.champion, candidateScore);
 
     if (!shouldSubmitSharedChampion || !input.runSession) {
       return;
@@ -1471,12 +1473,17 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
           const killStartedAtMs = performance.now();
           killFeed.addKill(runtimeParams.playerName, event.enemyName, event.isHeadshot);
           weaponAudio.playKillDing();
+          const waveIndex = Math.floor(runStats.kills / 9); // before increment
           scoreHud.recordKill({ isHeadshot: event.isHeadshot });
           waveStats.kills++;
           runStats.kills++;
           if (event.isHeadshot) {
             waveStats.headshots++;
             runStats.headshots++;
+            while (runHeadshotsPerWave.length <= waveIndex) {
+              runHeadshotsPerWave.push(0);
+            }
+            runHeadshotsPerWave[waveIndex] = (runHeadshotsPerWave[waveIndex] ?? 0) + 1;
           }
           killFeedbackMs += performance.now() - killStartedAtMs;
           break;
@@ -1692,9 +1699,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         reloading: ammoSnapshot.reloading,
       },
       score: {
-        current: roundScoreValue(scoreHud.getScore()),
-        best: roundScoreValue(bestScore),
-        lastRun: lastRunScore === null ? null : roundScoreValue(lastRunScore),
+        current: normalizeScoreValue(scoreHud.getScore()),
+        best: normalizeScoreValue(bestScore),
+        lastRun: lastRunScore === null ? null : normalizeScoreValue(lastRunScore),
         scope: "browser-session",
       },
       sharedChampion: sharedChampionSnapshot.champion,
@@ -1750,16 +1757,22 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
     const aliveNow = !game.getIsDead();
     if (!aliveNow && wasAlive) {
-      lastRunScore = roundScoreValue(scoreHud.getScore());
+      lastRunScore = normalizeScoreValue(scoreHud.getScore());
       const nextBestScore = Math.max(bestScore, lastRunScore);
       const deathCause = lastDamageCause ?? "unknown";
       const accuracy = runStats.shotsFired > 0
         ? Math.round(((runStats.shotsHit / runStats.shotsFired) * 100) * 10) / 10
         : 0;
+      // Pad headshotsPerWave to expected length (waves with 0 headshots)
+      const expectedWaves = runStats.kills > 0 ? Math.ceil(runStats.kills / 9) : 0;
+      while (runHeadshotsPerWave.length < expectedWaves) {
+        runHeadshotsPerWave.push(0);
+      }
       const sharedChampionRunSummary: SharedChampionRunSummary = {
         survivalTimeS: Math.round((Math.max(0, performance.now() - runStartedAtMs) / 1000) * 10) / 10,
         kills: runStats.kills,
         headshots: runStats.headshots,
+        headshotsPerWave: [...runHeadshotsPerWave],
         shotsFired: runStats.shotsFired,
         shotsHit: runStats.shotsHit,
         accuracy,
@@ -1774,7 +1787,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         shotsHit: sharedChampionRunSummary.shotsHit,
         accuracy: sharedChampionRunSummary.accuracy,
         finalScore: sharedChampionRunSummary.finalScore,
-        bestScore: roundScoreValue(nextBestScore),
+        bestScore: normalizeScoreValue(nextBestScore),
         deathCause,
       };
       if (lastRunScore > bestScore) {

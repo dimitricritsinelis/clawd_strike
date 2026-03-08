@@ -48,14 +48,14 @@ Clawd Strike is deployed publicly on Vercel. This document covers every security
 **How it works**:
 - POST body must include `telemetry: { kills, headshots, shotsFired, shotsHit, survivalTimeS }`.
 - Server checks:
-  - `scoreHalfPoints === kills * 20 + headshots * 5` (formula match)
+  - `score === kills * 5 + headshots * 5` (flat formula match for admin writes)
   - `headshots <= kills`
   - `shotsHit >= kills` (when kills > 0)
   - `shotsFired >= shotsHit`
   - `survivalTimeS > 0`
   - `kills / survivalTimeS <= 5` (plausibility cap)
 
-**Score formula**: `score_points = kills * 10 + headshots * 2.5`. Stored as half-points (multiplied by 2) to avoid floating point.
+**Score formula**: Wave-scaled — `killValue(w) = 5 + (w-1)*2`, headshot bonus = killValue (2× multiplier). Public runs use per-wave headshot tracking. Admin writes use flat formula: `score = kills * 5 + headshots * 5`. Scores are always integers.
 
 **Files**:
 - `apps/shared/highScore.ts` — `parseTelemetry()`, `validateTelemetry()`

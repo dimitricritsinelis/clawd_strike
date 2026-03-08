@@ -9,18 +9,28 @@ type LoadingScreenUICallbacks = {
   onSelectMode: (mode: LoadingScreenMode, playerName: string) => void;
 };
 
+type BannerOptions = {
+  persist?: boolean;
+};
+
 export type LoadingScreenUI = {
   show: () => void;
   dispose: () => void;
+  setBackgroundReady: (ready: boolean) => void;
   setAssetReady: (ready: boolean) => void;
   setTransitioning: (active: boolean) => void;
+  hydrateVisibleOverlayAssets: () => void;
+  waitForVisibleOverlayAssets: () => Promise<boolean>;
+  warmLazyAssets: () => void;
   setSharedChampion: (snapshot: SharedChampionSnapshot) => void;
   setMuteState: (muted: boolean) => void;
   flashMuteToggle: () => void;
-  showBanner: (message: string) => void;
+  showBanner: (message: string, options?: BannerOptions) => void;
+  hideBanner: () => void;
   getState: () => {
     startVisible: boolean;
     bannerVisible: boolean;
+    backgroundReady: boolean;
     assetsReady: boolean;
     transitioning: boolean;
   };
@@ -73,16 +83,127 @@ function formatLoadingChampionScore(value: number): string {
   return Math.max(0, Math.round(value)).toLocaleString("en-US");
 }
 
+function getPreferredPictureSource(image: HTMLImageElement): string | null {
+  const picture = image.closest("picture");
+  if (!(picture instanceof HTMLPictureElement)) return null;
+
+  const sourceEls = Array.from(picture.querySelectorAll<HTMLSourceElement>("source[data-srcset]"));
+  for (const sourceEl of sourceEls) {
+    const deferredSrcset = sourceEl.dataset.srcset?.trim();
+    if (!deferredSrcset) continue;
+    if (sourceEl.media && !window.matchMedia(sourceEl.media).matches) continue;
+    return deferredSrcset.split(",")[0]?.trim().split(/\s+/)[0] ?? null;
+  }
+
+  return null;
+}
+
+function bindFallbackImage(image: HTMLImageElement, fallbackSrc: string | undefined): void {
+  if (!fallbackSrc || image.dataset.fallbackBound === "true") return;
+
+  image.dataset.fallbackBound = "true";
+  image.addEventListener(
+    "error",
+    () => {
+      if (image.getAttribute("src") === fallbackSrc) return;
+      image.src = fallbackSrc;
+    },
+    { once: true },
+  );
+}
+
+function hydrateDeferredSources(root: ParentNode): HTMLImageElement[] {
+  root.querySelectorAll<HTMLSourceElement>("source[data-srcset]").forEach((sourceEl) => {
+    const deferredSrcset = sourceEl.dataset.srcset;
+    if (!deferredSrcset || sourceEl.srcset === deferredSrcset) return;
+    sourceEl.srcset = deferredSrcset;
+  });
+
+  const images = Array.from(root.querySelectorAll<HTMLImageElement>("img[data-src]"));
+  for (const imageEl of images) {
+    const fallbackSrc = imageEl.dataset.src;
+    bindFallbackImage(imageEl, fallbackSrc);
+    const preferredSrc = getPreferredPictureSource(imageEl) ?? fallbackSrc;
+    if (!preferredSrc || imageEl.getAttribute("src") === preferredSrc) continue;
+    imageEl.src = preferredSrc;
+  }
+
+  return images;
+}
+
+function hydrateDeferredBackgroundImage(element: HTMLElement): void {
+  const backgroundUrl = element.dataset.bgUrl;
+  if (!backgroundUrl || element.style.backgroundImage.length > 0) return;
+  element.style.backgroundImage = `url("${backgroundUrl}")`;
+}
+
+function isImageReady(image: HTMLImageElement): boolean {
+  return image.currentSrc.length > 0 && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+}
+
+function hasImageFailed(image: HTMLImageElement): boolean {
+  return image.complete && (image.currentSrc.length === 0 || image.naturalWidth === 0 || image.naturalHeight === 0);
+}
+
+function waitForHydratedImages(images: HTMLImageElement[]): Promise<boolean> {
+  if (images.length === 0) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const tick = () => {
+      if (images.every((image) => isImageReady(image))) {
+        resolve(true);
+        return;
+      }
+
+      if (images.some((image) => hasImageFailed(image))) {
+        resolve(false);
+        return;
+      }
+
+      window.requestAnimationFrame(tick);
+    };
+
+    tick();
+  });
+}
+
+type IdleCapableWindow = Window & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
+function scheduleIdleWork(task: () => void): number {
+  const idleWindow = window as IdleCapableWindow;
+  if (typeof idleWindow.requestIdleCallback === "function") {
+    return idleWindow.requestIdleCallback(task, { timeout: 1200 });
+  }
+
+  return window.setTimeout(task, 180);
+}
+
+function cancelIdleWork(handle: number): void {
+  const idleWindow = window as IdleCapableWindow;
+  if (typeof idleWindow.cancelIdleCallback === "function") {
+    idleWindow.cancelIdleCallback(handle);
+    return;
+  }
+
+  window.clearTimeout(handle);
+}
+
 export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): LoadingScreenUI {
   const start = getRequiredEl<HTMLDivElement>("#start");
+  const loadingScreenOverlay = getRequiredEl<HTMLDivElement>("#loading-screen-overlay");
   const muteToggleBtn = getRequiredEl<HTMLButtonElement>("#mute-toggle-btn");
   const singlePlayerBtn = getRequiredEl<HTMLButtonElement>("#single-player-btn");
   const multiPlayerBtn = getRequiredEl<HTMLButtonElement>("#multi-player-btn");
   const infoBtn = getRequiredEl<HTMLButtonElement>("#info-btn");
   const skillsMdBtn = getRequiredEl<HTMLButtonElement>("#skills-md-btn");
   const enterAgentModeBtn = getRequiredEl<HTMLButtonElement>("#enter-agent-mode-btn");
+  const infoScreen = getRequiredEl<HTMLDivElement>("#info-screen");
   const modeBanner = getRequiredEl<HTMLDivElement>("#mode-banner");
   const playerNameInput = getRequiredEl<HTMLInputElement>("#player-name-input");
+  const nameEntry = getRequiredEl<HTMLDivElement>(".name-entry");
   const sharedChampionCard = getRequiredEl<HTMLElement>("#shared-champion-card");
   const sharedChampionNameEl = getRequiredEl<HTMLElement>("#shared-champion-name");
   const sharedChampionScoreEl = getRequiredEl<HTMLElement>("#shared-champion-score");
@@ -90,6 +211,11 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   let disposed = false;
   let bannerTimer: number | null = null;
   let pendingMode: LoadingScreenMode | null = null;
+  let visibleOverlayImages: HTMLImageElement[] = [];
+  let overlayAssetsHydrated = false;
+  let infoAssetsHydrated = false;
+  let nameEntryArtHydrated = false;
+  let lazyWarmupHandle: number | null = null;
   const playerNameMaxLength = playerNameInput.maxLength > 0 ? playerNameInput.maxLength : 15;
   let persistedAgentName = readPersistedAgentName(playerNameMaxLength);
   if (persistedAgentName.length > 0) {
@@ -98,12 +224,69 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   start.dataset.agentSubmenu = "false";
   start.dataset.nameEntryVisible = "false";
   start.dataset.infoVisible = "false";
+  start.dataset.backgroundReady = "false";
+  start.dataset.assetsReady = "false";
   start.dataset.transitioning = "false";
+  loadingScreenOverlay.setAttribute("aria-hidden", "true");
 
   function clearBannerTimer() {
     if (bannerTimer === null) return;
     window.clearTimeout(bannerTimer);
     bannerTimer = null;
+  }
+
+  function clearLazyWarmupHandle() {
+    if (lazyWarmupHandle === null) return;
+    cancelIdleWork(lazyWarmupHandle);
+    lazyWarmupHandle = null;
+  }
+
+  function showBanner(message: string, options: BannerOptions = {}) {
+    modeBanner.textContent = message;
+    modeBanner.classList.add("show");
+
+    clearBannerTimer();
+    if (options.persist) return;
+
+    bannerTimer = window.setTimeout(() => {
+      modeBanner.classList.remove("show");
+      bannerTimer = null;
+    }, 2200);
+  }
+
+  function hideBanner() {
+    clearBannerTimer();
+    modeBanner.classList.remove("show");
+    modeBanner.textContent = "";
+  }
+
+  function ensureVisibleOverlayAssetsHydrated() {
+    if (overlayAssetsHydrated) return;
+    visibleOverlayImages = hydrateDeferredSources(loadingScreenOverlay);
+    hydrateDeferredBackgroundImage(sharedChampionCard);
+    overlayAssetsHydrated = true;
+  }
+
+  function ensureInfoScreenAssetsHydrated() {
+    if (infoAssetsHydrated) return;
+    hydrateDeferredSources(infoScreen);
+    infoAssetsHydrated = true;
+  }
+
+  function ensureNameEntryArtHydrated() {
+    if (nameEntryArtHydrated) return;
+    hydrateDeferredBackgroundImage(nameEntry);
+    nameEntryArtHydrated = true;
+  }
+
+  function queueLazyAssetWarmup() {
+    if (lazyWarmupHandle !== null) return;
+    lazyWarmupHandle = scheduleIdleWork(() => {
+      lazyWarmupHandle = null;
+      if (disposed) return;
+      ensureInfoScreenAssetsHydrated();
+      ensureNameEntryArtHydrated();
+    });
   }
 
   function onWarmupAudio() {
@@ -154,6 +337,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   }
 
   function revealNameEntry(mode: LoadingScreenMode) {
+    ensureNameEntryArtHydrated();
     pendingMode = mode;
     playerNameInput.placeholder = mode === "agent" ? "AGENT NAME" : "HUMAN NAME";
     if (mode === "agent" && persistedAgentName.length > 0) {
@@ -178,13 +362,16 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
   function showInfoScreen() {
     if (start.dataset.infoVisible === "true") return;
+    ensureInfoScreenAssetsHydrated();
     start.dataset.infoVisible = "true";
+    infoScreen.setAttribute("aria-hidden", "false");
     closeNameAndModePanels();
   }
 
   function closeInfoScreen() {
     if (start.dataset.infoVisible !== "true") return;
     start.dataset.infoVisible = "false";
+    infoScreen.setAttribute("aria-hidden", "true");
   }
 
   function toggleInfoScreen() {
@@ -239,20 +426,9 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     submitPendingModeSelection();
   }
 
-  function showTransientBanner(message: string) {
-    modeBanner.textContent = message;
-    modeBanner.classList.add("show");
-
-    clearBannerTimer();
-    bannerTimer = window.setTimeout(() => {
-      modeBanner.classList.remove("show");
-      bannerTimer = null;
-    }, 2200);
-  }
-
   function onOpenSkillsMd() {
     if (disposed) return;
-    showTransientBanner("Opening skills.md");
+    showBanner("Opening skills.md");
     window.open(SKILLS_MD_PLACEHOLDER_URL, "_blank", "noopener,noreferrer");
   }
 
@@ -318,28 +494,48 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
     sharedChampionCard.dataset.state = "empty";
     sharedChampionNameEl.textContent = "CLAIM THE CROWN";
-    sharedChampionScoreEl.textContent = "OPEN";
+    sharedChampionScoreEl.textContent = "9999";
   }
 
   return {
     show() {
       start.style.display = "grid";
     },
+    setBackgroundReady(ready) {
+      const nextValue = ready ? "true" : "false";
+      if (start.dataset.backgroundReady === nextValue) return;
+      start.dataset.backgroundReady = nextValue;
+    },
     setAssetReady(ready) {
       const nextValue = ready ? "true" : "false";
       if (start.dataset.assetsReady === nextValue) return;
       start.dataset.assetsReady = nextValue;
+      loadingScreenOverlay.setAttribute("aria-hidden", ready ? "false" : "true");
+      if (ready) {
+        queueLazyAssetWarmup();
+      }
     },
     setTransitioning(active) {
       const nextValue = active ? "true" : "false";
       if (start.dataset.transitioning === nextValue) return;
       start.dataset.transitioning = nextValue;
     },
+    hydrateVisibleOverlayAssets() {
+      ensureVisibleOverlayAssetsHydrated();
+    },
+    waitForVisibleOverlayAssets() {
+      ensureVisibleOverlayAssetsHydrated();
+      return waitForHydratedImages(visibleOverlayImages);
+    },
+    warmLazyAssets() {
+      queueLazyAssetWarmup();
+    },
     setSharedChampion,
     dispose() {
       if (disposed) return;
       disposed = true;
       clearBannerTimer();
+      clearLazyWarmupHandle();
 
       start.removeEventListener("pointerdown", onStartPointerDown);
       start.removeEventListener("pointerup", onStartPointerUp);
@@ -366,13 +562,17 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       void muteToggleBtn.offsetWidth;
       muteToggleBtn.classList.add("flash");
     },
-    showBanner(message) {
-      showTransientBanner(message);
+    showBanner(message, options) {
+      showBanner(message, options);
+    },
+    hideBanner() {
+      hideBanner();
     },
     getState() {
       return {
         startVisible: start.style.display !== "none",
         bannerVisible: modeBanner.classList.contains("show"),
+        backgroundReady: start.dataset.backgroundReady === "true",
         assetsReady: start.dataset.assetsReady === "true",
         transitioning: start.dataset.transitioning === "true",
       };

@@ -2,12 +2,12 @@ export const HIGH_SCORE_PLAYER_NAME_MAX_LENGTH = 15;
 export const HIGH_SCORE_MAP_ID_MAX_LENGTH = 64;
 export const SITEWIDE_CHAMPION_SCOPE = "sitewide";
 export const SITEWIDE_CHAMPION_BOARD_KEY = "default";
-export const SHARED_CHAMPION_SCORE_RULESET = "wave-score-v1-k10-hs2_5";
+export const SHARED_CHAMPION_SCORE_RULESET = "wave-score-v3-k5-wi2-hs2x";
 export const SHARED_CHAMPION_WAVE_ENEMY_COUNT = 9;
 export const SHARED_CHAMPION_WAVE_RESPAWN_DELAY_S = 5;
 export const SHARED_CHAMPION_FIRE_INTERVAL_S = 0.1;
-export const SHARED_CHAMPION_KILL_SCORE_HALF_POINTS = 20;
-export const SHARED_CHAMPION_HEADSHOT_BONUS_HALF_POINTS = 5;
+export const SHARED_CHAMPION_KILL_SCORE = 5;
+export const SHARED_CHAMPION_WAVE_SCORE_INCREMENT = 2;
 export const SHARED_CHAMPION_RUN_TOKEN_TTL_MS = 30 * 60 * 1000;
 export const SHARED_CHAMPION_SCORE_WRITE_ENDPOINT = "/api/high-score";
 export const SHARED_CHAMPION_RUN_START_ENDPOINT = "/api/run/start";
@@ -24,7 +24,6 @@ export type SharedChampionRunDeathCause = "enemy-fire" | "unknown";
 export type SharedChampion = {
   holderName: string;
   score: number;
-  scoreHalfPoints: number;
   controlMode: SharedChampionControlMode;
   scope: typeof SITEWIDE_CHAMPION_SCOPE;
   updatedAt: string;
@@ -51,7 +50,7 @@ export type SharedChampionPostTelemetry = {
 
 export type SharedChampionPostRequest = {
   playerName: string;
-  scoreHalfPoints: number;
+  score: number;
   controlMode: SharedChampionControlMode;
   telemetry?: SharedChampionPostTelemetry;
 };
@@ -78,6 +77,7 @@ export type SharedChampionRunSummary = {
   survivalTimeS: number;
   kills: number;
   headshots: number;
+  headshotsPerWave: number[];
   shotsFired: number;
   shotsHit: number;
   accuracy: number;
@@ -100,7 +100,7 @@ export type SharedChampionRunFinishResponse = {
 export type SharedChampionRunValidation =
   | {
       ok: true;
-      computedScoreHalfPoints: number;
+      computedScore: number;
       elapsedMs: number;
       maxKills: number;
       maxShotsFired: number;
@@ -108,7 +108,7 @@ export type SharedChampionRunValidation =
   | {
       ok: false;
       reason: string;
-      computedScoreHalfPoints: number;
+      computedScore: number;
       elapsedMs: number;
       maxKills: number;
       maxShotsFired: number;
@@ -142,23 +142,10 @@ export function sanitizeSharedChampionMapId(value: unknown): string {
   return normalized.length > 0 ? normalized : "unknown-map";
 }
 
-export function normalizeScoreHalfPoints(value: unknown): number {
+export function normalizeScore(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(0, Math.round(parsed));
-}
-
-export function roundScoreValue(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.round(value * 2) / 2);
-}
-
-export function scoreHalfPointsToValue(value: unknown): number {
-  return roundScoreValue(normalizeScoreHalfPoints(value) / 2);
-}
-
-export function scoreValueToHalfPoints(value: number): number {
-  return normalizeScoreHalfPoints(roundScoreValue(value) * 2);
 }
 
 export function normalizeRunCount(value: unknown): number {
@@ -184,20 +171,44 @@ export function computeAccuracyPercent(shotsHit: number, shotsFired: number): nu
   return normalizeAccuracyPercent((shotsHit / shotsFired) * 100);
 }
 
-export function calculateSharedChampionScoreHalfPoints(kills: number, headshots: number): number {
-  const normalizedKills = normalizeRunCount(kills);
-  const normalizedHeadshots = normalizeRunCount(headshots);
-  return (normalizedKills * SHARED_CHAMPION_KILL_SCORE_HALF_POINTS)
-    + (normalizedHeadshots * SHARED_CHAMPION_HEADSHOT_BONUS_HALF_POINTS);
+/** Base kill value for a 1-indexed wave number. */
+export function getWaveKillValue(wave: number): number {
+  return SHARED_CHAMPION_KILL_SCORE + (Math.max(1, wave) - 1) * SHARED_CHAMPION_WAVE_SCORE_INCREMENT;
 }
 
-export function calculateSharedChampionScoreValue(kills: number, headshots: number): number {
-  return scoreHalfPointsToValue(calculateSharedChampionScoreHalfPoints(kills, headshots));
+/** Headshot bonus for a 1-indexed wave number (2× multiplier: bonus = killValue). */
+export function getWaveHeadshotBonus(wave: number): number {
+  return getWaveKillValue(wave);
+}
+
+/** Flat score formula used only by admin telemetry validation. */
+export function calculateFlatScore(kills: number, headshots: number): number {
+  const normalizedKills = normalizeRunCount(kills);
+  const normalizedHeadshots = normalizeRunCount(headshots);
+  return (normalizedKills * SHARED_CHAMPION_KILL_SCORE)
+    + (normalizedHeadshots * SHARED_CHAMPION_KILL_SCORE);
+}
+
+/** Wave-scaled score from kills + per-wave headshot distribution. */
+export function calculateSharedChampionScore(kills: number, headshotsPerWave: number[]): number {
+  const normalizedKills = normalizeRunCount(kills);
+  const totalWaves = Math.ceil(normalizedKills / SHARED_CHAMPION_WAVE_ENEMY_COUNT);
+  let score = 0;
+  for (let w = 1; w <= totalWaves; w++) {
+    const killsInWave = Math.min(
+      SHARED_CHAMPION_WAVE_ENEMY_COUNT,
+      normalizedKills - (w - 1) * SHARED_CHAMPION_WAVE_ENEMY_COUNT,
+    );
+    const hsInWave = normalizeRunCount(headshotsPerWave[w - 1] ?? 0);
+    const kv = getWaveKillValue(w);
+    score += killsInWave * kv + hsInWave * kv;
+  }
+  return score;
 }
 
 export function createSharedChampion(input: {
   holderName: string;
-  scoreHalfPoints: number;
+  score: number;
   controlMode: SharedChampionControlMode;
   updatedAt: Date | string;
 }): SharedChampion {
@@ -207,8 +218,7 @@ export function createSharedChampion(input: {
 
   return {
     holderName: clampSharedChampionName(input.holderName),
-    scoreHalfPoints: normalizeScoreHalfPoints(input.scoreHalfPoints),
-    score: scoreHalfPointsToValue(input.scoreHalfPoints),
+    score: normalizeScore(input.score),
     controlMode: input.controlMode,
     scope: SITEWIDE_CHAMPION_SCOPE,
     updatedAt,
@@ -228,7 +238,7 @@ export function parseSharedChampion(value: unknown): SharedChampion | null {
 
   return createSharedChampion({
     holderName: record.holderName,
-    scoreHalfPoints: normalizeScoreHalfPoints(record.scoreHalfPoints),
+    score: normalizeScore(record.score),
     controlMode: record.controlMode,
     updatedAt,
   });
@@ -252,23 +262,34 @@ export function parseSharedChampionPostResponse(value: unknown): SharedChampionP
   };
 }
 
+function normalizeHeadshotsPerWave(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const result: number[] = [];
+  for (const item of value) {
+    result.push(normalizeRunCount(item));
+  }
+  return result;
+}
+
 export function normalizeSharedChampionRunSummary(value: unknown): SharedChampionRunSummary | null {
   if (!value || typeof value !== "object") return null;
 
   const record = value as Record<string, unknown>;
-  const deathCause = record.deathCause;
-  if (deathCause !== undefined && !isSharedChampionRunDeathCause(deathCause)) {
+  const rawDeathCause = record.deathCause;
+  if (rawDeathCause !== undefined && !isSharedChampionRunDeathCause(rawDeathCause)) {
     return null;
   }
+  const deathCause = rawDeathCause as SharedChampionRunDeathCause | undefined;
 
   return {
     survivalTimeS: normalizeRunSeconds(record.survivalTimeS),
     kills: normalizeRunCount(record.kills),
     headshots: normalizeRunCount(record.headshots),
+    headshotsPerWave: normalizeHeadshotsPerWave(record.headshotsPerWave),
     shotsFired: normalizeRunCount(record.shotsFired),
     shotsHit: normalizeRunCount(record.shotsHit),
     accuracy: normalizeAccuracyPercent(record.accuracy),
-    finalScore: roundScoreValue(typeof record.finalScore === "number" ? record.finalScore : Number(record.finalScore)),
+    finalScore: normalizeScore(record.finalScore),
     ...(deathCause !== undefined ? { deathCause } : {}),
   };
 }
@@ -300,21 +321,23 @@ export function parseSharedChampionRunFinishResponse(value: unknown): SharedCham
   const record = value as Record<string, unknown>;
   if (typeof record.accepted !== "boolean") return null;
   if (typeof record.updated !== "boolean") return null;
-  if (!(typeof record.reason === "string" || record.reason === null)) return null;
+  const reason = record.reason;
+  if (!(typeof reason === "string" || reason === null)) return null;
+  const normalizedReason: string | null = typeof reason === "string" ? reason : null;
   return {
     accepted: record.accepted,
     updated: record.updated,
     champion: record.champion === null ? null : parseSharedChampion(record.champion),
-    reason: record.reason,
+    reason: normalizedReason,
   };
 }
 
 export function isBetterSharedChampionCandidate(
   champion: SharedChampion | null,
-  scoreHalfPoints: number,
+  score: number,
 ): boolean {
-  const candidate = normalizeScoreHalfPoints(scoreHalfPoints);
-  return champion === null || candidate > champion.scoreHalfPoints;
+  const candidate = normalizeScore(score);
+  return champion === null || candidate > champion.score;
 }
 
 export function calculateSharedChampionMaxKills(elapsedMs: number): number {
@@ -336,16 +359,65 @@ export function validateSharedChampionRunSummary(
   const normalizedElapsedMs = Math.max(0, Math.round(elapsedMs));
   const maxKills = calculateSharedChampionMaxKills(normalizedElapsedMs);
   const maxShotsFired = calculateSharedChampionMaxShotsFired(normalizedElapsedMs);
-  const computedScoreHalfPoints = calculateSharedChampionScoreHalfPoints(summary.kills, summary.headshots);
+
+  // ── Per-wave headshot validation ──────────────────────────────────────────
+  const expectedWaveCount = summary.kills > 0
+    ? Math.ceil(summary.kills / SHARED_CHAMPION_WAVE_ENEMY_COUNT)
+    : 0;
+
+  if (summary.headshotsPerWave.length !== expectedWaveCount) {
+    return {
+      ok: false,
+      reason: "headshots-per-wave-length-mismatch",
+      computedScore: 0,
+      elapsedMs: normalizedElapsedMs,
+      maxKills,
+      maxShotsFired,
+    };
+  }
+
+  let headshotsPerWaveSum = 0;
+  for (let w = 0; w < summary.headshotsPerWave.length; w++) {
+    const hsInWave = summary.headshotsPerWave[w]!;
+    const killsInWave = Math.min(
+      SHARED_CHAMPION_WAVE_ENEMY_COUNT,
+      summary.kills - w * SHARED_CHAMPION_WAVE_ENEMY_COUNT,
+    );
+    if (hsInWave < 0 || hsInWave > killsInWave) {
+      return {
+        ok: false,
+        reason: "headshots-per-wave-out-of-range",
+        computedScore: 0,
+        elapsedMs: normalizedElapsedMs,
+        maxKills,
+        maxShotsFired,
+      };
+    }
+    headshotsPerWaveSum += hsInWave;
+  }
+
+  if (headshotsPerWaveSum !== summary.headshots) {
+    return {
+      ok: false,
+      reason: "headshots-per-wave-sum-mismatch",
+      computedScore: 0,
+      elapsedMs: normalizedElapsedMs,
+      maxKills,
+      maxShotsFired,
+    };
+  }
+
+  // ── Score computation using wave-scaled formula ───────────────────────────
+  const computedScore = calculateSharedChampionScore(summary.kills, summary.headshotsPerWave);
   const expectedAccuracy = computeAccuracyPercent(summary.shotsHit, summary.shotsFired);
   const survivalTimeDeltaMs = Math.abs((summary.survivalTimeS * 1000) - normalizedElapsedMs);
-  const reportedScoreHalfPoints = scoreValueToHalfPoints(summary.finalScore);
+  const reportedScore = normalizeScore(summary.finalScore);
 
   if (summary.headshots > summary.kills) {
     return {
       ok: false,
       reason: "headshots-exceed-kills",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
@@ -356,7 +428,7 @@ export function validateSharedChampionRunSummary(
     return {
       ok: false,
       reason: "shots-hit-exceed-shots-fired",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
@@ -367,7 +439,7 @@ export function validateSharedChampionRunSummary(
     return {
       ok: false,
       reason: "kills-exceed-shots-hit",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
@@ -378,7 +450,7 @@ export function validateSharedChampionRunSummary(
     return {
       ok: false,
       reason: "kills-exceed-cap",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
@@ -389,18 +461,18 @@ export function validateSharedChampionRunSummary(
     return {
       ok: false,
       reason: "shots-fired-exceed-cap",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
     };
   }
 
-  if (reportedScoreHalfPoints !== computedScoreHalfPoints) {
+  if (reportedScore !== computedScore) {
     return {
       ok: false,
       reason: "score-does-not-match-stats",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
@@ -411,7 +483,7 @@ export function validateSharedChampionRunSummary(
     return {
       ok: false,
       reason: "accuracy-does-not-match-stats",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
@@ -422,7 +494,7 @@ export function validateSharedChampionRunSummary(
     return {
       ok: false,
       reason: "survival-time-out-of-range",
-      computedScoreHalfPoints,
+      computedScore,
       elapsedMs: normalizedElapsedMs,
       maxKills,
       maxShotsFired,
@@ -431,7 +503,7 @@ export function validateSharedChampionRunSummary(
 
   return {
     ok: true,
-    computedScoreHalfPoints,
+    computedScore,
     elapsedMs: normalizedElapsedMs,
     maxKills,
     maxShotsFired,
@@ -439,7 +511,7 @@ export function validateSharedChampionRunSummary(
 }
 
 export function formatSharedChampionScore(value: number): string {
-  return roundScoreValue(value).toLocaleString("en-US");
+  return normalizeScore(value).toLocaleString("en-US");
 }
 
 export function formatSharedChampionMode(mode: SharedChampionControlMode): string {
@@ -448,8 +520,8 @@ export function formatSharedChampionMode(mode: SharedChampionControlMode): strin
 
 // ── Telemetry parsing & validation ──────────────────────────────────────────
 
-const SCORE_PER_KILL_HALF_POINTS = 20; // 10 points * 2
-const SCORE_PER_HEADSHOT_HALF_POINTS = 5; // 2.5 points * 2
+const TELEMETRY_SCORE_PER_KILL = 5;
+const TELEMETRY_SCORE_PER_HEADSHOT = 5;
 const MAX_KILLS_PER_SECOND = 5;
 
 export function parseTelemetry(value: unknown): SharedChampionPostTelemetry | null {
@@ -480,15 +552,15 @@ export type TelemetryValidationResult =
   | { valid: false; reason: string };
 
 export function validateTelemetry(
-  scoreHalfPoints: number,
+  score: number,
   telemetry: SharedChampionPostTelemetry,
 ): TelemetryValidationResult {
   const { kills, headshots, shotsFired, shotsHit, survivalTimeS } = telemetry;
 
-  // Score formula: half_points = kills * 20 + headshots * 5
-  const expectedHalfPoints =
-    kills * SCORE_PER_KILL_HALF_POINTS + headshots * SCORE_PER_HEADSHOT_HALF_POINTS;
-  if (scoreHalfPoints !== expectedHalfPoints) {
+  // Flat score formula (admin-only): score = kills * 5 + headshots * 5
+  const expectedScore =
+    kills * TELEMETRY_SCORE_PER_KILL + headshots * TELEMETRY_SCORE_PER_HEADSHOT;
+  if (score !== expectedScore) {
     return { valid: false, reason: "score-mismatch" };
   }
 

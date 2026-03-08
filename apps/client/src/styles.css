@@ -41,6 +41,8 @@ body {
   display: grid;
   place-items: center;
   pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
 
   background-image:
     radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
@@ -55,10 +57,26 @@ body {
   background-size: cover;
   background-position: center center;
 }
+#loading-screen-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  will-change: opacity;
+}
+#start[data-assets-ready="true"] #loading-screen-overlay {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
 #start .panel {
   width: min(1080px, calc(100vw - 52px));
   height: 100%;
   position: relative;
+  justify-self: center;
 }
 #start .panel,
 #start .logo-wrap,
@@ -86,30 +104,6 @@ body {
   -webkit-touch-callout: none;
   -webkit-user-drag: none;
   -webkit-tap-highlight-color: transparent;
-}
-#start #mute-toggle-btn,
-#start #info-btn,
-#start .logo-wrap,
-#start .actions,
-#start .shared-champion-card {
-  transition: opacity 120ms ease;
-}
-#start[data-assets-ready="false"] #mute-toggle-btn,
-#start[data-assets-ready="false"] #info-btn,
-#start[data-assets-ready="false"] .logo-wrap,
-#start[data-assets-ready="false"] .actions,
-#start[data-assets-ready="false"] .shared-champion-card {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-#start[data-assets-ready="true"] #mute-toggle-btn,
-#start[data-assets-ready="true"] #info-btn,
-#start[data-assets-ready="true"] .logo-wrap,
-#start[data-assets-ready="true"] .actions,
-#start[data-assets-ready="true"] .shared-champion-card {
-  opacity: 1;
-  visibility: visible;
 }
 #start[data-transitioning="true"] {
   pointer-events: none;
@@ -258,7 +252,7 @@ body {
 }
 #start .actions {
   position: absolute;
-  left: calc(50% - 16px);
+  left: 50%;
   transform: translateX(-50%);
 }
 #start .actions-buttons {
@@ -270,18 +264,17 @@ body {
 }
 #start .actions-nameplate {
   top: 435px;
-  left: calc(50% - 11px);
+  left: 50%;
   width: min(364px, calc(100vw - 150px));
   display: none;
 }
 #start .shared-champion-card {
   position: absolute;
   left: 50%;
-  top: 618px;
+  top: 598px;
   transform: translateX(-50%);
-  width: min(320px, calc(100vw - 30px));
+  width: min(384px, calc(100vw - 30px));
   aspect-ratio: 3 / 2;
-  background-image: url("/loading-screen/assets/loading-world-champion-badge.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
@@ -291,13 +284,13 @@ body {
     drop-shadow(0 18px 30px rgba(0, 0, 0, 0.3))
     drop-shadow(0 8px 18px rgba(0, 0, 0, 0.2));
   --shared-champion-name-color: rgba(255, 241, 224, 0.95);
-  --shared-champion-name-size: clamp(10px, 0.9vw, 14px);
+  --shared-champion-name-size: clamp(12px, 1.08vw, 17px);
   --shared-champion-name-spacing: 0.03em;
   --shared-champion-name-shadow:
     0 1px 0 rgba(49, 24, 7, 0.92),
     0 0 10px rgba(18, 9, 4, 0.2);
   --shared-champion-score-color: #ffd78d;
-  --shared-champion-score-size: clamp(12px, 1.02vw, 16px);
+  --shared-champion-score-size: clamp(14px, 1.22vw, 19px);
   --shared-champion-score-spacing: 0.03em;
   --shared-champion-score-shadow:
     0 1px 0 rgba(78, 39, 11, 0.95),
@@ -324,24 +317,24 @@ body {
   user-select: none;
 }
 #start .shared-champion-name {
-  left: 9.3%;
-  top: 37.4%;
-  width: 56.2%;
-  height: 23.6%;
+  left: 7%;
+  top: 38%;
+  width: 62.8%;
+  height: 22.2%;
   justify-content: center;
-  padding: 0 1px;
+  padding: 0 2.4%;
   color: var(--shared-champion-name-color);
   font-size: var(--shared-champion-name-size);
   letter-spacing: var(--shared-champion-name-spacing);
   text-shadow: var(--shared-champion-name-shadow);
 }
 #start .shared-champion-score {
-  left: 72.6%;
-  top: 37.6%;
-  width: 14.6%;
-  height: 23.3%;
+  left: 73.5%;
+  top: 39.2%;
+  width: 17.6%;
+  height: 19.8%;
   justify-content: flex-end;
-  padding: 0 7px 0 1px;
+  padding: 0 1.8% 0 0.6%;
   color: var(--shared-champion-score-color);
   font-size: var(--shared-champion-score-size);
   font-weight: 800;
@@ -352,14 +345,14 @@ body {
 }
 #start .shared-champion-card[data-state="unavailable"] {
   --shared-champion-name-color: rgba(255, 222, 203, 0.98);
-  --shared-champion-name-size: clamp(9px, 0.82vw, 12px);
+  --shared-champion-name-size: clamp(11px, 0.98vw, 14px);
   --shared-champion-name-spacing: 0.12em;
   --shared-champion-name-shadow:
     0 1px 0 rgba(66, 22, 8, 0.94),
     0 0 12px rgba(161, 64, 32, 0.18);
   --shared-champion-score-color: rgba(255, 205, 178, 0.95);
-  --shared-champion-score-size: clamp(10px, 0.95vw, 13px);
-  --shared-champion-score-spacing: 0.12em;
+  --shared-champion-score-size: clamp(11px, 1.05vw, 14px);
+  --shared-champion-score-spacing: 0.04em;
   --shared-champion-score-shadow:
     0 1px 0 rgba(74, 24, 8, 0.96),
     0 0 10px rgba(174, 72, 36, 0.14);
@@ -367,14 +360,14 @@ body {
 #start .shared-champion-card[data-state="loading"],
 #start .shared-champion-card[data-state="empty"] {
   --shared-champion-name-color: rgba(254, 239, 213, 0.98);
-  --shared-champion-name-size: clamp(9px, 0.84vw, 12px);
+  --shared-champion-name-size: clamp(11px, 1vw, 14px);
   --shared-champion-name-spacing: 0.11em;
   --shared-champion-name-shadow:
     0 1px 0 rgba(66, 35, 11, 0.94),
     0 0 10px rgba(255, 214, 142, 0.12);
   --shared-champion-score-color: rgba(255, 228, 167, 0.98);
-  --shared-champion-score-size: clamp(10px, 0.98vw, 13px);
-  --shared-champion-score-spacing: 0.14em;
+  --shared-champion-score-size: clamp(11px, 1.08vw, 14px);
+  --shared-champion-score-spacing: 0.04em;
   --shared-champion-score-shadow:
     0 1px 0 rgba(90, 51, 16, 0.96),
     0 0 12px rgba(255, 202, 92, 0.14);
@@ -531,7 +524,6 @@ body {
   min-width: 0;
   margin: 0 auto 2px;
   aspect-ratio: 3 / 2;
-  background-image: url("/loading-screen/assets/loading-nameplate-callsign.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
@@ -660,20 +652,20 @@ body {
     max-width: calc(100vw - 18px);
   }
   #start .actions {
-    left: calc(50% - 16px);
+    left: 50%;
   }
   #start .actions-buttons {
     gap: 18px;
-    top: 75%;
-    width: min(420px, calc(100vw - 26px));
+    top: 59%;
+    width: min(364px, calc(100vw - 26px));
   }
   #start .shared-champion-card {
     top: auto;
     left: 50%;
     right: auto;
     transform: translateX(-50%);
-    width: min(390px, calc(100vw - 18px));
-    bottom: 18px;
+    width: min(384px, calc(100vw - 24px));
+    bottom: 34px;
   }
   #start .shared-champion-name {
     font-size: var(--shared-champion-name-size);

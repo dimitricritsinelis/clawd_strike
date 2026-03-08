@@ -107,7 +107,7 @@ export async function handleSharedChampionRunStartRequest(
     windowMs: 60_000,
     requireSameOrigin: true,
   });
-  if (!writeCheck.ok) {
+  if (writeCheck.ok === false) {
     await recordAuditEvent(store, {
       eventType: "run-start",
       outcome: "rejected",
@@ -232,7 +232,7 @@ export async function handleSharedChampionRunFinishRequest(
     windowMs: 60_000,
     requireSameOrigin: true,
   });
-  if (!writeCheck.ok) {
+  if (writeCheck.ok === false) {
     await recordAuditEvent(store, {
       eventType: "run-finish",
       outcome: "rejected",
@@ -311,7 +311,7 @@ export async function handleSharedChampionRunFinishRequest(
     const elapsedMs = Math.max(0, claimedAtMs - issuedAtMs);
     const validation = validateSharedChampionRunSummary(parsedBody.summary, elapsedMs);
 
-    if (!validation.ok) {
+    if (validation.ok === false) {
       await recordAuditEvent(store, {
         eventType: "run-finish",
         outcome: "rejected",
@@ -336,7 +336,7 @@ export async function handleSharedChampionRunFinishRequest(
       tokenRecord: consumed.record,
       summary: parsedBody.summary,
       elapsedMs: validation.elapsedMs,
-      scoreHalfPoints: validation.computedScoreHalfPoints,
+      score: validation.computedScore,
       clientIpFingerprint: writeCheck.clientIpFingerprint,
       userAgentFingerprint: writeCheck.userAgentFingerprint,
     });
@@ -352,7 +352,7 @@ export async function handleSharedChampionRunFinishRequest(
         controlMode: consumed.record.controlMode,
         mapId: consumed.record.mapId,
         elapsedMs: validation.elapsedMs,
-        scoreHalfPoints: validation.computedScoreHalfPoints,
+        score: validation.computedScore,
         updated: result.updated,
         runId: result.run.runId,
         summary: parsedBody.summary,

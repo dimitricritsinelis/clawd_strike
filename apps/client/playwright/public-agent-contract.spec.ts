@@ -14,7 +14,6 @@ function expectSharedChampionShape(sharedChampion: unknown) {
   expect(sharedChampion).toEqual({
     holderName: expect.any(String),
     score: expect.any(Number),
-    scoreHalfPoints: expect.any(Number),
     controlMode: expect.stringMatching(/^(human|agent)$/),
     scope: "sitewide",
     updatedAt: expect.any(String),
@@ -50,6 +49,42 @@ async function dragAcrossSelector(page: Page, selector: string) {
   await page.mouse.up();
 }
 
+async function clearBrowserCache(page: Page) {
+  try {
+    const client = await page.context().newCDPSession(page);
+    await client.send("Network.enable");
+    await client.send("Network.clearBrowserCache");
+    await client.detach();
+  } catch {
+    // Chromium-only cache clearing; ignore when unavailable.
+  }
+}
+
+async function readLoadingScreenRevealState(page: Page) {
+  return page.evaluate(() => {
+    const start = document.querySelector<HTMLElement>("#start");
+    const overlay = document.querySelector<HTMLElement>("#loading-screen-overlay");
+    const banner = document.querySelector<HTMLElement>("#mode-banner");
+    const overlayStyle = overlay ? window.getComputedStyle(overlay) : null;
+    const images = Array.from(document.querySelectorAll<HTMLImageElement>("#loading-screen-overlay img")).map((image) => ({
+      currentSrc: image.currentSrc,
+      complete: image.complete,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+    }));
+
+    return {
+      backgroundReady: start?.dataset.backgroundReady ?? null,
+      assetsReady: start?.dataset.assetsReady ?? null,
+      overlayOpacity: overlayStyle?.opacity ?? null,
+      overlayVisibility: overlayStyle?.visibility ?? null,
+      bannerVisible: banner?.classList.contains("show") ?? false,
+      bannerText: banner?.textContent?.trim() ?? "",
+      images,
+    };
+  });
+}
+
 test("exposes the public agent contract before runtime boot", async ({ page }, testInfo) => {
   const recorder = attachConsoleRecorder(page);
 
@@ -72,6 +107,61 @@ test("exposes the public agent contract before runtime boot", async ({ page }, t
   expectSharedChampionShape(state.sharedChampion ?? null);
   expect(state.health).toBeNull();
   expect(state.ammo).toBeNull();
+  expect(recorder.counts().errorCount).toBe(0);
+});
+
+test("reveals the loading-screen overlay only after the first-paint art is fully ready", async ({ page }, testInfo) => {
+  const recorder = attachConsoleRecorder(page);
+  const baseUrl = testInfo.project.use.baseURL as string;
+  let delayedButtonRequestCount = 0;
+
+  await page.route("**/loading-screen/assets/*", async (route) => {
+    const url = route.request().url();
+    if (/\/loading-button-(human|agent|skill-md|enter-agent-mode)-(desktop|mobile)\.webp$/.test(url)) {
+      delayedButtonRequestCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 4200));
+    }
+    await route.continue();
+  });
+  await clearBrowserCache(page);
+
+  await page.goto(`${baseUrl}/`, {
+    waitUntil: "domcontentloaded",
+  });
+
+  await page.waitForSelector("#start[data-background-ready=\"true\"]");
+
+  await expect.poll(async () => readLoadingScreenRevealState(page)).toMatchObject({
+    backgroundReady: "true",
+    assetsReady: "false",
+    overlayOpacity: "0",
+    overlayVisibility: "hidden",
+  });
+
+  const stalledOverlayState = await readLoadingScreenRevealState(page);
+  expect(
+    stalledOverlayState.images.some((image) => image.currentSrc.length === 0 || image.complete === false || image.naturalWidth === 0),
+  ).toBe(true);
+
+  await page.waitForSelector("#start[data-assets-ready=\"true\"]", { timeout: 20_000 });
+
+  const readyOverlayState = await readLoadingScreenRevealState(page);
+  expect(delayedButtonRequestCount).toBeGreaterThan(0);
+  expect(readyOverlayState.backgroundReady).toBe("true");
+  expect(readyOverlayState.assetsReady).toBe("true");
+  expect(Number(readyOverlayState.overlayOpacity)).toBeGreaterThan(0.99);
+  expect(readyOverlayState.overlayVisibility).toBe("visible");
+  expect(readyOverlayState.images.length).toBeGreaterThan(0);
+  expect(
+    readyOverlayState.images.every((image) =>
+      image.currentSrc.length > 0
+      && image.complete
+      && image.naturalWidth > 0
+      && image.naturalHeight > 0),
+  ).toBe(true);
+
+  await page.waitForTimeout(250);
+  expect(await readLoadingScreenRevealState(page)).toMatchObject(readyOverlayState);
   expect(recorder.counts().errorCount).toBe(0);
 });
 

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS shared_champion_scores (
   board_key TEXT PRIMARY KEY,
-  score_half_points INTEGER NOT NULL CHECK (score_half_points >= 0),
+  score INTEGER NOT NULL CHECK (score >= 0),
   holder_name VARCHAR(15) NOT NULL,
   holder_mode TEXT NOT NULL CHECK (holder_mode IN ('human', 'agent')),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS shared_champion_runs (
   started_at TIMESTAMPTZ NOT NULL,
   ended_at TIMESTAMPTZ NOT NULL,
   elapsed_ms INTEGER NOT NULL CHECK (elapsed_ms >= 0),
-  score_half_points INTEGER NOT NULL CHECK (score_half_points >= 0),
+  score INTEGER NOT NULL CHECK (score >= 0),
   kills INTEGER NOT NULL CHECK (kills >= 0),
   headshots INTEGER NOT NULL CHECK (headshots >= 0),
   shots_fired INTEGER NOT NULL CHECK (shots_fired >= 0),
@@ -88,8 +88,8 @@ SELECT
   COUNT(DISTINCT player_name_key)::BIGINT AS unique_player_names,
   SUM(CASE WHEN control_mode = 'human' THEN 1 ELSE 0 END)::BIGINT AS human_runs,
   SUM(CASE WHEN control_mode = 'agent' THEN 1 ELSE 0 END)::BIGINT AS agent_runs,
-  MAX(score_half_points)::INTEGER AS best_score_half_points,
-  AVG(score_half_points)::DOUBLE PRECISION AS average_score_half_points,
+  MAX(score)::INTEGER AS best_score,
+  AVG(score)::DOUBLE PRECISION AS average_score,
   AVG(accuracy_pct)::DOUBLE PRECISION AS average_accuracy_pct
 FROM shared_champion_runs
 GROUP BY 1;
@@ -102,8 +102,8 @@ SELECT
   SUM(CASE WHEN champion_updated THEN 1 ELSE 0 END)::BIGINT AS champion_updates,
   SUM(CASE WHEN control_mode = 'human' THEN 1 ELSE 0 END)::BIGINT AS human_runs,
   SUM(CASE WHEN control_mode = 'agent' THEN 1 ELSE 0 END)::BIGINT AS agent_runs,
-  MAX(score_half_points)::INTEGER AS best_score_half_points,
-  AVG(score_half_points)::DOUBLE PRECISION AS average_score_half_points,
+  MAX(score)::INTEGER AS best_score,
+  AVG(score)::DOUBLE PRECISION AS average_score,
   AVG(accuracy_pct)::DOUBLE PRECISION AS average_accuracy_pct,
   MAX(created_at) AS latest_run_at
 FROM shared_champion_runs

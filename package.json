@@ -10,14 +10,17 @@
   "devDependencies": {
     "@types/node": "^24.3.0",
     "@types/pg": "^8.15.5",
+    "tsx": "^4.20.6",
     "vite": "^6.0.11"
   },
   "scripts": {
     "dev": "pnpm --filter @clawd-strike/client dev -- --port 5174",
     "build": "pnpm --filter @clawd-strike/client build",
     "preview": "pnpm --filter @clawd-strike/client preview",
+    "reconcile:shared-champion": "tsx scripts/reconcile-shared-champion.ts",
     "stats:admin": "bash apps/client/scripts/admin-stats.sh",
     "typecheck": "pnpm --filter @clawd-strike/client exec tsc -p ../../tsconfig.json --noEmit && pnpm --filter @clawd-strike/client typecheck",
+    "test:server": "tsx --test ./server/highScoreStoreImpl.test.ts",
     "test:playwright": "pnpm --filter @clawd-strike/client test:playwright",
     "smoke:no-context": "pnpm --filter @clawd-strike/client smoke:no-context",
     "verify:skills-contract": "pnpm --filter @clawd-strike/client verify:skills-contract",

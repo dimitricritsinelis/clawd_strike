@@ -3,7 +3,7 @@ Authority: normative
 Read when: map, visuals, ai, gameplay, ui, public-contract, perf, tooling, docs
 Owns: durable internal decisions that future tasks should not rediscover
 Do not use for: current task status, temporary bug lists, per-task notes, public browser-agent behavior details
-Last updated: 2026-03-07
+Last updated: 2026-03-08
 
 # Durable Decisions
 
@@ -72,3 +72,13 @@ Last updated: 2026-03-07
 - Every accepted validated run is persisted as a first-class server-side run record rather than only as audit JSON or the single shared champion row.
 - Public browser/game contracts stay unchanged; run history is exposed only through protected internal admin stats endpoints, not through `/skills.md` or public runtime payloads.
 - Client/network metadata for stats storage uses privacy-preserving HMAC fingerprints, not raw IP addresses or raw user-agent strings.
+
+## DEC-013: Shared champion storage accepts standard provider URL aliases
+- Shared champion server routes prefer explicit overrides (`POSTGRES_WRITE_URL`, `POSTGRES_READ_URL`) but must also accept standard marketplace/provider aliases such as `POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, `DATABASE_URL`, and `NEON_DATABASE_URL`.
+- Production compatibility with deployment-provided aliases is required for the public champion surface; do not narrow production back to a single env var name.
+- The resolver behavior is covered by a server-side regression test and CI job so deploy-time config assumptions fail before release.
+
+## DEC-014: Production shared-champion ops use explicit envs and fail-closed stats auth
+- Production deployments should set explicit `POSTGRES_WRITE_URL` and `POSTGRES_READ_URL` even though runtime alias fallback remains supported for compatibility.
+- Admin stats must fail closed in production when `STATS_ADMIN_TOKEN` is missing; the built-in fallback token is development-only.
+- Shared champion schema/history reconciliation runs through a dedicated operator command using an unpooled Postgres URL rather than relying on the first live request to bootstrap storage.
