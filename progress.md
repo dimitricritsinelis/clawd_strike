@@ -7,18 +7,19 @@ Last updated: 2026-03-08
 
 # progress.md — Clawd Strike Status
 
-Original prompt: i want you to trace down this error, fix it, and lets figure out how to make sure it doesnt break again, it feels breaking everytime i redeploy to vercel
+Original prompt: lets implement the following fixes: Increase to 10 bots per round, bots can’t stand on top of each other, and health needs to reset between each round.
 
 ## Active Change Tag
-- `tooling`
+- `bot-ai`
 
 ## Current Status (<=10 lines)
-- Traced the production high-score outage to legacy Postgres columns (`score_half_points`) that the current shared-champion runtime no longer migrated before querying `score`.
-- Reproduced the failure locally against pulled production envs: reconcile first failed with `column "score" does not exist`, then with legacy rollup-view dependencies on `score_half_points`.
-- Patched shared-champion schema maintenance to drop/recreate rollup views, migrate legacy half-point columns into integer `score`, and remove the obsolete columns safely.
-- Fixed the `pnpm reconcile:shared-champion` operator script so it no longer references deleted `*HalfPoints` fields.
-- Ran the repaired reconcile against the production database; the live endpoint now returns `200` and the champion payload (`big bossy`, score `573`).
-- Validation: `pnpm test:server`, `pnpm typecheck`, `pnpm build`, plus a live production `GET /api/high-score` verification on `2026-03-08`.
+- Raised the runtime wave roster from 9 to 10 via a shared enemy-count constant and updated score/wave bookkeeping to match 10-kill waves.
+- Added a tenth authored fallback spawn at west-hall north (`x=4.75`, `z=60`) and extended the role template to keep the extra bot as baseline rifler pressure.
+- Fixed bot ghosting in two layers: spawn selection/finalization now rejects overlapping footprints, and a deterministic post-movement depenetration pass keeps live bots from occupying the same space.
+- Restored player health to `100` on each new wave spawn; the wave-ammo-reset smoke now proves both ammo and health refill between rounds.
+- Updated `/skills.md` retry semantics to document full-health and full-ammo wave resets, and kept localhost/preview shared-champion calls offline so browser tests stay console-clean.
+- Aligned shared-champion ruleset metadata to 10-kill waves and bumped the ruleset version string to avoid mixing old and new score semantics.
+- Validation on 2026-03-08: `pnpm typecheck`, `pnpm build`, `pnpm --filter @clawd-strike/client exec playwright test playwright/death-restart.spec.ts playwright/public-agent-contract.spec.ts`, `BASE_URL=http://127.0.0.1:4174 pnpm --filter @clawd-strike/client smoke:wave-ammo-reset`, `BASE_URL=http://127.0.0.1:4174 pnpm --filter @clawd-strike/client bot:smoke`, `BASE_URL=http://127.0.0.1:4174 pnpm verify:skills-contract`, `BASE_URL=http://127.0.0.1:4174 pnpm smoke:no-context`.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:4174/?map=bazaar-map`
@@ -30,23 +31,25 @@ Original prompt: i want you to trace down this error, fix it, and lets figure ou
 ```bash
 pnpm typecheck
 pnpm build
-pnpm test:server
-pnpm test:playwright
-pnpm reconcile:shared-champion -- --help
 pnpm --filter @clawd-strike/client exec vite preview --host --port 4174
+BASE_URL=http://127.0.0.1:4174 pnpm --filter @clawd-strike/client exec playwright test playwright/death-restart.spec.ts playwright/public-agent-contract.spec.ts
+BASE_URL=http://127.0.0.1:4174 pnpm --filter @clawd-strike/client smoke:wave-ammo-reset
+BASE_URL=http://127.0.0.1:4174 pnpm --filter @clawd-strike/client bot:smoke
+BASE_URL=http://127.0.0.1:4174 pnpm verify:skills-contract
+BASE_URL=http://127.0.0.1:4174 pnpm smoke:no-context
 ```
 
 ## Last Completed Prompt
-- Title: Restore the Vercel high-score path and harden it against legacy schema drift
-- Changed: traced the production outage to unmigrated half-point score columns, patched runtime schema maintenance and the reconcile tool, and repaired the live production database.
-- Files: `server/highScoreStoreImpl.ts`, `server/highScoreStoreImpl.test.ts`, `scripts/reconcile-shared-champion.ts`, `progress.md`
-- Validation: pulled production envs, reproduced the DB failure locally, ran `pnpm test:server`, `pnpm typecheck`, `pnpm build`, executed `pnpm reconcile:shared-champion -- --env-file .env.production.local --json`, and verified `https://clawd-strike.vercel.app/api/high-score`.
+- Title: Raise bot waves to 10, remove bot overlap, and reset health each round
+- Changed: enemy wave sizing/spawn separation/live depenetration, wave health reset, score-wave bookkeeping, localhost shared-champion gating, and public `/skills.md` retry semantics.
+- Files: `apps/client/src/runtime/enemies/EnemyManager.ts`, `apps/client/src/runtime/enemies/EnemyController.ts`, `apps/client/src/runtime/game/Game.ts`, `apps/client/src/runtime/bootstrap.ts`, `apps/client/src/runtime/ui/ScoreHud.ts`, `apps/client/src/shared/sharedChampionClient.ts`, `apps/shared/highScore.ts`, `apps/client/public/skills.md`, `apps/client/playwright/death-restart.spec.ts`, `apps/client/playwright/public-agent-contract.spec.ts`, `apps/client/playwright/shared-champion.spec.ts`, `apps/client/scripts/wave-ammo-reset-smoke.mjs`, `apps/client/scripts/bot-intelligence-smoke.mjs`
+- Validation: see the Current Status validation line above.
 
 ## Next 3 Tasks
-1. Push the schema-migration fix so future Vercel redeploys carry the self-healing path in code, not only in the repaired database.
-2. Optionally add a deployment smoke that hits `/api/high-score` right after prod deploy and fails loudly on any non-`200` response.
-3. If score-history semantics matter, decide whether legacy half-point rows should stay rounded integers permanently or get a one-time historical note in internal ops docs.
+1. Run a short human combat pass on `http://127.0.0.1:4174/?map=bazaar-map` to verify hall pressure and round-to-round health refill subjectively, since only automated coverage was run this turn.
+2. If shared-champion production verification matters immediately, run the shared-champion Playwright suite against an API-enabled environment to confirm the bumped ruleset version behaves as expected end-to-end.
+3. Consider centralizing the preview/test base URL so the smoke scripts and preview port stop diverging between `4174` and `5174`.
 
 ## Known Issues / Risks
-- The live repair rounded legacy half-point values to integer `score` during migration (`1145 -> 573`), which matches the current integer-only contract but slightly changes historical display precision.
-- The admin-stats endpoint itself was not fully exercised in this turn because the ad hoc shell header interpolation failed; the public high-score path and DB schema were verified directly.
+- The required human combat pass from the repo completion standard was not performed in this turn; only automated browser/runtime validation was completed.
+- Shared-champion network calls are intentionally disabled on localhost/preview to avoid console-noise from missing local API routes; canonical deployments still use the network path.

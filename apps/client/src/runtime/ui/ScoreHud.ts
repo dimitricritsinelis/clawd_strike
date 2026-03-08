@@ -3,6 +3,7 @@ import {
   formatSharedChampionScore,
   type SharedChampionSnapshot,
 } from "../../../../shared/highScore";
+import { ENEMIES_PER_WAVE } from "../enemies/EnemyManager";
 
 type ScoreHudKillRecord = {
   isHeadshot: boolean;
@@ -25,7 +26,7 @@ export class ScoreHud {
   private headshots = 0;
   private score = 0;
   private readonly SCORE_BASE = 0;
-  private readonly WAVE_ENEMY_COUNT = 9;
+  private readonly WAVE_ENEMY_COUNT = ENEMIES_PER_WAVE;
   private readonly KILL_SCORE_BASE = 5;
   private readonly WAVE_SCORE_INCREMENT = 2;
   private flashTimerS = 0;

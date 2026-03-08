@@ -13,6 +13,7 @@ import {
 } from "../../../shared/highScore";
 
 const SHARED_CHAMPION_ENDPOINT = SHARED_CHAMPION_SCORE_WRITE_ENDPOINT;
+const LOCAL_PREVIEW_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 export type SharedChampionRunSession = {
   runToken: string;
@@ -40,7 +41,21 @@ export function getSharedChampionSnapshot(): SharedChampionSnapshot {
   return snapshot();
 }
 
+function canUseSharedChampionNetwork(): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+  return !LOCAL_PREVIEW_HOSTNAMES.has(window.location.hostname);
+}
+
 export async function loadSharedChampionWithMeta(options: { force?: boolean } = {}): Promise<LoadSharedChampionResult> {
+  if (!canUseSharedChampionNetwork()) {
+    status = champion ? "ready" : "unavailable";
+    return {
+      snapshot: snapshot(),
+      loadedFromNetwork: false,
+    };
+  }
   if (!options.force && status === "ready") {
     return {
       snapshot: snapshot(),
@@ -96,6 +111,9 @@ export async function loadSharedChampion(options: { force?: boolean } = {}): Pro
 export async function startSharedChampionRunSession(
   input: SharedChampionRunStartRequest,
 ): Promise<SharedChampionRunSession | null> {
+  if (!canUseSharedChampionNetwork()) {
+    return null;
+  }
   try {
     const response = await fetch(SHARED_CHAMPION_RUN_START_ENDPOINT, {
       method: "POST",
@@ -129,6 +147,15 @@ export async function submitSharedChampionRunSession(
   session: SharedChampionRunSession,
   summary: SharedChampionRunSummary,
 ): Promise<{ accepted: boolean; updated: boolean; reason: string | null; snapshot: SharedChampionSnapshot }> {
+  if (!canUseSharedChampionNetwork()) {
+    status = champion ? "ready" : "unavailable";
+    return {
+      accepted: false,
+      updated: false,
+      reason: "shared-champion-network-disabled",
+      snapshot: snapshot(),
+    };
+  }
   try {
     const response = await fetch(SHARED_CHAMPION_RUN_FINISH_ENDPOINT, {
       method: "POST",

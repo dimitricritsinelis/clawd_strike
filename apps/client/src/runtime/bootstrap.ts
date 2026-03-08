@@ -2,6 +2,7 @@ import { PerspectiveCamera, Vector3 } from "three";
 import { Game } from "./game/Game";
 import { PerfHud } from "./debug/PerfHud";
 import { setEnemyVisualModelStreamingEnabled } from "./enemies/EnemyVisual";
+import { ENEMIES_PER_WAVE } from "./enemies/EnemyManager";
 import { PointerLockController } from "./input/PointerLock";
 import { loadMap, RuntimeMapLoadError } from "./map/loadMap";
 import { designToWorldVec3 } from "./map/coordinateTransforms";
@@ -39,6 +40,7 @@ import {
   type SharedChampionRunSession,
 } from "../shared/sharedChampionClient";
 import {
+  SHARED_CHAMPION_SCORE_RULESET,
   isBetterSharedChampionCandidate,
   normalizeScore,
   type SharedChampion,
@@ -63,7 +65,7 @@ const RUNTIME_TEXT_API_VERSION = 4;
 const PUBLIC_AGENT_API_VERSION = 1;
 const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
 const SCORE_STORAGE_PREFIX = "clawd-strike:score-best";
-const SCORE_RULESET_KEY = "wave-score-v3-k5-wi2-hs2x";
+const SCORE_RULESET_KEY = SHARED_CHAMPION_SCORE_RULESET;
 const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const AGENT_VISIBLE_RENDER_INTERVAL_MS = 1000 / 30;
 const AGENT_BACKGROUND_STEP_INTERVAL_MS = 500;
@@ -1125,7 +1127,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   // Wire kill feed
   // Wire kill events → feed + ding + score counter
-  const TOTAL_ENEMIES = 9;
+  const TOTAL_ENEMIES = ENEMIES_PER_WAVE;
   scoreHud.setTotal(TOTAL_ENEMIES);
   game.setEnemyKillCallback((name, isHeadshot) => {
     enqueueCombatFeedback({
@@ -1306,7 +1308,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   // Per-wave stats counters (reset each new wave)
   const waveStats: RoundStats = {
     kills: 0,
-    totalEnemies: 9, // matches TOTAL_ENEMIES defined below
+    totalEnemies: TOTAL_ENEMIES,
     shotsFired: 0,
     shotsHit: 0,
     headshots: 0,
@@ -1473,7 +1475,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
           const killStartedAtMs = performance.now();
           killFeed.addKill(runtimeParams.playerName, event.enemyName, event.isHeadshot);
           weaponAudio.playKillDing();
-          const waveIndex = Math.floor(runStats.kills / 9); // before increment
+          const waveIndex = Math.floor(runStats.kills / TOTAL_ENEMIES); // before increment
           scoreHud.recordKill({ isHeadshot: event.isHeadshot });
           waveStats.kills++;
           runStats.kills++;
@@ -1764,7 +1766,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         ? Math.round(((runStats.shotsHit / runStats.shotsFired) * 100) * 10) / 10
         : 0;
       // Pad headshotsPerWave to expected length (waves with 0 headshots)
-      const expectedWaves = runStats.kills > 0 ? Math.ceil(runStats.kills / 9) : 0;
+      const expectedWaves = runStats.kills > 0 ? Math.ceil(runStats.kills / TOTAL_ENEMIES) : 0;
       while (runHeadshotsPerWave.length < expectedWaves) {
         runHeadshotsPerWave.push(0);
       }

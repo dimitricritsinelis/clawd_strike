@@ -639,6 +639,27 @@ export class EnemyController {
   isFiring(): boolean { return this.firingThisFrame; }
   getState(): EnemyState { return this.state; }
 
+  nudgeWithCollision(deltaX: number, deltaZ: number, worldColliders: WorldColliders): void {
+    if (this.dead) return;
+    if (Math.abs(deltaX) < 0.0001 && Math.abs(deltaZ) < 0.0001) return;
+
+    this.solver.moveAndCollide(
+      this.position,
+      deltaX,
+      deltaZ,
+      0,
+      worldColliders,
+      this.motionResult,
+    );
+
+    const bounds = worldColliders.playableBounds;
+    const halfWidth = ENEMY_HALF_WIDTH_M + BOUNDS_EPS;
+    if (this.position.x < bounds.minX + halfWidth) this.position.x = bounds.minX + halfWidth;
+    if (this.position.x > bounds.maxX - halfWidth) this.position.x = bounds.maxX - halfWidth;
+    if (this.position.z < bounds.minZ + halfWidth) this.position.z = bounds.minZ + halfWidth;
+    if (this.position.z > bounds.maxZ - halfWidth) this.position.z = bounds.maxZ - halfWidth;
+  }
+
   getDebugSnapshot(): EnemyDebugSnapshot {
     return {
       id: this.id,

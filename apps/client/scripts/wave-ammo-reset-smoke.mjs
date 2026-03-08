@@ -90,6 +90,50 @@ async function readAmmoWaveState(page) {
   return state;
 }
 
+function buildDamageProbePoses(state) {
+  const enemies = state?.bots?.enemies ?? [];
+  const poses = [];
+
+  for (const enemy of enemies.slice(0, 4)) {
+    poses.push({ x: enemy.position.x, y: 0.0001, z: enemy.position.z - 3.2, yawDeg: 0 });
+    poses.push({ x: enemy.position.x, y: 0.0001, z: enemy.position.z + 3.2, yawDeg: 180 });
+    poses.push({ x: enemy.position.x - 3.2, y: 0.0001, z: enemy.position.z, yawDeg: 90 });
+    poses.push({ x: enemy.position.x + 3.2, y: 0.0001, z: enemy.position.z, yawDeg: -90 });
+  }
+
+  return poses;
+}
+
+async function takeDamageBeforeWaveReset(page, initialState) {
+  const poses = buildDamageProbePoses(initialState);
+  assert(poses.length > 0, "Expected debug enemy data to build damage probe poses");
+
+  for (const pose of poses) {
+    await page.evaluate((payload) => {
+      window.__debug_reset_bot_knowledge?.();
+      window.__debug_set_player_pose?.(payload);
+    }, pose);
+    await stepFrames(page, 2, FRAME_STEP_MS);
+
+    try {
+      const damagedState = await waitFor(
+        page,
+        (state) => (state.health ?? 100) < 100 || state.gameplay?.alive === false,
+        "Timed out waiting for the player to take damage",
+        { timeoutMs: 2_500, stepMs: 100 },
+      );
+      assert(damagedState.gameplay?.alive !== false, "Damage probe killed the player before wave reset");
+      if ((damagedState.health ?? 100) < 100) {
+        return damagedState;
+      }
+    } catch {
+      // Try the next probe pose.
+    }
+  }
+
+  throw new Error("Unable to get the player damaged before the wave reset");
+}
+
 const BASE_URL = parseBaseUrl(process.env.BASE_URL ?? DEFAULT_BASE_URL);
 const HEADLESS = parseBooleanEnv(process.env.HEADLESS, true);
 const OUTPUT_DIR = path.resolve(
@@ -119,7 +163,6 @@ try {
       agentName: "AmmoSmoke",
       extraSearchParams: {
         debug: 1,
-        god: 1,
       },
     }),
     { waitUntil: "domcontentloaded" },
@@ -180,6 +223,9 @@ try {
   const duringReloadState = await readAmmoWaveState(page);
   assert(duringReloadState.ammo?.reloading === true, "Expected reload to still be active before the wave reset");
 
+  const damagedState = await takeDamageBeforeWaveReset(page, initialState);
+  assert((damagedState.health ?? 100) < 100, `Expected player health to drop below 100, got ${damagedState.health ?? "n/a"}`);
+
   const eliminatedBots = await page.evaluate(() => window.__debug_eliminate_all_bots?.() ?? 0);
   assert(eliminatedBots > 0, `Expected debug bot clear to eliminate enemies, got ${eliminatedBots}`);
 
@@ -194,6 +240,7 @@ try {
   assert(nextWaveState.ammo?.mag === 30, `Expected new-wave mag to reset to 30, got ${nextWaveState.ammo?.mag ?? "n/a"}`);
   assert(nextWaveState.ammo?.reserve === 120, `Expected new-wave reserve to reset to 120, got ${nextWaveState.ammo?.reserve ?? "n/a"}`);
   assert(nextWaveState.ammo?.reloading === false, "Expected new-wave ammo to cancel any active reload");
+  assert(nextWaveState.health === 100, `Expected new-wave health to reset to 100, got ${nextWaveState.health ?? "n/a"}`);
 
   if (consoleRecorder.counts().errorCount > 0) {
     throw new Error(`Console/page errors observed: ${consoleRecorder.counts().errorCount}`);
@@ -222,9 +269,14 @@ try {
       ammo: partialReloadState.ammo ?? null,
       duringReloadAmmo: duringReloadState.ammo ?? null,
     },
+    damaged: {
+      health: damagedState.health ?? null,
+      alive: damagedState.gameplay?.alive ?? null,
+    },
     nextWave: {
       waveNumber: nextWaveState.bots?.waveNumber ?? null,
       ammo: nextWaveState.ammo ?? null,
+      health: nextWaveState.health ?? null,
       countdown: roundMetric(nextWaveState.bots?.waveElapsedS ?? 0),
     },
   };

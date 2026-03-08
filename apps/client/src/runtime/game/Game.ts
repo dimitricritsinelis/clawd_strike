@@ -696,6 +696,7 @@ export class Game {
 
   setEnemyNewWaveCallback(cb: (wave: number) => void): void {
     this.enemyManager?.setNewWaveCallback((wave) => {
+      this.playerHealth = 100;
       this.weapon.reset();
       cb(wave);
     });

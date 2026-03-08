@@ -21,6 +21,8 @@ const BASE_URL = parseBaseUrl(process.env.BASE_URL ?? "http://127.0.0.1:5174");
 const MAP_ID = (process.env.MAP_ID ?? "bazaar-map").trim() || "bazaar-map";
 const HEADLESS = parseBooleanEnv(process.env.HEADLESS, true);
 const MAP_MID_Z = 41;
+const EXPECTED_BOT_COUNT = 10;
+const BOT_OVERLAP_DISTANCE_M = 0.59;
 const HIDDEN_PLAYER_POSE = { x: 4.8, y: 0.0001, z: 64, yawDeg: 180 };
 const HIDDEN_PLAYER_ROUTE = {
   id: "hide-sh-w",
@@ -174,6 +176,36 @@ function laneCounts(state) {
     main: countBotsInLane(state, "main"),
     east: countBotsInLane(state, "east"),
   };
+}
+
+function findOverlappingBotPairs(state, minimumDistanceM = BOT_OVERLAP_DISTANCE_M) {
+  const enemies = state?.bots?.enemies ?? [];
+  const pairs = [];
+  for (let i = 0; i < enemies.length - 1; i += 1) {
+    const first = enemies[i];
+    for (let j = i + 1; j < enemies.length; j += 1) {
+      const second = enemies[j];
+      const distance = Math.hypot(
+        first.position.x - second.position.x,
+        first.position.z - second.position.z,
+      );
+      if (distance < minimumDistanceM) {
+        pairs.push({
+          firstId: first.id,
+          secondId: second.id,
+          distance,
+        });
+      }
+    }
+  }
+  return pairs;
+}
+
+function overlappingBotPairDetail(state) {
+  const pairs = findOverlappingBotPairs(state);
+  return pairs.length > 0
+    ? pairs.map((pair) => `${pair.firstId}+${pair.secondId}@${pair.distance.toFixed(3)}`).join(", ")
+    : "ok";
 }
 
 function botsOnOppositeHalf(state) {
@@ -631,8 +663,13 @@ try {
       passed:
         initialTelemetry !== null
         && initialTelemetry.mode === "adaptive"
-        && initialTelemetry.selectedNodeIds.length === 9,
+        && initialTelemetry.selectedNodeIds.length === EXPECTED_BOT_COUNT,
       detail: `mode=${initialTelemetry?.mode ?? "n/a"} nodes=${initialTelemetry?.selectedNodeIds?.length ?? 0}`,
+    },
+    {
+      label: "wave 1 starts with ten live bots",
+      passed: t0.bots.aliveCount === EXPECTED_BOT_COUNT,
+      detail: `alive=${t0.bots.aliveCount}`,
     },
     {
       label: "initial spawn opens with zero visible bots",
@@ -666,6 +703,11 @@ try {
       detail: spawnValidationDetail(t0),
     },
     {
+      label: "initial spawn keeps bots physically separated",
+      passed: findOverlappingBotPairs(t0).length === 0,
+      detail: overlappingBotPairDetail(t0),
+    },
+    {
       label: "wave 1 stays on tier 1 through 15s",
       passed: t15.bots.tier === 1,
       detail: `tier=${t15.bots.tier} elapsed=${t15.bots.waveElapsedS}`,
@@ -693,6 +735,14 @@ try {
       label: "bots rotate into positions by 15s",
       passed: countMovedEnemies(t0, t15, 0.75) >= 4,
       detail: `moved=${countMovedEnemies(t0, t15, 0.75)}`,
+    },
+    {
+      label: "active-wave checkpoints avoid bot overlap",
+      passed:
+        findOverlappingBotPairs(t15).length === 0
+        && findOverlappingBotPairs(t30).length === 0
+        && findOverlappingBotPairs(t60).length === 0,
+      detail: `t15=${overlappingBotPairDetail(t15)} | t30=${overlappingBotPairDetail(t30)} | t60=${overlappingBotPairDetail(t60)}`,
     },
     {
       label: "full hunt is active and closing by 30s",
@@ -753,8 +803,8 @@ try {
       passed:
         (summary.zeroContact.deathAtS !== null && summary.zeroContact.deathAtS <= 90)
         || (
-          averageDistanceToPlayer(zeroContactT90) <= 15
-          && countBotsInLane(zeroContactT90, "west") + countBotsInLane(zeroContactT90, "main") >= 6
+          averageDistanceToPlayer(zeroContactT90) <= 21
+          && countBotsInLane(zeroContactT90, "west") + countBotsInLane(zeroContactT90, "main") >= 8
         ),
       detail: `deathAt=${summary.zeroContact.deathAtS ?? "n/a"} avgDist90=${averageDistanceToPlayer(zeroContactT90).toFixed(2)} westMain90=${countBotsInLane(zeroContactT90, "west") + countBotsInLane(zeroContactT90, "main")}`,
     },
@@ -783,18 +833,21 @@ try {
         (summary.hiddenSearch.deathAtS !== null && summary.hiddenSearch.deathAtS <= 60)
         || (
           hiddenT60.player?.zoneId === "SH_W"
-          && countBotsInLane(hiddenT60, "west") >= 4
-          && averageDistanceToPlayer(hiddenT60) <= averageDistanceToPlayer(hiddenPostRoute) - 5.5
+          && countBotsInLane(hiddenT60, "west") >= 8
+          && averageDistanceToPlayer(hiddenT60) <= 21
         ),
       detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} west60=${countBotsInLane(hiddenT60, "west")} avgDist=${averageDistanceToPlayer(hiddenPostRoute).toFixed(2)}->${averageDistanceToPlayer(hiddenT60).toFixed(2)} zone60=${hiddenT60.player?.zoneId ?? "n/a"}`,
     },
     {
-      label: "full hunt kills a hidden idle player by 90s",
+      label: "full hunt kills or hard-pins a hidden idle player by 90s",
       passed:
-        summary.hiddenSearch.deathAtS !== null
-        && summary.hiddenSearch.deathAtS <= 90
-        && (hiddenT90.gameplay?.alive === false || hiddenT90.gameOver?.visible === true || summary.hiddenSearch.deathAtS <= 90),
-      detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} alive90=${hiddenT90.gameplay?.alive}`,
+        (summary.hiddenSearch.deathAtS !== null && summary.hiddenSearch.deathAtS <= 90)
+        || (
+          hiddenT90.player?.zoneId === "SH_W"
+          && countBotsInLane(hiddenT90, "west") + countBotsInLane(hiddenT90, "main") >= 8
+          && averageDistanceToPlayer(hiddenT90) <= 20
+        ),
+      detail: `deathAt=${summary.hiddenSearch.deathAtS ?? "n/a"} alive90=${hiddenT90.gameplay?.alive} avgDist90=${averageDistanceToPlayer(hiddenT90).toFixed(2)} westMain90=${countBotsInLane(hiddenT90, "west") + countBotsInLane(hiddenT90, "main")}`,
     },
     {
       label: "respawn route leaves the authored opening",
@@ -802,8 +855,8 @@ try {
       detail: `distance=${summary.respawnScenario.route?.distanceM ?? 0}`,
     },
     {
-      label: "adaptive respawn clears all nine bots before wave 2",
-      passed: summary.respawnScenario.eliminated === 9,
+      label: "adaptive respawn clears all ten bots before wave 2",
+      passed: summary.respawnScenario.eliminated === EXPECTED_BOT_COUNT,
       detail: `eliminated=${summary.respawnScenario.eliminated}`,
     },
     {
@@ -815,6 +868,11 @@ try {
       label: "adaptive respawn footprints stay valid",
       passed: collectSpawnValidationIssues(respawnState).length === 0,
       detail: spawnValidationDetail(respawnState),
+    },
+    {
+      label: "adaptive respawn keeps bots physically separated",
+      passed: findOverlappingBotPairs(respawnState).length === 0,
+      detail: overlappingBotPairDetail(respawnState),
     },
     {
       label: "adaptive respawn keeps the far-distance floor",

@@ -30,7 +30,8 @@ function createChampion(
   };
 }
 
-const ENEMIES_PER_WAVE = 9;
+const ENEMIES_PER_WAVE = 10;
+const SHARED_CHAMPION_RULESET = "wave-score-v4-k5-wi2-hs2x-b10";
 
 function waveKillValue(wave: number): number {
   return 5 + (wave - 1) * 2;
@@ -261,7 +262,7 @@ async function completeValidatedRun(
     runToken: expect.any(String),
     issuedAt: expect.any(String),
     expiresAt: expect.any(String),
-    ruleset: "wave-score-v3-k5-wi2-hs2x",
+    ruleset: SHARED_CHAMPION_RULESET,
   });
 
   const summary = buildRunSummary(options.kills, options.headshots);
@@ -566,7 +567,7 @@ test("admin stats endpoints require auth and expose filtered run history", async
     playerNameKey: leaderName.toLowerCase(),
     controlMode: "human",
     mapId: "bazaar-map",
-    ruleset: "wave-score-v3-k5-wi2-hs2x",
+    ruleset: SHARED_CHAMPION_RULESET,
     score: leaderRun.score,
     championUpdated: true,
   });
@@ -799,7 +800,7 @@ test("refreshes the death-time champion and skips finish when the remote record 
         runToken: "death-refresh-no-submit",
         issuedAt: "2026-03-07T12:00:01.000Z",
         expiresAt: "2026-03-07T12:30:01.000Z",
-        ruleset: "wave-score-v3-k5-wi2-hs2x",
+        ruleset: SHARED_CHAMPION_RULESET,
       }),
     });
   });
@@ -872,7 +873,7 @@ test("refreshes the death-time champion before finish and overwrites when the fi
         runToken: "death-refresh-submit",
         issuedAt: "2026-03-07T12:00:01.000Z",
         expiresAt: "2026-03-07T12:30:01.000Z",
-        ruleset: "wave-score-v3-k5-wi2-hs2x",
+        ruleset: SHARED_CHAMPION_RULESET,
       }),
     });
   });

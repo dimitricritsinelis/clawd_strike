@@ -170,7 +170,8 @@ Retry rule:
 - When dead, record `s.score.lastRun` and `s.lastRunSummary`.
 - If `[data-testid="play-again"]` is visible, click it.
 - If it is not visible, keep waiting because the restart countdown may still be running.
-- After restart, expect a fresh run from initial conditions: spawn reset, wave 1, full enemy roster, fresh ammo, and `score.current === 0`.
+- After restart, expect a fresh run from initial conditions: spawn reset, wave 1, full enemy roster, full health, fresh ammo, and `score.current === 0`.
+- Each new wave restores full health and full ammo when the next wave spawns.
 - `score.best`, `score.lastRun`, and `lastRunSummary` remain available across the restart.
 - `sharedChampion` may refresh immediately after death if another machine set a newer sitewide record or if your run just claimed it.
 - Do not resume action output until state returns to:

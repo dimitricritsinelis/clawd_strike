@@ -368,6 +368,7 @@ test("supports the documented no-context death and retry loop", async ({ page },
       }, { timeout: 20_000 });
 
       const restartedState = await readDocumentedAgentState(page);
+      expect(restartedState.health).toBe(100);
       expect(restartedState.score?.current).toBe(0);
       expect(restartedState.score?.lastRun ?? null).toBe(deathLastRun);
       expect(restartedState.lastRunSummary?.finalScore ?? null).toBe(deathLastRunSummary?.finalScore ?? null);

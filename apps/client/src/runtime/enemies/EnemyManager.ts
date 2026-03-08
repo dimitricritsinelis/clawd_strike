@@ -52,6 +52,9 @@ const ADAPTIVE_RESPAWN_NEAR_CLUSTER_M = 7;
 const INITIAL_SPAWN_MIN_PER_LANE = 2;
 const INITIAL_SPAWN_TARGET_PER_LANE = 3;
 const INITIAL_SPAWN_MAX_PER_LANE = 4;
+const SPAWN_MIN_SEPARATION_M = ENEMY_HALF_WIDTH_M * 2 + 0.02;
+const LIVE_BOT_MIN_SEPARATION_M = ENEMY_HALF_WIDTH_M * 2;
+const LIVE_BOT_DEPENETRATION_PASSES = 3;
 const TACTICAL_LANES: readonly TacticalLane[] = ["west", "main", "east"] as const;
 const WALKABLE_ZONE_TYPES = new Set(["spawn_plaza", "main_lane_segment", "side_hall", "connector", "cut"]);
 const SPAWN_SEARCH_DIRECTIONS = [
@@ -84,6 +87,8 @@ const STATE_COMMIT_S: Record<EnemyState, number> = {
   RELOAD: 0.8,
 };
 
+export const ENEMIES_PER_WAVE = 10;
+
 const ENEMY_SPAWN_CONFIG = [
   { name: "Ghost", x: 4.75, z: 20 },
   { name: "Viper", x: 45.25, z: 20 },
@@ -91,6 +96,7 @@ const ENEMY_SPAWN_CONFIG = [
   { name: "Raven", x: 4.75, z: 45 },
   { name: "Hawk", x: 45.25, z: 45 },
   { name: "Cobra", x: 25, z: 59 },
+  { name: "Panther", x: 4.75, z: 60 },
   { name: "Fox", x: 45.25, z: 60 },
   { name: "Eagle", x: 25, z: 75 },
   { name: "Lynx", x: 20, z: 75 },
@@ -102,11 +108,20 @@ const ROLE_TEMPLATE: readonly EnemyRole[] = [
   "rifler",
   "rifler",
   "rifler",
+  "rifler",
   "flanker",
   "flanker",
   "roamer",
   "roamer",
 ] as const;
+
+if (ENEMY_SPAWN_CONFIG.length !== ENEMIES_PER_WAVE) {
+  throw new Error(`[enemy-manager] ENEMY_SPAWN_CONFIG length ${ENEMY_SPAWN_CONFIG.length} does not match ENEMIES_PER_WAVE ${ENEMIES_PER_WAVE}`);
+}
+
+if (ROLE_TEMPLATE.length !== ENEMIES_PER_WAVE) {
+  throw new Error(`[enemy-manager] ROLE_TEMPLATE length ${ROLE_TEMPLATE.length} does not match ENEMIES_PER_WAVE ${ENEMIES_PER_WAVE}`);
+}
 
 type ContactSource = "visual" | "footstep" | "gunshot" | "radio" | "hunt";
 
@@ -186,6 +201,8 @@ type SpawnPlacement = {
   visibleToPlayer: boolean;
 };
 
+type SpawnFootprint = Pick<SpawnPlacement, "spawnX" | "spawnZ">;
+
 type FinalizedSpawnPlacement = SpawnPlacement & {
   spawnDebug: EnemySpawnDebugSnapshot;
 };
@@ -210,6 +227,7 @@ type SpawnResolution = {
 type SpawnSearchOptions = {
   expectedZoneId?: string | null;
   requireWalkableZone: boolean;
+  occupiedPlacements?: readonly SpawnFootprint[];
 };
 
 type SpawnCorrectionKind = "none" | "same-lane-fallback" | "global-fallback";
@@ -443,7 +461,7 @@ export class EnemyManager {
   constructor(scene: Scene) {
     this.scene = scene;
     this.sharedLoader = new GLTFLoader();
-    this.targetPool = Array.from({ length: ENEMY_SPAWN_CONFIG.length + 1 }, () => ({
+    this.targetPool = Array.from({ length: ENEMIES_PER_WAVE + 1 }, () => ({
       id: "",
       team: "enemy",
       position: { x: 0, y: 0, z: 0 },
@@ -576,7 +594,7 @@ export class EnemyManager {
 
     if (
       this.controllers.length > 0 &&
-      (this.controllers.length !== ENEMY_SPAWN_CONFIG.length || this.visuals.length !== ENEMY_SPAWN_CONFIG.length)
+      (this.controllers.length !== ENEMIES_PER_WAVE || this.visuals.length !== ENEMIES_PER_WAVE)
     ) {
       this.dispose(this.scene);
     }
@@ -597,7 +615,7 @@ export class EnemyManager {
     this.lastSpawnTelemetry = finalizedSpawnBatch.telemetry;
 
     if (this.controllers.length === 0) {
-      for (let i = 0; i < ENEMY_SPAWN_CONFIG.length; i += 1) {
+      for (let i = 0; i < ENEMIES_PER_WAVE; i += 1) {
         const config = ENEMY_SPAWN_CONFIG[i]!;
         const placement = finalizedSpawnBatch.placements[i]!;
         const id: EnemyId = `enemy_${config.name.toLowerCase()}`;
@@ -609,7 +627,7 @@ export class EnemyManager {
         this.spawnDebugByEnemyId.set(id, placement.spawnDebug);
       }
     } else {
-      for (let i = 0; i < ENEMY_SPAWN_CONFIG.length; i += 1) {
+      for (let i = 0; i < ENEMIES_PER_WAVE; i += 1) {
         const placement = finalizedSpawnBatch.placements[i]!;
         const controller = this.controllers[i]!;
         const visual = this.visuals[i]!;
@@ -668,7 +686,9 @@ export class EnemyManager {
     worldColliders: WorldColliders,
     playerPos: { x: number; y: number; z: number } | null,
   ): { placements: SpawnPlacement[]; telemetry: EnemySpawnTelemetry } {
-    const placements = ENEMY_SPAWN_CONFIG.map((config) => {
+    const placements: SpawnPlacement[] = [];
+
+    for (const config of ENEMY_SPAWN_CONFIG) {
       const resolution = this.resolveSafeSpawnPoint(
         config.x,
         config.z,
@@ -676,13 +696,14 @@ export class EnemyManager {
         worldColliders,
         {
           requireWalkableZone: true,
+          occupiedPlacements: placements,
         },
       );
       const spawnX = resolution?.spawnX ?? config.x;
       const spawnZ = resolution?.spawnZ ?? config.z;
       const zoneId = resolution?.zoneId ?? this.findWalkableZoneIdForPoint(spawnX, spawnZ);
       const distanceToPlayerM = playerPos ? distanceM(spawnX, spawnZ, playerPos.x, playerPos.z) : null;
-      return {
+      placements.push({
         spawnX,
         spawnZ,
         nodeId: null,
@@ -691,8 +712,8 @@ export class EnemyManager {
         nodeType: "authored" as const,
         distanceToPlayerM,
         visibleToPlayer: false,
-      };
-    });
+      });
+    }
 
     return {
       placements,
@@ -719,7 +740,7 @@ export class EnemyManager {
     waveSeed: number,
   ): { placements: SpawnPlacement[]; telemetry: EnemySpawnTelemetry } | null {
     const candidates = this.buildSpawnCandidates(worldColliders, playerPos);
-    if (!candidates || candidates.length < ENEMY_SPAWN_CONFIG.length) {
+    if (!candidates || candidates.length < ENEMIES_PER_WAVE) {
       return null;
     }
 
@@ -732,7 +753,7 @@ export class EnemyManager {
       return playerStartsSouth ? candidate.spawnZ > mapMidZ : candidate.spawnZ < mapMidZ;
     });
 
-    if (oppositeSideCandidates.length < ENEMY_SPAWN_CONFIG.length) {
+    if (oppositeSideCandidates.length < ENEMIES_PER_WAVE) {
       return null;
     }
 
@@ -773,7 +794,7 @@ export class EnemyManager {
     waveSeed: number,
   ): { placements: SpawnPlacement[]; telemetry: EnemySpawnTelemetry } | null {
     const candidates = this.buildSpawnCandidates(worldColliders, playerPos);
-    if (!candidates || candidates.length < ENEMY_SPAWN_CONFIG.length) {
+    if (!candidates || candidates.length < ENEMIES_PER_WAVE) {
       return null;
     }
 
@@ -811,7 +832,7 @@ export class EnemyManager {
     worldColliders: WorldColliders,
     playerPos: { x: number; y: number; z: number },
   ): AdaptiveSpawnCandidate[] | null {
-    if (!this.tacticalGraph || this.tacticalGraph.nodes.length < ENEMY_SPAWN_CONFIG.length) {
+    if (!this.tacticalGraph || this.tacticalGraph.nodes.length < ENEMIES_PER_WAVE) {
       return null;
     }
 
@@ -913,7 +934,7 @@ export class EnemyManager {
     const zoneUsage = new Map<string, number>();
     let visibleCount = 0;
 
-    for (let pickIndex = 0; pickIndex < ENEMY_SPAWN_CONFIG.length; pickIndex += 1) {
+    for (let pickIndex = 0; pickIndex < ENEMIES_PER_WAVE; pickIndex += 1) {
       let bestCandidate: AdaptiveSpawnCandidate | null = null;
       let bestScore = Number.NEGATIVE_INFINITY;
 
@@ -923,6 +944,7 @@ export class EnemyManager {
         if (!phase.allowPlayerZone && playerZoneId && candidate.zoneId === playerZoneId) continue;
         if (!phase.allowAdjacentZones && adjacentZones.has(candidate.zoneId)) continue;
         if (candidate.visibleToPlayer && visibleCount >= phase.maxVisibleBots) continue;
+        if (this.hasSpawnFootprintConflict(candidate.spawnX, candidate.spawnZ, selected)) continue;
 
         const score = this.scoreAdaptiveRespawnCandidate(candidate, selected, laneUsage, zoneUsage, waveSeed, pickIndex);
         if (score > bestScore) {
@@ -954,12 +976,12 @@ export class EnemyManager {
     }
 
     const totalAvailable = Array.from(availableByLane.values()).reduce((sum, count) => sum + count, 0);
-    if (totalAvailable < ENEMY_SPAWN_CONFIG.length) {
+    if (totalAvailable < ENEMIES_PER_WAVE) {
       return null;
     }
 
     const targets = createLaneUsageMap();
-    let remaining = ENEMY_SPAWN_CONFIG.length;
+    let remaining = ENEMIES_PER_WAVE;
 
     for (const lane of TACTICAL_LANES) {
       const baseTarget = Math.min(INITIAL_SPAWN_MIN_PER_LANE, availableByLane.get(lane) ?? 0);
@@ -1014,7 +1036,7 @@ export class EnemyManager {
   ): AdaptiveSpawnCandidate[] | null {
     const pickOrder: TacticalLane[] = [];
     const remainingByLane = new Map(laneTargets);
-    while (pickOrder.length < ENEMY_SPAWN_CONFIG.length) {
+    while (pickOrder.length < ENEMIES_PER_WAVE) {
       let appended = false;
       for (const lane of TACTICAL_LANES) {
         const remaining = remainingByLane.get(lane) ?? 0;
@@ -1022,7 +1044,7 @@ export class EnemyManager {
         pickOrder.push(lane);
         remainingByLane.set(lane, remaining - 1);
         appended = true;
-        if (pickOrder.length === ENEMY_SPAWN_CONFIG.length) break;
+        if (pickOrder.length === ENEMIES_PER_WAVE) break;
       }
       if (!appended) {
         return null;
@@ -1042,6 +1064,7 @@ export class EnemyManager {
       for (const candidate of candidates) {
         if (candidate.lane !== desiredLane) continue;
         if (selectedNodeIds.has(candidate.nodeId)) continue;
+        if (this.hasSpawnFootprintConflict(candidate.spawnX, candidate.spawnZ, selected)) continue;
 
         const score = this.scoreInitialSpawnCandidate(candidate, selected, laneUsage, zoneUsage, waveSeed, pickIndex, laneTargets);
         if (score > bestScore) {
@@ -1252,6 +1275,16 @@ export class EnemyManager {
     return this.findWalkableZoneForPoint(x, z)?.id ?? null;
   }
 
+  private hasSpawnFootprintConflict(
+    spawnX: number,
+    spawnZ: number,
+    placements: readonly SpawnFootprint[],
+    minimumDistanceM = SPAWN_MIN_SEPARATION_M,
+  ): boolean {
+    const minimumDistanceSq = minimumDistanceM * minimumDistanceM;
+    return placements.some((placement) => distanceSq(spawnX, spawnZ, placement.spawnX, placement.spawnZ) < minimumDistanceSq);
+  }
+
   private isInsideSpawnFootprint(
     zone: RuntimeBlockoutZone,
     x: number,
@@ -1325,6 +1358,9 @@ export class EnemyManager {
       for (const offset of offsets) {
         const spawnX = baseX + offset.x;
         const spawnZ = baseZ + offset.z;
+        if (this.hasSpawnFootprintConflict(spawnX, spawnZ, options.occupiedPlacements ?? [])) {
+          continue;
+        }
         const validation = this.validateSpawnPoint(
           spawnX,
           spawnZ,
@@ -1382,6 +1418,7 @@ export class EnemyManager {
     node: TacticalNode,
     worldColliders: WorldColliders,
     playerPos: { x: number; y: number; z: number } | null,
+    occupiedPlacements: readonly SpawnFootprint[] = [],
   ): SpawnPlacement | null {
     const resolution = this.resolveSafeSpawnPoint(
       node.x,
@@ -1391,6 +1428,7 @@ export class EnemyManager {
       {
         expectedZoneId: node.zoneId,
         requireWalkableZone: true,
+        occupiedPlacements,
       },
     );
     if (!resolution) {
@@ -1424,6 +1462,7 @@ export class EnemyManager {
     worldColliders: WorldColliders,
     playerPos: { x: number; y: number; z: number } | null,
     usedNodeIds: ReadonlySet<string>,
+    occupiedPlacements: readonly SpawnFootprint[],
   ): { placement: SpawnPlacement; correctionKind: SpawnCorrectionKind; fallbackNodeId: string | null } | null {
     if (!this.tacticalGraph) {
       return null;
@@ -1435,7 +1474,7 @@ export class EnemyManager {
       for (const node of this.tacticalGraph?.nodes ?? []) {
         if (lane && node.lane !== lane) continue;
         if (usedNodeIds.has(node.id)) continue;
-        const candidate = this.createPlacementFromNode(node, worldColliders, playerPos);
+        const candidate = this.createPlacementFromNode(node, worldColliders, playerPos, occupiedPlacements);
         if (!candidate) continue;
         const candidateDistance = distanceM(candidate.spawnX, candidate.spawnZ, placement.spawnX, placement.spawnZ);
         if (candidateDistance < bestDistance) {
@@ -1477,8 +1516,10 @@ export class EnemyManager {
         .filter((nodeId): nodeId is string => typeof nodeId === "string"),
     );
     let correctedPlacements = 0;
+    const placements: FinalizedSpawnPlacement[] = [];
 
-    const placements = spawnBatch.placements.map((placement, index) => {
+    for (let index = 0; index < spawnBatch.placements.length; index += 1) {
+      const placement = spawnBatch.placements[index]!;
       let resolvedPlacement = placement;
       let correctionKind: SpawnCorrectionKind = "none";
       let fallbackNodeId: string | null = null;
@@ -1488,13 +1529,24 @@ export class EnemyManager {
         worldColliders,
         placement.zoneId,
       );
+      let overlapsExistingPlacement = this.hasSpawnFootprintConflict(
+        placement.spawnX,
+        placement.spawnZ,
+        placements,
+      );
 
-      if (!validation.valid) {
+      if (!validation.valid || overlapsExistingPlacement) {
         const nextUsedNodeIds = new Set(usedNodeIds);
         if (placement.nodeId) {
           nextUsedNodeIds.delete(placement.nodeId);
         }
-        const fallback = this.resolveFallbackPlacement(placement, worldColliders, playerPos, nextUsedNodeIds);
+        const fallback = this.resolveFallbackPlacement(
+          placement,
+          worldColliders,
+          playerPos,
+          nextUsedNodeIds,
+          placements,
+        );
         if (!fallback) {
           throw new Error(`[enemy-spawn] unable to resolve safe placement for index ${index}`);
         }
@@ -1507,6 +1559,14 @@ export class EnemyManager {
           worldColliders,
           resolvedPlacement.zoneId,
         );
+        overlapsExistingPlacement = this.hasSpawnFootprintConflict(
+          resolvedPlacement.spawnX,
+          resolvedPlacement.spawnZ,
+          placements,
+        );
+        if (!validation.valid || overlapsExistingPlacement) {
+          throw new Error(`[enemy-spawn] fallback placement remained invalid for index ${index}`);
+        }
         correctedPlacements += 1;
       }
 
@@ -1514,7 +1574,7 @@ export class EnemyManager {
         usedNodeIds.add(resolvedPlacement.nodeId);
       }
 
-      return {
+      placements.push({
         ...resolvedPlacement,
         spawnDebug: this.createSpawnDebugSnapshot(
           resolvedPlacement.spawnX,
@@ -1524,8 +1584,8 @@ export class EnemyManager {
           correctionKind,
           fallbackNodeId,
         ),
-      };
-    });
+      });
+    }
 
     return {
       placements,
@@ -1676,6 +1736,8 @@ export class EnemyManager {
       );
     }
 
+    this.resolveLiveBotOverlaps(worldColliders);
+
     if (this.allDead()) {
       if (this.waveRespawnTimer === null) {
         this.waveRespawnTimer = WAVE_RESPAWN_DELAY_S;
@@ -1718,6 +1780,46 @@ export class EnemyManager {
         });
       }
       visual.updateFx(deltaSeconds);
+    }
+  }
+
+  private resolveLiveBotOverlaps(worldColliders: WorldColliders): void {
+    const liveControllers = this.controllers.filter((controller) => !controller.isDead());
+    if (liveControllers.length < 2) return;
+
+    for (let pass = 0; pass < LIVE_BOT_DEPENETRATION_PASSES; pass += 1) {
+      for (let i = 0; i < liveControllers.length - 1; i += 1) {
+        const first = liveControllers[i]!;
+        for (let j = i + 1; j < liveControllers.length; j += 1) {
+          const second = liveControllers[j]!;
+          const firstPos = first.getPosition();
+          const secondPos = second.getPosition();
+          let dx = secondPos.x - firstPos.x;
+          let dz = secondPos.z - firstPos.z;
+          let distance = Math.hypot(dx, dz);
+          if (distance >= LIVE_BOT_MIN_SEPARATION_M) continue;
+
+          if (distance < 0.0001) {
+            const stableSeed = (i + 1) * 97 + (j + 1) * 53;
+            if (stableSeed % 2 === 0) {
+              dx = stableSeed % 4 < 2 ? 1 : -1;
+              dz = 0;
+            } else {
+              dx = 0;
+              dz = stableSeed % 4 < 2 ? 1 : -1;
+            }
+            distance = 1;
+          }
+
+          const overlapM = LIVE_BOT_MIN_SEPARATION_M - distance;
+          if (overlapM <= 0) continue;
+          const inverseDistance = 1 / distance;
+          const pushX = dx * inverseDistance * overlapM * 0.5;
+          const pushZ = dz * inverseDistance * overlapM * 0.5;
+          first.nudgeWithCollision(-pushX, -pushZ, worldColliders);
+          second.nudgeWithCollision(pushX, pushZ, worldColliders);
+        }
+      }
     }
   }
 

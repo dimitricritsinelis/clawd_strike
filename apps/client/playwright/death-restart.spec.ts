@@ -26,7 +26,7 @@ test("death restart returns the runtime to a fresh wave-1 run", async ({ page },
   const initialSpawn = initialState.player?.pos;
   expect(initialSpawn).toBeTruthy();
   expect(initialState.bots?.waveNumber).toBe(1);
-  expect(initialState.bots?.aliveCount).toBe(9);
+  expect(initialState.bots?.aliveCount).toBe(10);
 
   let died = false;
   for (let step = 0; step < 120 && !died; step += 1) {
@@ -69,7 +69,7 @@ test("death restart returns the runtime to a fresh wave-1 run", async ({ page },
         && state.gameplay?.alive === true
         && state.gameOver?.visible !== true
         && state.bots?.waveNumber === 1
-        && state.bots?.aliveCount === 9
+        && state.bots?.aliveCount === 10
         && state.score?.current === 0;
     } catch {
       return false;
@@ -80,9 +80,10 @@ test("death restart returns the runtime to a fresh wave-1 run", async ({ page },
   const restartedPublicState = await readDocumentedAgentState(page);
   expect(planarDistance(restartedState.player.pos, initialSpawn)).toBeLessThan(0.05);
   expect(restartedState.bots.waveNumber).toBe(1);
-  expect(restartedState.bots.aliveCount).toBe(9);
+  expect(restartedState.bots.aliveCount).toBe(10);
   expect(restartedState.gameOver.visible).toBe(false);
   expect(restartedState.score.current).toBe(0);
+  expect(restartedPublicState.health).toBe(100);
   expect(restartedPublicState.score?.current).toBe(0);
   expect(restartedPublicState.score?.lastRun ?? null).toBe(deadPublicState.score?.lastRun ?? null);
   expect(restartedPublicState.lastRunSummary?.finalScore ?? null).toBe(deadPublicState.lastRunSummary?.finalScore ?? null);
