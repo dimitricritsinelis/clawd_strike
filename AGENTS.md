@@ -59,6 +59,7 @@ If a fact is not in one of the six Markdown authorities, prefer code, scripts, J
 - Runtime map files must be generated from the design packet with `pnpm --filter @clawd-strike/client gen:maps`. Do not hand-maintain drift in `apps/client/public/maps/`.
 - `apps/client/public/skills.md` must stay fair and browser-only. Do not expose coordinates, map zones, landmark IDs, enemy positions, routes, seeds, hidden line-of-sight truth, or repo-only debug data.
 - Internal agent tooling is not game runtime code and is not part of the public `/skills.md` surface. Keep agent-only deploy or debug bundles out of the repo root unless they become an explicit repo workflow requirement.
+- Repo-local operator helpers should live in scripts, not new Markdown surfaces. The admin stats helper lives at `apps/client/scripts/admin-stats.sh`; document its usage in existing authority files instead of adding standalone tool docs.
 - Tool shims such as `CLAUDE.md` may point to this file, but they may not redefine policy.
 
 ## Primary Change Tag

@@ -1,7 +1,5 @@
 import type { LoadingScreenMode } from "./types";
 import {
-  formatSharedChampionMode,
-  formatSharedChampionScore,
   type SharedChampionSnapshot,
 } from "../../../shared/highScore";
 
@@ -15,6 +13,7 @@ export type LoadingScreenUI = {
   show: () => void;
   dispose: () => void;
   setAssetReady: (ready: boolean) => void;
+  setTransitioning: (active: boolean) => void;
   setSharedChampion: (snapshot: SharedChampionSnapshot) => void;
   setMuteState: (muted: boolean) => void;
   flashMuteToggle: () => void;
@@ -22,6 +21,8 @@ export type LoadingScreenUI = {
   getState: () => {
     startVisible: boolean;
     bannerVisible: boolean;
+    assetsReady: boolean;
+    transitioning: boolean;
   };
 };
 
@@ -57,6 +58,21 @@ function writePersistedAgentName(value: string): void {
   }
 }
 
+function targetIsWithinInput(target: EventTarget | null, input: HTMLInputElement): boolean {
+  return target instanceof Node && input.contains(target);
+}
+
+function clearDocumentSelection(): void {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  selection.removeAllRanges();
+}
+
+function formatLoadingChampionScore(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  return Math.max(0, Math.round(value)).toLocaleString("en-US");
+}
+
 export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): LoadingScreenUI {
   const start = getRequiredEl<HTMLDivElement>("#start");
   const muteToggleBtn = getRequiredEl<HTMLButtonElement>("#mute-toggle-btn");
@@ -70,8 +86,6 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   const sharedChampionCard = getRequiredEl<HTMLElement>("#shared-champion-card");
   const sharedChampionNameEl = getRequiredEl<HTMLElement>("#shared-champion-name");
   const sharedChampionScoreEl = getRequiredEl<HTMLElement>("#shared-champion-score");
-  const sharedChampionModeEl = getRequiredEl<HTMLElement>("#shared-champion-mode");
-  const sharedChampionStatusEl = getRequiredEl<HTMLElement>("#shared-champion-status");
 
   let disposed = false;
   let bannerTimer: number | null = null;
@@ -84,6 +98,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   start.dataset.agentSubmenu = "false";
   start.dataset.nameEntryVisible = "false";
   start.dataset.infoVisible = "false";
+  start.dataset.transitioning = "false";
 
   function clearBannerTimer() {
     if (bannerTimer === null) return;
@@ -99,6 +114,35 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   function onMuteToggleClick() {
     if (disposed) return;
     callbacks.onMuteToggle();
+  }
+
+  function allowNativeSelection(target: EventTarget | null): boolean {
+    return targetIsWithinInput(target, playerNameInput);
+  }
+
+  function onStartPointerDown(event: PointerEvent) {
+    if (disposed) return;
+    if (!allowNativeSelection(event.target)) {
+      clearDocumentSelection();
+    }
+    callbacks.onWarmupAudio();
+  }
+
+  function onStartSelectStart(event: Event) {
+    if (disposed || allowNativeSelection(event.target)) return;
+    clearDocumentSelection();
+    event.preventDefault();
+  }
+
+  function onStartDragStart(event: DragEvent) {
+    if (disposed || allowNativeSelection(event.target)) return;
+    clearDocumentSelection();
+    event.preventDefault();
+  }
+
+  function onStartPointerUp(event: PointerEvent) {
+    if (disposed || allowNativeSelection(event.target)) return;
+    clearDocumentSelection();
   }
 
   function resetToPrimaryButtons() {
@@ -233,7 +277,10 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     });
   }
 
-  start.addEventListener("pointerdown", onWarmupAudio, { passive: true });
+  start.addEventListener("pointerdown", onStartPointerDown, { passive: true });
+  start.addEventListener("pointerup", onStartPointerUp, { passive: true });
+  start.addEventListener("selectstart", onStartSelectStart);
+  start.addEventListener("dragstart", onStartDragStart);
   window.addEventListener("keydown", onWarmupAudio);
   window.addEventListener("keydown", onGlobalKeyDown);
   muteToggleBtn.addEventListener("click", onMuteToggleClick);
@@ -250,36 +297,28 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     const champion = snapshot.champion;
     if (snapshot.status === "unavailable") {
       sharedChampionCard.dataset.state = "unavailable";
-      sharedChampionNameEl.textContent = "Champion unavailable";
-      sharedChampionScoreEl.textContent = "--";
-      sharedChampionModeEl.textContent = "OFFLINE";
-      sharedChampionStatusEl.textContent = "Shared score service could not be reached";
+      sharedChampionNameEl.textContent = "RECORD OFFLINE";
+      sharedChampionScoreEl.textContent = "N/A";
       return;
     }
 
     if (champion) {
       sharedChampionCard.dataset.state = "ready";
       sharedChampionNameEl.textContent = champion.holderName.toUpperCase();
-      sharedChampionScoreEl.textContent = formatSharedChampionScore(champion.score);
-      sharedChampionModeEl.textContent = formatSharedChampionMode(champion.controlMode);
-      sharedChampionStatusEl.textContent = "Shared sitewide record";
+      sharedChampionScoreEl.textContent = formatLoadingChampionScore(champion.score);
       return;
     }
 
     if (snapshot.status === "loading" || snapshot.status === "idle") {
       sharedChampionCard.dataset.state = "loading";
-      sharedChampionNameEl.textContent = "Loading champion";
-      sharedChampionScoreEl.textContent = "--";
-      sharedChampionModeEl.textContent = "SYNC";
-      sharedChampionStatusEl.textContent = "Fetching shared record";
+      sharedChampionNameEl.textContent = "SCANNING LEGENDS";
+      sharedChampionScoreEl.textContent = "...";
       return;
     }
 
     sharedChampionCard.dataset.state = "empty";
-    sharedChampionNameEl.textContent = "No champion yet";
-    sharedChampionScoreEl.textContent = "--";
-    sharedChampionModeEl.textContent = "OPEN";
-    sharedChampionStatusEl.textContent = "First score claims the board";
+    sharedChampionNameEl.textContent = "CLAIM THE CROWN";
+    sharedChampionScoreEl.textContent = "OPEN";
   }
 
   return {
@@ -291,13 +330,21 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       if (start.dataset.assetsReady === nextValue) return;
       start.dataset.assetsReady = nextValue;
     },
+    setTransitioning(active) {
+      const nextValue = active ? "true" : "false";
+      if (start.dataset.transitioning === nextValue) return;
+      start.dataset.transitioning = nextValue;
+    },
     setSharedChampion,
     dispose() {
       if (disposed) return;
       disposed = true;
       clearBannerTimer();
 
-      start.removeEventListener("pointerdown", onWarmupAudio);
+      start.removeEventListener("pointerdown", onStartPointerDown);
+      start.removeEventListener("pointerup", onStartPointerUp);
+      start.removeEventListener("selectstart", onStartSelectStart);
+      start.removeEventListener("dragstart", onStartDragStart);
       window.removeEventListener("keydown", onWarmupAudio);
       window.removeEventListener("keydown", onGlobalKeyDown);
       muteToggleBtn.removeEventListener("click", onMuteToggleClick);
@@ -326,6 +373,8 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       return {
         startVisible: start.style.display !== "none",
         bannerVisible: modeBanner.classList.contains("show"),
+        assetsReady: start.dataset.assetsReady === "true",
+        transitioning: start.dataset.transitioning === "true",
       };
     },
   };

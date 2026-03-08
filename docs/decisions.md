@@ -67,3 +67,8 @@ Last updated: 2026-03-07
 - `GET /api/high-score` remains public and read-only, but browser clients may no longer write arbitrary champion scores directly.
 - Public champion submissions now use a server-issued run token plus a server-side validator over run summary stats before any overwrite attempt.
 - Public run submissions stay enabled by default once the validated run-token flow exists; `SHARED_CHAMPION_ENABLE_PUBLIC_RUNS=false` is an emergency kill switch, and direct `POST /api/high-score` remains internal admin-only behind a secret.
+
+## DEC-012: Validated run history is private server-side data
+- Every accepted validated run is persisted as a first-class server-side run record rather than only as audit JSON or the single shared champion row.
+- Public browser/game contracts stay unchanged; run history is exposed only through protected internal admin stats endpoints, not through `/skills.md` or public runtime payloads.
+- Client/network metadata for stats storage uses privacy-preserving HMAC fingerprints, not raw IP addresses or raw user-agent strings.

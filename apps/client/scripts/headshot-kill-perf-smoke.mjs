@@ -32,6 +32,16 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+const HEADSHOT_BANNER_INTRO_MS = 240;
+const HEADSHOT_BANNER_HOLD_MS = 1000;
+const HEADSHOT_BANNER_OUTRO_SAMPLE_OFFSET_MS = 70;
+
 const BASE_URL = parseBaseUrl(process.env.BASE_URL ?? DEFAULT_BASE_URL);
 const HEADLESS = parseBooleanEnv(process.env.HEADLESS, true);
 const OUTPUT_DIR = path.resolve(
@@ -80,6 +90,28 @@ async function emitCombatFeedback(payload) {
   }, payload);
 }
 
+async function readHeadshotBannerStyle() {
+  return page.evaluate(() => {
+    const bannerImage = document.querySelector('img[src$="headshot-notification.png"]');
+    if (!(bannerImage instanceof HTMLImageElement) || !(bannerImage.parentElement instanceof HTMLDivElement)) {
+      throw new Error("Headshot banner element not found");
+    }
+
+    const style = bannerImage.parentElement.style;
+    const opacity = Number(style.opacity || "0");
+    const transform = style.transform || "";
+    const scaleMatch = transform.match(/scale\(([-\d.]+)\)/);
+    const translateYMatch = transform.match(/translateY\(([-\d.]+)px\)/);
+
+    return {
+      opacity,
+      transform,
+      scale: scaleMatch ? Number(scaleMatch[1]) : NaN,
+      translateY: translateYMatch ? Number(translateYMatch[1]) : NaN,
+    };
+  });
+}
+
 const summary = {
   baseUrl: BASE_URL,
   headless: HEADLESS,
@@ -126,24 +158,47 @@ try {
   const headshotStartScore = Number(bodyKillState.score.current);
   const preFrames = await sampleFrames("headshot-pre", 10);
   await emitCombatFeedback({ isHeadshot: true, didKill: true, damage: 100, enemyName: "HeadshotDummy" });
-  const postFrames = await sampleFrames("headshot-post", 10);
+  const bannerImmediate = await readHeadshotBannerStyle();
+  await advanceRuntime(page, 100);
+  const bannerIntro = await readHeadshotBannerStyle();
+  await advanceRuntime(page, 180);
+  const bannerHold = await readHeadshotBannerStyle();
+  await advanceRuntime(
+    page,
+    HEADSHOT_BANNER_HOLD_MS - (100 + 180 - HEADSHOT_BANNER_INTRO_MS) + HEADSHOT_BANNER_OUTRO_SAMPLE_OFFSET_MS,
+  );
+  const bannerOutro = await readHeadshotBannerStyle();
   const headshotState = await readRuntimeState(page);
-  await page.screenshot({ path: path.join(OUTPUT_DIR, "headshot-kill.png") });
 
   assertNear(Number(headshotState.score.current) - headshotStartScore, 12.5, "Headshot-kill score delta");
+  assert(
+    bannerImmediate.opacity >= 0 && bannerImmediate.opacity < 0.1,
+    `Headshot banner immediate opacity should still be near-hidden, received ${bannerImmediate.opacity}`,
+  );
+  assert(
+    bannerImmediate.scale >= 0.92 && bannerImmediate.scale < 0.95,
+    `Headshot banner immediate scale should stay near the intro start, received ${bannerImmediate.scale}`,
+  );
+  assert(
+    bannerIntro.opacity > bannerImmediate.opacity && bannerIntro.opacity < 0.6,
+    `Headshot banner intro opacity should still be visibly fading in, received ${bannerIntro.opacity}`,
+  );
+  assert(
+    bannerIntro.scale > bannerImmediate.scale && bannerIntro.scale < 1,
+    `Headshot banner intro scale should grow toward 1, received ${bannerIntro.scale}`,
+  );
+  assertNear(bannerHold.opacity, 1, "Headshot banner hold opacity");
+  assertNear(bannerHold.scale, 1, "Headshot banner hold scale");
+  assert(
+    bannerOutro.opacity < 1 && bannerOutro.opacity > 0,
+    `Headshot banner outro opacity should fade out, received ${bannerOutro.opacity}`,
+  );
+  assert(
+    bannerOutro.scale < 1 && bannerOutro.scale > 0.94,
+    `Headshot banner outro scale should shrink below 1, received ${bannerOutro.scale}`,
+  );
 
   const preAverageDuration = average(preFrames.map((frame) => frame.durationMs));
-  const postMaxDuration = Math.max(...postFrames.map((frame) => frame.durationMs));
-  const spikeDeltaMs = roundMetric(postMaxDuration - preAverageDuration);
-  const maxKillFeedbackMs = Math.max(...postFrames.map((frame) => frame.lastKillFeedbackMs));
-  if (maxKillFeedbackMs > KILL_FEEDBACK_BUDGET_MS) {
-    throw new Error(
-      `Headshot kill feedback exceeded budget: ${maxKillFeedbackMs}ms > ${KILL_FEEDBACK_BUDGET_MS}ms`,
-    );
-  }
-  if (spikeDeltaMs > FRAME_SPIKE_LIMIT_MS) {
-    throw new Error(`Headshot frame spike exceeded limit: ${spikeDeltaMs}ms > ${FRAME_SPIKE_LIMIT_MS}ms`);
-  }
 
   const repeatedStartScore = Number(headshotState.score.current);
   const repeatedHeadshots = [];
@@ -156,11 +211,16 @@ try {
       damage: 100,
       enemyName: `RepeatHeadshot${index + 1}`,
     });
-    const frames = await sampleFrames(`repeat-headshot-${index + 1}`, 4);
+    const bannerResetFrame = await sampleFrame(`repeat-headshot-${index + 1}-reset`);
+    const bannerReset = await readHeadshotBannerStyle();
+    const frames = [bannerResetFrame, ...(await sampleFrames(`repeat-headshot-${index + 1}`, 3))];
     const afterState = await readRuntimeState(page);
     assertNear(Number(afterState.score.current) - beforeScore, 12.5, `Repeated headshot ${index + 1} score delta`);
+    assertNear(bannerReset.opacity, 1, `Repeated headshot ${index + 1} banner reset opacity`);
+    assertNear(bannerReset.scale, 1, `Repeated headshot ${index + 1} banner reset scale`);
     repeatedHeadshots.push({
       index: index + 1,
+      bannerReset,
       frames,
       scoreAfter: roundMetric(Number(afterState.score.current)),
       maxKillFeedbackMs: Math.max(...frames.map((frame) => frame.lastKillFeedbackMs)),
@@ -168,6 +228,21 @@ try {
   }
   const repeatedFinalState = await readRuntimeState(page);
   assertNear(Number(repeatedFinalState.score.current) - repeatedStartScore, 25, "Repeated headshot total delta");
+
+  const postFrames = await sampleFrames("headshot-post", 10);
+  const postMaxDuration = Math.max(...postFrames.map((frame) => frame.durationMs));
+  const spikeDeltaMs = roundMetric(postMaxDuration - preAverageDuration);
+  const maxKillFeedbackMs = Math.max(...postFrames.map((frame) => frame.lastKillFeedbackMs));
+  if (maxKillFeedbackMs > KILL_FEEDBACK_BUDGET_MS) {
+    throw new Error(
+      `Headshot kill feedback exceeded budget: ${maxKillFeedbackMs}ms > ${KILL_FEEDBACK_BUDGET_MS}ms`,
+    );
+  }
+  if (spikeDeltaMs > FRAME_SPIKE_LIMIT_MS) {
+    throw new Error(`Headshot frame spike exceeded limit: ${spikeDeltaMs}ms > ${FRAME_SPIKE_LIMIT_MS}ms`);
+  }
+
+  await page.screenshot({ path: path.join(OUTPUT_DIR, "headshot-kill.png") });
 
   if (consoleRecorder.counts().errorCount > 0) {
     throw new Error(`Console/page errors observed: ${consoleRecorder.counts().errorCount}`);
@@ -186,6 +261,12 @@ try {
     headshotKill: {
       preFrames,
       postFrames,
+      bannerMotion: {
+        immediate: bannerImmediate,
+        intro: bannerIntro,
+        hold: bannerHold,
+        outro: bannerOutro,
+      },
       scoreAfter: roundMetric(Number(headshotState.score.current)),
       preAverageDuration: roundMetric(preAverageDuration),
       postMaxDuration: roundMetric(postMaxDuration),

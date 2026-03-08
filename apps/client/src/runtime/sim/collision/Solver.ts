@@ -27,9 +27,13 @@ export class AabbCollisionSolver {
 
   constructor(
     private readonly halfWidth: number,
-    private readonly height: number,
+    private height: number,
     private readonly epsilon = 0.0001,
   ) {}
+
+  setHeight(h: number): void {
+    this.height = h;
+  }
 
   moveAndCollide(
     position: MutablePosition,

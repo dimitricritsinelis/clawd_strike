@@ -11,7 +11,7 @@ export class HitVignette {
       position: "absolute",
       inset: "0",
       pointerEvents: "none",
-      background: "radial-gradient(ellipse at center, transparent 40%, rgba(180, 0, 0, 0.72) 100%)",
+      background: "radial-gradient(ellipse at center, transparent 15%, rgba(180, 0, 0, 0.72) 100%)",
     };
 
     // Hit flash layer
@@ -36,8 +36,8 @@ export class HitVignette {
    */
   triggerHit(damage = 25): void {
     // Scale fade duration and peak opacity with damage magnitude
-    this.fadeDurationS = 0.2 + (damage / 50) * 0.35;
-    this.peakOpacity = Math.min(1.0, damage / 30);
+    this.fadeDurationS = 0.25 + (damage / 50) * 0.45;
+    this.peakOpacity = Math.min(1.0, 0.6 + damage / 60);
     this.timerS = this.fadeDurationS;
     this.hitLayer.style.opacity = this.peakOpacity.toFixed(3);
   }
@@ -47,7 +47,7 @@ export class HitVignette {
    * Call every frame.
    */
   setHealth(health: number): void {
-    const targetOpacity = health <= 30 ? 0.18 : 0;
+    const targetOpacity = health <= 40 ? 0.22 : 0;
     const current = parseFloat(this.lowHpLayer.style.opacity) || 0;
     // CSS transition handles smooth fade (0.5s set in constructor)
     if (Math.abs(current - targetOpacity) > 0.01) {

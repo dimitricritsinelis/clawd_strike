@@ -29,9 +29,9 @@ const HIDDEN_PLAYER_ROUTE = {
   expectedMinDistanceM: 18,
   maxStationaryTicks: 12,
   segments: [
-    { durationMs: 1200, action: { moveX: 1, sprint: true } },
-    { durationMs: 1200, action: { moveZ: 1, sprint: true } },
-    { durationMs: 1200, action: { moveX: 1, sprint: true } },
+    { durationMs: 1200, action: { moveX: 1 } },
+    { durationMs: 1200, action: { moveZ: 1 } },
+    { durationMs: 1200, action: { moveX: 1 } },
   ],
 };
 
@@ -311,7 +311,9 @@ async function waitForRuntimeState(page) {
     if (typeof window.render_game_to_text !== "function") return false;
     try {
       const state = JSON.parse(window.render_game_to_text());
-      return state.mode === "runtime" && state.map?.loaded === true;
+      return state.mode === "runtime"
+        && state.map?.loaded === true
+        && state.boot?.revealPhase === "active";
     } catch {
       return false;
     }
@@ -392,7 +394,7 @@ async function enforceHiddenPlayerPose(page, options = {}) {
       lookYawDelta: 0,
       lookPitchDelta: 0,
       fire: false,
-      sprint: false,
+      crouch: true,
     });
   }, { pose: HIDDEN_PLAYER_POSE, suppressIntel: suppressIntelMs });
 }

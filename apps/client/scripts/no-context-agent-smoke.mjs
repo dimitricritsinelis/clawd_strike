@@ -182,7 +182,6 @@ try {
       window.agent_apply_action?.({
         moveX,
         moveZ: 1,
-        sprint: true,
         lookYawDelta,
         fire,
       });

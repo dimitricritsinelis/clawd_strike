@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   advanceRuntime,
   attachConsoleRecorder,
@@ -19,6 +19,35 @@ function expectSharedChampionShape(sharedChampion: unknown) {
     scope: "sitewide",
     updatedAt: expect.any(String),
   });
+}
+
+async function readSelectionState(page: Page) {
+  return page.evaluate(() => {
+    const selection = window.getSelection();
+    return {
+      type: selection?.type ?? "None",
+      text: selection?.toString() ?? "",
+      rangeCount: selection?.rangeCount ?? 0,
+    };
+  });
+}
+
+async function expectNoSelection(page: Page) {
+  await expect
+    .poll(async () => readSelectionState(page))
+    .toEqual({ type: "None", text: "", rangeCount: 0 });
+}
+
+async function dragAcrossSelector(page: Page, selector: string) {
+  const box = await page.locator(selector).first().boundingBox();
+  if (!box) {
+    throw new Error(`Unable to drag across missing selector: ${selector}`);
+  }
+
+  await page.mouse.move(box.x + 24, box.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 24, box.y + box.height - 24, { steps: 18 });
+  await page.mouse.up();
 }
 
 test("exposes the public agent contract before runtime boot", async ({ page }, testInfo) => {
@@ -43,6 +72,71 @@ test("exposes the public agent contract before runtime boot", async ({ page }, t
   expectSharedChampionShape(state.sharedChampion ?? null);
   expect(state.health).toBeNull();
   expect(state.ammo).toBeNull();
+  expect(recorder.counts().errorCount).toBe(0);
+});
+
+test("suppresses native loading-screen selection while preserving name-entry flow", async ({ page }, testInfo) => {
+  const recorder = attachConsoleRecorder(page);
+  const baseUrl = testInfo.project.use.baseURL as string;
+
+  await page.goto(`${baseUrl}/`, {
+    waitUntil: "domcontentloaded",
+  });
+  await page.waitForSelector("#start[data-assets-ready=\"true\"]");
+
+  await dragAcrossSelector(page, ".logo-img");
+  await expectNoSelection(page);
+
+  await dragAcrossSelector(page, ".option-img");
+  await expectNoSelection(page);
+
+  await page.click("#info-btn");
+  await expect(page.locator(".info-screen-art-img")).toBeVisible();
+  await dragAcrossSelector(page, ".info-screen-art-img");
+  await expectNoSelection(page);
+
+  await page.click("#info-btn");
+  await page.getByTestId("agent-mode").click();
+  await page.getByTestId("play").click();
+
+  const agentNameInput = page.getByTestId("agent-name");
+  await expect(agentNameInput).toBeVisible();
+  await expect(agentNameInput).toBeFocused();
+  await agentNameInput.fill("SelectGuard");
+  await expect(agentNameInput).toHaveValue("SelectGuard");
+  await agentNameInput.press("Escape");
+
+  await expect(agentNameInput).not.toBeVisible();
+  await expect(page.locator("#single-player-btn")).toBeFocused();
+
+  await page.getByTestId("agent-mode").click();
+  await page.getByTestId("play").click();
+  await expect(agentNameInput).toBeFocused();
+  await agentNameInput.fill("SelectGuard");
+  await agentNameInput.press("Enter");
+
+  await page.waitForFunction(() => {
+    const read = () => {
+      if (typeof window.agent_observe === "function") {
+        return window.agent_observe();
+      }
+      if (typeof window.render_game_to_text === "function") {
+        return window.render_game_to_text();
+      }
+      return null;
+    };
+
+    const raw = read();
+    if (typeof raw !== "string") return false;
+
+    try {
+      const state = JSON.parse(raw);
+      return state.mode === "runtime" && state.runtimeReady === true;
+    } catch {
+      return false;
+    }
+  }, { timeout: 20_000 });
+
   expect(recorder.counts().errorCount).toBe(0);
 });
 
@@ -201,7 +295,6 @@ test("supports the documented no-context death and retry loop", async ({ page },
       window.agent_apply_action?.({
         moveX,
         moveZ: 1,
-        sprint: true,
         lookYawDelta,
         fire,
       });

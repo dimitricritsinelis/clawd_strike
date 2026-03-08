@@ -1,5 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect, Plugin, ViteDevServer } from "vite";
+import {
+  handleSharedChampionStatsDailyRequest,
+  handleSharedChampionStatsNamesRequest,
+  handleSharedChampionStatsOverviewRequest,
+  handleSharedChampionStatsRunsRequest,
+} from "./highScoreAdminApi";
 import { handleSharedChampionRequest } from "./highScoreApi";
 import {
   handleSharedChampionRunFinishRequest,
@@ -19,6 +25,10 @@ const routeHandlers = new Map<string, SharedChampionRouteHandler>([
   ["/api/high-score", handleSharedChampionRequest],
   ["/api/run/start", handleSharedChampionRunStartRequest],
   ["/api/run/finish", handleSharedChampionRunFinishRequest],
+  ["/api/admin/stats/overview", handleSharedChampionStatsOverviewRequest],
+  ["/api/admin/stats/runs", handleSharedChampionStatsRunsRequest],
+  ["/api/admin/stats/names", handleSharedChampionStatsNamesRequest],
+  ["/api/admin/stats/daily", handleSharedChampionStatsDailyRequest],
 ]);
 
 async function readRequestBody(request: IncomingMessage): Promise<string | undefined> {

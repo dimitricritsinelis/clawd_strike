@@ -128,12 +128,12 @@ export class Game {
     jump: false,
     fire: false,
     reload: false,
-    sprint: true,
+    crouch: false,
   };
   private readonly frameInput: PlayerInputState = {
     forward: 0,
     right: 0,
-    walkHeld: false,
+    crouchHeld: false,
     jumpPressed: false,
   };
 
@@ -153,7 +153,7 @@ export class Game {
   private agentJumpQueued = false;
   private agentReloadQueued = false;
   private agentFireHeld = false;
-  private agentSprintHeld = true;
+  private agentCrouchHeld = false;
   private spawn: RuntimeSpawnId = "A";
   private mapId = "bazaar-map";
   private seedOverride: number | null = null;
@@ -231,6 +231,7 @@ export class Game {
   private shakeX = 0;
   private shakeXVel = 0;
   private shakeY = 0;
+  private smoothedEyeHeight = PLAYER_EYE_HEIGHT_M;
   private shakeYVel = 0;
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -451,7 +452,7 @@ export class Game {
         this.shakeYVel -= 0.06;
       }
       this.wasGrounded = nowGrounded;
-      this.updateCameraFromPlayer();
+      this.updateCameraFromPlayer(deltaSeconds);
       this.desertSky?.update();
 
       this.camera.getWorldDirection(this.cameraForward);
@@ -492,6 +493,8 @@ export class Game {
           this.playerController.getPosition(),
           this.playerHealth,
           this.worldColliders,
+          this.playerController.getCurrentHeight(),
+          this.playerController.getCurrentEyeHeight(),
         );
         const delta = this.enemyManager.getPlayerHealthDelta();
         if (this.unlimitedHealth) {
@@ -786,8 +789,8 @@ export class Game {
     if (action.fire !== undefined) {
       this.agentFireHeld = action.fire;
     }
-    if (action.sprint !== undefined) {
-      this.agentSprintHeld = action.sprint;
+    if (action.crouch !== undefined) {
+      this.agentCrouchHeld = action.crouch;
     }
   }
 
@@ -797,6 +800,7 @@ export class Game {
     this.wasGrounded = true;
     this.shakeX = 0; this.shakeXVel = 0;
     this.shakeY = 0; this.shakeYVel = 0;
+    this.smoothedEyeHeight = PLAYER_EYE_HEIGHT_M;
     this.resetInputState();
     this.weapon.reset();
     this.resetWeaponDebugState();
@@ -946,7 +950,7 @@ export class Game {
   private buildHumanIntent(): void {
     this.tickIntent.moveZ = (this.pressedKeys.has("KeyW") ? 1 : 0) + (this.pressedKeys.has("KeyS") ? -1 : 0);
     this.tickIntent.moveX = (this.pressedKeys.has("KeyD") ? 1 : 0) + (this.pressedKeys.has("KeyA") ? -1 : 0);
-    this.tickIntent.sprint = !(this.pressedKeys.has("ShiftLeft") || this.pressedKeys.has("ShiftRight"));
+    this.tickIntent.crouch = this.pressedKeys.has("ShiftLeft") || this.pressedKeys.has("ShiftRight");
     this.tickIntent.jump = this.humanJumpQueued;
     this.tickIntent.fire = this.humanFireHeld;
     this.tickIntent.reload = this.humanReloadQueued;
@@ -967,7 +971,7 @@ export class Game {
     this.tickIntent.jump = this.agentJumpQueued;
     this.tickIntent.fire = this.agentFireHeld;
     this.tickIntent.reload = this.agentReloadQueued;
-    this.tickIntent.sprint = this.agentSprintHeld;
+    this.tickIntent.crouch = this.agentCrouchHeld;
 
     this.agentLookYawDeltaDeg = 0;
     this.agentLookPitchDeltaDeg = 0;
@@ -993,7 +997,7 @@ export class Game {
 
     this.frameInput.forward = this.tickIntent.moveZ;
     this.frameInput.right = this.tickIntent.moveX;
-    this.frameInput.walkHeld = !this.tickIntent.sprint;
+    this.frameInput.crouchHeld = this.tickIntent.crouch;
     this.frameInput.jumpPressed = this.tickIntent.jump;
   }
 
@@ -1011,7 +1015,7 @@ export class Game {
     this.agentJumpQueued = false;
     this.agentReloadQueued = false;
     this.agentFireHeld = false;
-    this.agentSprintHeld = true;
+    this.agentCrouchHeld = false;
     this.weapon.cancelTrigger();
     resetTickIntent(this.tickIntent);
     this.resetFrameInput();
@@ -1020,13 +1024,17 @@ export class Game {
   private resetFrameInput(): void {
     this.frameInput.forward = 0;
     this.frameInput.right = 0;
-    this.frameInput.walkHeld = false;
+    this.frameInput.crouchHeld = false;
     this.frameInput.jumpPressed = false;
   }
 
-  private updateCameraFromPlayer(): void {
+  private updateCameraFromPlayer(deltaSeconds = 1.0): void {
     const position = this.playerController.getPosition();
-    this.camera.position.set(position.x, position.y + PLAYER_EYE_HEIGHT_M, position.z);
+    const targetEyeHeight = this.playerController.getCurrentEyeHeight();
+    const lerpRate = 10.0;
+    this.smoothedEyeHeight += (targetEyeHeight - this.smoothedEyeHeight) *
+      Math.min(1, deltaSeconds * lerpRate);
+    this.camera.position.set(position.x, position.y + this.smoothedEyeHeight, position.z);
     this.applyAnglesToCamera();
   }
 

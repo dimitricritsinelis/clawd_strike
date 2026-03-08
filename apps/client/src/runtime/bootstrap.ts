@@ -28,6 +28,7 @@ import { FadeOverlay } from "./ui/FadeOverlay";
 import { HeadshotBanner } from "./ui/HeadshotBanner";
 import { parseRuntimeUrlParams, sanitizeRuntimePlayerName, type RuntimeControlMode } from "./utils/UrlParams";
 import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
+import { BulletHoleManager } from "./effects/BulletHoleManager";
 import type { RuntimeWarmupAssets } from "./warmup";
 import {
   getSharedChampionSnapshot,
@@ -73,6 +74,8 @@ type ScenePerfSnapshot = {
   instancedMeshes: number;
   instancedInstances: number;
 };
+
+type RevealPhase = "warming" | "ready" | "revealing" | "active";
 
 type QueuedCombatFeedbackEvent =
   | {
@@ -192,6 +195,7 @@ export type RuntimeTextState = {
     warnings: string[];
   };
   boot: {
+    revealPhase: RevealPhase;
     warmupTimedOut: boolean;
     performanceSafeFallback: boolean;
     enemyVisualsReady: boolean;
@@ -210,10 +214,11 @@ export type RuntimeTextState = {
       yawDeg: number;
       pitchDeg: number;
       fovDeg: number;
+      aspect: number;
     };
   };
   gameplay: {
-    active: true;
+    active: boolean;
     alive: boolean;
     pointerLocked: boolean;
     focused: boolean;
@@ -480,6 +485,9 @@ export type PublicAgentObserveState = {
 
 export type RuntimeHandle = {
   teardown: () => void;
+  getRootElement: () => HTMLDivElement;
+  beginReveal: () => void;
+  activate: () => void;
 };
 
 export type RuntimeBootstrapOptions = {
@@ -496,15 +504,30 @@ function getAppRoot(): HTMLElement {
 
 function createRuntimeRoot(appRoot: HTMLElement): HTMLDivElement {
   const existing = appRoot.querySelector<HTMLDivElement>("#runtime-root");
-  if (existing) return existing;
+  if (existing) {
+    existing.style.position = "absolute";
+    existing.style.inset = "0";
+    existing.style.background = "#0b0b0b";
+    existing.style.overflow = "hidden";
+    existing.style.userSelect = "none";
+    existing.style.opacity = "0";
+    existing.style.pointerEvents = "none";
+    existing.style.willChange = "opacity";
+    existing.style.transition = "none";
+    return existing;
+  }
 
   const runtimeRoot = document.createElement("div");
   runtimeRoot.id = "runtime-root";
   runtimeRoot.style.position = "absolute";
   runtimeRoot.style.inset = "0";
-  runtimeRoot.style.background = "#e8f2ff";
+  runtimeRoot.style.background = "#0b0b0b";
   runtimeRoot.style.overflow = "hidden";
   runtimeRoot.style.userSelect = "none";
+  runtimeRoot.style.opacity = "0";
+  runtimeRoot.style.pointerEvents = "none";
+  runtimeRoot.style.willChange = "opacity";
+  runtimeRoot.style.transition = "none";
   appRoot.prepend(runtimeRoot);
   return runtimeRoot;
 }
@@ -892,6 +915,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   }
 
   const bootTelemetry = {
+    revealPhase: "warming" as RevealPhase,
     warmupTimedOut,
     performanceSafeFallback,
     enemyVisualsReady: warmupAssets?.enemyVisualsReady ?? false,
@@ -986,6 +1010,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   shotId = resolvedShot?.id ?? null;
   inputFrozen = resolvedShot?.freezeInput ?? false;
 
+  let bulletHoles: BulletHoleManager | null = null;
+
   const game = new Game({
     controlMode: runtimeParams.controlMode,
     mapId: runtimeParams.mapId,
@@ -1054,12 +1080,18 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
             damage,
             isHeadshot,
           });
+        } else if (shot.hitNormal) {
+          // Bullet hit world surface (wall/floor/prop), not an enemy — spawn decal
+          bulletHoles?.spawn(shot.hitPoint!, shot.hitNormal);
         }
       }
     },
     unlimitedHealth: runtimeParams.unlimitedHealth,
     ...(runtimeParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
   });
+
+  // Bullet hole decals on world surfaces
+  bulletHoles = new BulletHoleManager(game.scene, runtimeParams.seed ?? 1);
 
   // Wire enemy gunshot audio (quiet distant shots from AI enemies)
   game.setEnemyAudio(weaponAudio);
@@ -1137,6 +1169,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       hitMarker.clear();
       hitVignette.clear();
       damageNumbers.clear();
+      bulletHoles?.clear();
       scoreHud.reset();
       sharedChampionFinalizedForCurrentRun = false;
       waveElapsedS = 0;
@@ -1186,6 +1219,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   // Let any async map assignments resolve before we draw the first visible gameplay frame.
   await Promise.resolve();
+  syncViewportNow();
   renderer.requestShadowUpdate();
 
   const overviewCameraAtBoot = game.camera.position.y > OVERVIEW_VIEWMODEL_DISABLE_HEIGHT_M;
@@ -1203,16 +1237,13 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     game.setWeaponDebugSnapshot(false, -1, 180);
   }
 
-  renderer.renderWithViewModel(
-    game.scene,
-    game.camera,
-    viewModel?.viewModelScene ?? null,
-    viewModel?.viewModelCamera ?? null,
-    viewModelVisible,
-  );
+  renderStagedFrame();
   bootTelemetry.hiddenWarmupRenderDone = true;
 
   try {
+    if (syncViewportIfChanged()) {
+      renderStagedFrame();
+    }
     await renderer.compileSceneAsync(
       game.scene,
       game.camera,
@@ -1227,13 +1258,16 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     );
   }
 
+  if (syncViewportIfChanged()) {
+    renderStagedFrame();
+  }
   await waitForHiddenTextureStability();
   markBootReady();
+  bootTelemetry.revealPhase = "ready";
 
   let pointerLock: PointerLockController | null = null;
   if (!inputFrozen && runtimeParams.controlMode === "human") {
     pointerLock = new PointerLockController({
-      mountEl: runtimeRoot,
       lockEl: renderer.canvas,
       onLockChange: (locked) => {
         game.setPointerLocked(locked);
@@ -1253,6 +1287,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     });
   }
 
+  let runtimeActive = false;
+  let runtimeLoopStarted = false;
+  let runtimeBindingsAttached = false;
   let rafId = 0;
   let previousFrameTime = performance.now();
   let previousHealth = 100;
@@ -1517,10 +1554,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
           yawDeg: yawPitch.yaw,
           pitchDeg: yawPitch.pitch,
           fovDeg: game.camera.fov,
+          aspect: game.camera.aspect,
         },
       },
       gameplay: {
-        active: true,
+        active: runtimeActive && mapLoaded,
         alive,
         pointerLocked,
         focused: document.hasFocus(),
@@ -1642,7 +1680,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       apiVersion: PUBLIC_AGENT_API_VERSION,
       contract: PUBLIC_AGENT_CONTRACT,
       mode: "runtime",
-      runtimeReady: mapLoaded,
+      runtimeReady: runtimeActive && mapLoaded,
       gameplay: {
         alive,
         gameOverVisible: deathScreen.isVisible(),
@@ -1664,12 +1702,36 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     };
   };
 
-  const onResize = (): void => {
+  function syncViewportNow(): void {
     renderer.resize();
     game.setAspect(renderer.getAspect());
     game.setViewportSize(renderer.getWidth(), renderer.getHeight());
     viewModel?.setAspect(renderer.getAspect());
-  };
+  }
+
+  function syncViewportIfChanged(): boolean {
+    const nextWidth = Math.max(1, runtimeRoot.clientWidth || window.innerWidth);
+    const nextHeight = Math.max(1, runtimeRoot.clientHeight || window.innerHeight);
+    if (renderer.getWidth() === nextWidth && renderer.getHeight() === nextHeight) {
+      return false;
+    }
+    syncViewportNow();
+    return true;
+  }
+
+  function renderStagedFrame(): void {
+    renderer.renderWithViewModel(
+      game.scene,
+      game.camera,
+      viewModel?.viewModelScene ?? null,
+      viewModel?.viewModelCamera ?? null,
+      viewModelVisible,
+    );
+  }
+
+  function onResize(): void {
+    syncViewportNow();
+  }
 
   const step = (deltaMs: number, options: { renderFrame?: boolean } = {}): void => {
     const clampedMs = Math.min(Math.max(deltaMs, 0), 100);
@@ -1737,10 +1799,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     // ── Health tracking & hit vignette ───────────────────────────────────────
     const currentHealth = game.getPlayerHealth();
     if (currentHealth < previousHealth) {
-      hitVignette.triggerHit();
+      hitVignette.triggerHit(previousHealth - currentHealth);
       lastDamageCause = "enemy-fire";
     }
     previousHealth = currentHealth;
+    hitVignette.setHealth(currentHealth);
 
     // ── Footstep audio ───────────────────────────────────────────────────────
     const grounded = game.getGrounded();
@@ -1817,6 +1880,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     headshotBanner.update(dt);
     hitMarker.update(dt);
     damageNumbers.update(dt);
+    bulletHoles?.update(dt);
 
     if (renderFrame && viewModel) {
       viewModel.setFrameInput(speedMps, grounded, swayMouseDeltaX, swayMouseDeltaY);
@@ -1962,6 +2026,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     }
     // When Escape is pressed, pointer lock exits first (browser default),
     // then we show the pause menu.
+    // If controls sub-screen is open, go back to pause (don't resume game).
+    if (pauseMenu.isVisible() && pauseMenu.handleEscapeFromControls()) {
+      return;
+    }
     // If we're already showing pause, hide it and try to re-lock.
     if (pauseMenu.isVisible()) {
       pauseMenu.hide();
@@ -1975,15 +2043,43 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       }
     }, 50);
   };
-  window.addEventListener("keydown", onKeyDownPause);
 
-  pointerLock?.init();
-  onResize();
-  window.addEventListener("resize", onResize);
-  document.addEventListener("visibilitychange", onVisibilityModeChange);
-  onVisibilityModeChange();
-  timerHud.start(); // begin counting from game boot
-  rafId = window.requestAnimationFrame(animate);
+  const attachRuntimeBindings = (): void => {
+    if (runtimeBindingsAttached) return;
+    runtimeBindingsAttached = true;
+    window.addEventListener("keydown", onKeyDownPause);
+    window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", onVisibilityModeChange);
+    pointerLock?.init();
+  };
+
+  const beginReveal = (): void => {
+    if (disposed) return;
+    if (bootTelemetry.revealPhase === "active") return;
+    if (syncViewportIfChanged()) {
+      renderStagedFrame();
+    }
+    bootTelemetry.revealPhase = "revealing";
+  };
+
+  const activate = (): void => {
+    if (disposed || runtimeActive) return;
+    if (syncViewportIfChanged()) {
+      renderStagedFrame();
+    }
+    runtimeActive = true;
+    runtimeRoot.style.pointerEvents = "auto";
+    bootTelemetry.revealPhase = "active";
+    attachRuntimeBindings();
+    previousFrameTime = performance.now();
+    lastAgentRenderTime = 0;
+    onVisibilityModeChange();
+    timerHud.start();
+    if (!runtimeLoopStarted) {
+      runtimeLoopStarted = true;
+      rafId = window.requestAnimationFrame(animate);
+    }
+  };
 
   window.agent_apply_action = (action: AgentAction) => {
     const normalized = normalizeAgentAction(action);
@@ -1993,6 +2089,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   window.agent_observe = () => JSON.stringify(publicObserveState());
   window.render_game_to_text = () => JSON.stringify(isInternalDebugSurface ? state() : publicObserveState());
   window.advanceTime = async (ms: number) => {
+    if (!runtimeActive) return;
     advanceSimulation(ms, {
       renderFrame: runtimeParams.controlMode !== "agent" || document.visibilityState === "visible",
     });
@@ -2067,5 +2164,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   window.addEventListener("pagehide", teardown);
   window.addEventListener("beforeunload", teardown);
 
-  return { teardown };
+  return {
+    teardown,
+    getRootElement: () => runtimeRoot,
+    beginReveal,
+    activate,
+  };
 }

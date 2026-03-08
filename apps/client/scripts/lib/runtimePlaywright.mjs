@@ -18,8 +18,8 @@ export const TRAVERSAL_ROUTES = [
     expectedMinDistanceM: 8,
     maxStationaryTicks: 8,
     segments: [
-      { durationMs: 2600, action: { moveZ: 1, sprint: true } },
-      { durationMs: 900, action: { moveZ: 1, moveX: 0.15, sprint: true } },
+      { durationMs: 2600, action: { moveZ: 1} },
+      { durationMs: 900, action: { moveZ: 1, moveX: 0.15} },
     ],
   },
   {
@@ -29,8 +29,8 @@ export const TRAVERSAL_ROUTES = [
     expectedMinDistanceM: 8,
     maxStationaryTicks: 8,
     segments: [
-      { durationMs: 2600, action: { moveZ: 1, sprint: true } },
-      { durationMs: 900, action: { moveZ: 1, moveX: -0.15, sprint: true } },
+      { durationMs: 2600, action: { moveZ: 1} },
+      { durationMs: 900, action: { moveZ: 1, moveX: -0.15} },
     ],
   },
   {
@@ -40,8 +40,8 @@ export const TRAVERSAL_ROUTES = [
     expectedMinDistanceM: 6,
     maxStationaryTicks: 10,
     segments: [
-      { durationMs: 1400, action: { moveZ: 1, moveX: 0.3, sprint: true } },
-      { durationMs: 1200, action: { moveZ: 1, sprint: true } },
+      { durationMs: 1400, action: { moveZ: 1, moveX: 0.3} },
+      { durationMs: 1200, action: { moveZ: 1} },
     ],
   },
 ];
@@ -281,7 +281,7 @@ export async function waitForDocumentedRuntimeReady(page, options = {}) {
     try {
       const state = JSON.parse(raw);
       if (state.mode !== "runtime") return false;
-      return state.runtimeReady === true || state.map?.loaded === true;
+      return state.runtimeReady === true;
     } catch {
       return false;
     }
@@ -320,6 +320,7 @@ export async function waitForRuntimeReady(page, options = {}) {
     try {
       const state = JSON.parse(window.render_game_to_text());
       if (state.mode !== "runtime" || state.map?.loaded !== true) return false;
+      if (state.boot?.revealPhase !== "active") return false;
       if (!shotId) return true;
       if (shotId === "compare") return state.shot?.active === true;
       return state.shot?.active === true && state.shot?.id === shotId;

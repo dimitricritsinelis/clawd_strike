@@ -5,8 +5,14 @@ import {
   readDocumentedAgentState,
 } from "../scripts/lib/runtimePlaywright.mjs";
 
+const STATS_ADMIN_TOKEN = process.env.STATS_ADMIN_TOKEN ?? "clawd-strike-dev-stats-admin-token";
+
 function formatScoreHalfPoints(scoreHalfPoints: number): string {
   return (scoreHalfPoints / 2).toLocaleString("en-US");
+}
+
+function formatLoadingScoreHalfPoints(scoreHalfPoints: number): string {
+  return Math.round(scoreHalfPoints / 2).toLocaleString("en-US");
 }
 
 function createChampion(
@@ -103,12 +109,47 @@ function originHeaders(baseUrl: string) {
   };
 }
 
+function statsAdminHeaders(token = STATS_ADMIN_TOKEN) {
+  return {
+    authorization: `Bearer ${token}`,
+  };
+}
+
 async function readSharedChampion(request: APIRequestContext, baseUrl: string) {
   const response = await request.get(new URL("/api/high-score", baseUrl).toString(), {
     failOnStatusCode: false,
   });
   expect(response.ok()).toBe(true);
   return response.json();
+}
+
+async function readAdminStats(
+  request: APIRequestContext,
+  baseUrl: string,
+  path: string,
+  options: {
+    params?: Record<string, string>;
+    token?: string | null;
+  } = {},
+) {
+  const url = new URL(path, baseUrl);
+  if (options.params) {
+    for (const [key, value] of Object.entries(options.params)) {
+      url.searchParams.set(key, value);
+    }
+  }
+
+  const headers = options.token === null
+    ? undefined
+    : statsAdminHeaders(options.token ?? STATS_ADMIN_TOKEN);
+  const response = await request.get(url.toString(), {
+    failOnStatusCode: false,
+    ...(headers ? { headers } : {}),
+  });
+  return {
+    response,
+    body: await response.json().catch(() => null),
+  };
 }
 
 function buildTelemetryForScore(scoreHalfPoints: number) {
@@ -242,7 +283,6 @@ async function driveUntilDeath(page: Page): Promise<void> {
       window.agent_apply_action?.({
         moveX,
         moveZ: 1,
-        sprint: true,
         lookYawDelta,
         fire,
       });
@@ -406,6 +446,225 @@ test("validated run submissions keep strict overwrite rules", async ({ request }
   });
 });
 
+test("admin stats endpoints require auth and expose filtered run history", async ({ request }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL as string;
+  const suffix = `${Date.now()}`.slice(-5);
+  const leaderName = `Lead${suffix}`;
+  const followerName = `Follow${suffix}`;
+  const windowStart = new Date().toISOString();
+
+  const noAuth = await readAdminStats(request, baseUrl, "/api/admin/stats/overview", {
+    token: null,
+  });
+  expect(noAuth.response.status()).toBe(401);
+  expect(noAuth.body).toEqual({
+    error: "Missing Bearer token.",
+  });
+
+  const wrongAuth = await readAdminStats(request, baseUrl, "/api/admin/stats/overview", {
+    token: "wrong-token",
+  });
+  expect(wrongAuth.response.status()).toBe(403);
+  expect(wrongAuth.body).toEqual({
+    error: "Invalid admin token.",
+  });
+
+  const current = await readSharedChampion(request, baseUrl);
+  const currentHalfPoints = typeof current.champion?.scoreHalfPoints === "number" ? current.champion.scoreHalfPoints : 0;
+  const leaderRun = chooseRunAtLeastHalfPoints(currentHalfPoints + 5);
+
+  const leader = await completeValidatedRun(request, baseUrl, {
+    playerName: leaderName,
+    controlMode: "human",
+    kills: leaderRun.kills,
+    headshots: leaderRun.headshots,
+  });
+  expect(leader.finished.response.ok()).toBe(true);
+  expect(leader.finished.body.updated).toBe(true);
+
+  const follower = await completeValidatedRun(request, baseUrl, {
+    playerName: followerName,
+    controlMode: "agent",
+    kills: 1,
+    headshots: 0,
+  });
+  expect(follower.finished.response.ok()).toBe(true);
+  expect(follower.finished.body.accepted).toBe(true);
+
+  const overview = await readAdminStats(request, baseUrl, "/api/admin/stats/overview", {
+    params: {
+      from: windowStart,
+    },
+  });
+  expect(overview.response.ok()).toBe(true);
+  expect(overview.body.overview).toMatchObject({
+    totalRuns: 2,
+    championUpdates: 1,
+    uniquePlayerNames: 2,
+    humanRuns: 1,
+    agentRuns: 1,
+  });
+
+  const firstPage = await readAdminStats(request, baseUrl, "/api/admin/stats/runs", {
+    params: {
+      from: windowStart,
+      limit: "1",
+    },
+  });
+  expect(firstPage.response.ok()).toBe(true);
+  expect(firstPage.body.items).toHaveLength(1);
+  expect(typeof firstPage.body.nextCursor).toBe("string");
+
+  const secondPage = await readAdminStats(request, baseUrl, "/api/admin/stats/runs", {
+    params: {
+      from: windowStart,
+      limit: "1",
+      cursor: firstPage.body.nextCursor,
+    },
+  });
+  expect(secondPage.response.ok()).toBe(true);
+  expect(secondPage.body.items).toHaveLength(1);
+  expect(secondPage.body.items[0].runId).not.toBe(firstPage.body.items[0].runId);
+
+  const leaderRuns = await readAdminStats(request, baseUrl, "/api/admin/stats/runs", {
+    params: {
+      playerName: leaderName,
+      limit: "10",
+    },
+  });
+  expect(leaderRuns.response.ok()).toBe(true);
+  expect(leaderRuns.body.items).toHaveLength(1);
+  expect(leaderRuns.body.items[0]).toMatchObject({
+    playerName: leaderName,
+    playerNameKey: leaderName.toLowerCase(),
+    controlMode: "human",
+    mapId: "bazaar-map",
+    ruleset: "wave-score-v1-k10-hs2_5",
+    scoreHalfPoints: leaderRun.scoreHalfPoints,
+    championUpdated: true,
+  });
+  expect(typeof leaderRuns.body.items[0].clientIpFingerprint).toBe("string");
+  expect(typeof leaderRuns.body.items[0].userAgentFingerprint).toBe("string");
+
+  const names = await readAdminStats(request, baseUrl, "/api/admin/stats/names", {
+    params: {
+      from: windowStart,
+      limit: "10",
+    },
+  });
+  expect(names.response.ok()).toBe(true);
+  expect(names.body.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        playerName: leaderName,
+        totalRuns: 1,
+        championUpdates: 1,
+      }),
+      expect.objectContaining({
+        playerName: followerName,
+        totalRuns: 1,
+      }),
+    ]),
+  );
+
+  const daily = await readAdminStats(request, baseUrl, "/api/admin/stats/daily", {
+    params: {
+      from: windowStart,
+      limit: "10",
+    },
+  });
+  expect(daily.response.ok()).toBe(true);
+  expect(daily.body.items[0]).toMatchObject({
+    totalRuns: 2,
+    championUpdates: 1,
+    uniquePlayerNames: 2,
+  });
+});
+
+test("validated run stats store only accepted finishes", async ({ request }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL as string;
+  const suffix = `${Date.now()}`.slice(-5);
+  const acceptedName = `Store${suffix}`;
+  const rejectedName = `Reject${suffix}`;
+
+  const accepted = await completeValidatedRun(request, baseUrl, {
+    playerName: acceptedName,
+    controlMode: "agent",
+    kills: 2,
+    headshots: 1,
+  });
+  expect(accepted.finished.response.ok()).toBe(true);
+  expect(accepted.finished.body.accepted).toBe(true);
+
+  const replayAttempt = await finishValidatedRun(request, baseUrl, {
+    runToken: accepted.started.body.runToken,
+    summary: accepted.summary,
+  });
+  expect(replayAttempt.response.status()).toBe(409);
+  expect(replayAttempt.body.reason).toBe("used");
+
+  const rejectedStart = await startValidatedRun(request, baseUrl, {
+    playerName: rejectedName,
+    controlMode: "human",
+  });
+  expect(rejectedStart.response.ok()).toBe(true);
+
+  const rejectedFinish = await finishValidatedRun(request, baseUrl, {
+    runToken: rejectedStart.body.runToken,
+    summary: {
+      survivalTimeS: 0.5,
+      kills: 99_999,
+      headshots: 99_999,
+      shotsFired: 99_999,
+      shotsHit: 99_999,
+      accuracy: 100,
+      finalScore: computeFinalScore(99_999, 99_999),
+      deathCause: "enemy-fire",
+    },
+  });
+  expect(rejectedFinish.response.status()).toBe(422);
+  expect(rejectedFinish.body.accepted).toBe(false);
+
+  const acceptedRuns = await readAdminStats(request, baseUrl, "/api/admin/stats/runs", {
+    params: {
+      playerName: acceptedName,
+      limit: "10",
+    },
+  });
+  expect(acceptedRuns.response.ok()).toBe(true);
+  expect(acceptedRuns.body.items).toHaveLength(1);
+  expect(acceptedRuns.body.items[0]).toMatchObject({
+    playerName: acceptedName,
+    controlMode: "agent",
+    kills: 2,
+    headshots: 1,
+    shotsFired: 2,
+    shotsHit: 2,
+    accuracyPct: 100,
+    scoreHalfPoints: 45,
+    score: 22.5,
+    waveReached: 1,
+    wavesCleared: 0,
+  });
+
+  const rejectedRuns = await readAdminStats(request, baseUrl, "/api/admin/stats/runs", {
+    params: {
+      playerName: rejectedName,
+      limit: "10",
+    },
+  });
+  expect(rejectedRuns.response.ok()).toBe(true);
+  expect(rejectedRuns.body.items).toHaveLength(0);
+
+  const acceptedOverview = await readAdminStats(request, baseUrl, "/api/admin/stats/overview", {
+    params: {
+      playerName: acceptedName,
+    },
+  });
+  expect(acceptedOverview.response.ok()).toBe(true);
+  expect(acceptedOverview.body.overview.totalRuns).toBe(1);
+});
+
 test("shows the same shared champion across loading, HUD, and death surfaces", async ({ browser, request }, testInfo) => {
   const baseUrl = testInfo.project.use.baseURL as string;
   const current = await readSharedChampion(request, baseUrl);
@@ -434,9 +693,8 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
 
     await expect(pageA.getByTestId("loading-world-champion-name")).toHaveText(holderName.toUpperCase());
     await expect(pageB.getByTestId("loading-world-champion-name")).toHaveText(holderName.toUpperCase());
-    await expect(pageA.getByTestId("loading-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
-    await expect(pageA.getByTestId("loading-world-champion-mode")).toHaveText("AGENT");
-    await expect(pageB.getByTestId("loading-world-champion-score")).toHaveText(formatScoreHalfPoints(nextRun.scoreHalfPoints));
+    await expect(pageA.getByTestId("loading-world-champion-score")).toHaveText(formatLoadingScoreHalfPoints(nextRun.scoreHalfPoints));
+    await expect(pageB.getByTestId("loading-world-champion-score")).toHaveText(formatLoadingScoreHalfPoints(nextRun.scoreHalfPoints));
 
     await gotoAgentRuntimeViaUi(pageA, {
       baseUrl,
@@ -460,7 +718,6 @@ test("shows the same shared champion across loading, HUD, and death surfaces", a
         window.agent_apply_action?.({
           moveX,
           moveZ: 1,
-          sprint: true,
           lookYawDelta,
           fire,
         });
@@ -655,7 +912,8 @@ test("keeps the game bootable when the shared champion API is unavailable", asyn
   await page.route("**/api/high-score", (route) => route.abort());
 
   await page.goto(new URL("/", baseUrl).toString(), { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("loading-world-champion-status")).toHaveText("Shared score service could not be reached");
+  await expect(page.getByTestId("loading-world-champion-name")).toHaveText("RECORD OFFLINE");
+  await expect(page.getByTestId("loading-world-champion-score")).toHaveText("N/A");
 
   await gotoAgentRuntimeViaUi(page, {
     baseUrl,

@@ -398,6 +398,8 @@ export class EnemyManager {
   private readonly aabbScratch: EnemyAabb[] = [];
   private readonly targetPool: EnemyTarget[];
   private readonly targetsScratch: EnemyTarget[] = [];
+  private currentPlayerHeightM = PLAYER_HEIGHT_M;
+  private currentPlayerEyeHeightM = PLAYER_EYE_HEIGHT_M;
   private readonly playerAabb: EnemyAabb = {
     id: "player",
     minX: 0,
@@ -840,7 +842,7 @@ export class EnemyManager {
           distanceToPlayerM: distanceM(spawnX, spawnZ, playerPos.x, playerPos.z),
           visibleToPlayer: hasLineOfSight(
             playerPos,
-            PLAYER_EYE_HEIGHT_M,
+            this.currentPlayerEyeHeightM,
             { x: spawnX, y: 0, z: spawnZ },
             ENEMY_EYE_HEIGHT_M,
             worldColliders,
@@ -1198,7 +1200,7 @@ export class EnemyManager {
     return samplePoints.every((sample) => {
       const hiddenFromPlayerView = !hasLineOfSight(
         playerPos,
-        PLAYER_EYE_HEIGHT_M,
+        this.currentPlayerEyeHeightM,
         { x: sample.x, y: 0, z: sample.z },
         ENEMY_EYE_HEIGHT_M,
         worldColliders,
@@ -1406,7 +1408,7 @@ export class EnemyManager {
       visibleToPlayer: playerPos
         ? hasLineOfSight(
             playerPos,
-            PLAYER_EYE_HEIGHT_M,
+            this.currentPlayerEyeHeightM,
             { x: resolution.spawnX, y: 0, z: resolution.spawnZ },
             ENEMY_EYE_HEIGHT_M,
             worldColliders,
@@ -1568,7 +1570,11 @@ export class EnemyManager {
     playerPos: { x: number; y: number; z: number },
     playerHealth: number,
     worldColliders: WorldColliders,
+    playerHeightM = PLAYER_HEIGHT_M,
+    playerEyeHeightM = PLAYER_EYE_HEIGHT_M,
   ): void {
+    this.currentPlayerHeightM = playerHeightM;
+    this.currentPlayerEyeHeightM = playerEyeHeightM;
     this.playerHealthDelta = 0;
     if (!this.allDead()) {
       this.waveElapsedS += Math.max(0, deltaSeconds);
@@ -1579,7 +1585,7 @@ export class EnemyManager {
     this.playerAabb.minY = playerPos.y;
     this.playerAabb.minZ = playerPos.z - PLAYER_HALF_WIDTH_M;
     this.playerAabb.maxX = playerPos.x + PLAYER_HALF_WIDTH_M;
-    this.playerAabb.maxY = playerPos.y + PLAYER_HEIGHT_M;
+    this.playerAabb.maxY = playerPos.y + this.currentPlayerHeightM;
     this.playerAabb.maxZ = playerPos.z + PLAYER_HALF_WIDTH_M;
 
     this.aabbScratch.length = 0;

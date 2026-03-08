@@ -90,7 +90,6 @@ export class PauseMenu {
       backdropFilter: "blur(2px)",
     });
 
-    // Warm sand panel
     const panel = document.createElement("div");
     Object.assign(panel.style, {
       background: "linear-gradient(180deg, rgba(44, 24, 10, 0.82), rgba(20, 11, 5, 0.78))",
@@ -129,7 +128,6 @@ export class PauseMenu {
     });
     hintEl.textContent = "Press Escape to return to game";
 
-    // Top row: Return to Game + Return to Lobby
     const actionsEl = document.createElement("div");
     Object.assign(actionsEl.style, {
       display: "flex",
@@ -175,7 +173,6 @@ export class PauseMenu {
 
     actionsEl.append(gameBtn, lobbyBtn);
 
-    // Controls button on its own row
     const controlsRow = document.createElement("div");
     Object.assign(controlsRow.style, {
       display: "flex",
@@ -258,6 +255,11 @@ export class PauseMenu {
 
   isVisible(): boolean {
     return this.visible;
+  }
+
+  /** External controls overlay handles its own dismiss flow. */
+  handleEscapeFromControls(): boolean {
+    return false;
   }
 
   dispose(): void {

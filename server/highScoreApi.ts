@@ -127,8 +127,8 @@ export async function handleSharedChampionRequest(
         await recordAuditEvent(store, {
           eventType: "champion-direct-write",
           outcome: "rejected",
-          ipHash: writeCheck.clientIpHash,
-          userAgent: writeCheck.userAgent,
+          ipFingerprint: writeCheck.clientIpFingerprint,
+          userAgentFingerprint: writeCheck.userAgentFingerprint,
           reason: writeCheck.error,
         });
         return errorResponse(writeCheck.status, writeCheck.error);
@@ -140,8 +140,8 @@ export async function handleSharedChampionRequest(
         await recordAuditEvent(store, {
           eventType: "champion-direct-write",
           outcome: "rejected",
-          ipHash: writeCheck.clientIpHash,
-          userAgent: writeCheck.userAgent,
+          ipFingerprint: writeCheck.clientIpFingerprint,
+          userAgentFingerprint: writeCheck.userAgentFingerprint,
           reason: "Direct shared champion writes are internal-only.",
         });
         return errorResponse(403, "Direct shared champion writes are internal-only.");
@@ -156,8 +156,8 @@ export async function handleSharedChampionRequest(
         await recordAuditEvent(store, {
           eventType: "champion-direct-write",
           outcome: "rejected",
-          ipHash: writeCheck.clientIpHash,
-          userAgent: writeCheck.userAgent,
+          ipFingerprint: writeCheck.clientIpFingerprint,
+          userAgentFingerprint: writeCheck.userAgentFingerprint,
           reason: "Invalid JSON body.",
         });
         return errorResponse(400, "Invalid JSON body.");
@@ -179,8 +179,8 @@ export async function handleSharedChampionRequest(
         await recordAuditEvent(store, {
           eventType: "champion-direct-write",
           outcome: "rejected",
-          ipHash: writeCheck.clientIpHash,
-          userAgent: writeCheck.userAgent,
+          ipFingerprint: writeCheck.clientIpFingerprint,
+          userAgentFingerprint: writeCheck.userAgentFingerprint,
           reason: "Expected { playerName, scoreHalfPoints, controlMode, telemetry, sessionToken }.",
         });
         return errorResponse(400, "Expected { playerName, scoreHalfPoints, controlMode, telemetry, sessionToken }.");
@@ -212,8 +212,8 @@ export async function handleSharedChampionRequest(
       await recordAuditEvent(store, {
         eventType: "champion-direct-write",
         outcome: "accepted",
-        ipHash: writeCheck.clientIpHash,
-        userAgent: writeCheck.userAgent,
+        ipFingerprint: writeCheck.clientIpFingerprint,
+        userAgentFingerprint: writeCheck.userAgentFingerprint,
         payload: {
           playerName: parsedBody.playerName,
           scoreHalfPoints: parsedBody.scoreHalfPoints,

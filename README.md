@@ -29,9 +29,42 @@ pnpm test:playwright
 pnpm qa:completion
 pnpm smoke:no-context
 pnpm verify:skills-contract
+pnpm stats:admin -- --help
 ```
 
 Use the canonical playtest URL recorded in `progress.md`.
+
+## Admin Stats
+
+Use the repo helper instead of hand-building `curl` commands:
+
+```bash
+export BASE_URL="http://127.0.0.1:5174"
+export STATS_ADMIN_TOKEN="your-token"
+
+pnpm stats:admin -- overview
+pnpm stats:admin -- runs limit=25
+pnpm stats:admin -- runs playerName=Dimitri championUpdated=true limit=10
+pnpm stats:admin -- daily from=2026-03-08T00:00:00.000Z limit=7
+```
+
+Supported endpoints:
+- `overview`
+- `runs`
+- `names`
+- `daily`
+
+Supported query keys:
+- `from`
+- `to`
+- `controlMode`
+- `mapId`
+- `playerName`
+- `limit`
+- `cursor` for `runs`
+- `championUpdated` for `runs`
+
+The helper lives at `apps/client/scripts/admin-stats.sh` and pretty-prints JSON with `jq` when available.
 
 ## Directory Map
 - `apps/client/src/runtime/`: gameplay runtime, simulation, rendering, HUD, weapons, bots

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 type RateLimitBucket = {
   count: number;
@@ -8,20 +8,32 @@ type RateLimitBucket = {
 export type SharedChampionWriteRequestCheck =
   | {
       ok: true;
-      clientIpHash: string;
-      userAgent: string;
+      clientIpFingerprint: string;
+      userAgentFingerprint: string;
       origin: string | null;
     }
   | {
       ok: false;
       status: number;
       error: string;
-      clientIpHash: string;
-      userAgent: string;
+      clientIpFingerprint: string;
+      userAgentFingerprint: string;
       origin: string | null;
     };
 
+export type SharedChampionAdminAuthCheck =
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+    };
+
 const rateLimitBuckets = new Map<string, RateLimitBucket>();
+const DEV_FALLBACK_PRIVACY_HASH_SECRET = "clawd-strike-dev-privacy-hash-secret-32chars";
+const DEV_FALLBACK_STATS_ADMIN_TOKEN = "clawd-strike-dev-stats-admin-token";
 
 function parseBooleanEnv(value: string | undefined): boolean | null {
   if (value === undefined) return null;
@@ -55,6 +67,26 @@ export function hasSharedChampionAdminToken(): boolean {
 
 export function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function getPrivacyHashSecret(): string {
+  const value = process.env.PRIVACY_HASH_SECRET?.trim() ?? "";
+  if (value.length >= 32) {
+    return value;
+  }
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    console.warn(
+      "[privacy-hash] WARNING: PRIVACY_HASH_SECRET is missing or too short. "
+      + "Using dev fallback. Set a 32+ character PRIVACY_HASH_SECRET env var in Vercel.",
+    );
+  }
+  return DEV_FALLBACK_PRIVACY_HASH_SECRET;
+}
+
+function fingerprintValue(namespace: string, value: string): string {
+  return createHmac("sha256", getPrivacyHashSecret())
+    .update(`${namespace}:${value}`)
+    .digest("hex");
 }
 
 export function extractClientIp(request: Request): string {
@@ -107,6 +139,14 @@ function normalizeUserAgent(request: Request): string {
   return (request.headers.get("user-agent")?.trim() ?? "").slice(0, 512);
 }
 
+export function fingerprintClientIp(request: Request): string {
+  return fingerprintValue("client-ip", extractClientIp(request));
+}
+
+export function fingerprintUserAgent(request: Request): string {
+  return fingerprintValue("user-agent", normalizeUserAgent(request));
+}
+
 function extractOrigin(request: Request): string | null {
   const origin = request.headers.get("origin")?.trim() ?? "";
   return origin.length > 0 ? origin : null;
@@ -126,8 +166,8 @@ export function protectJsonWriteRequest(
     requireSameOrigin: boolean;
   },
 ): SharedChampionWriteRequestCheck {
-  const clientIpHash = sha256Hex(extractClientIp(request));
-  const userAgent = normalizeUserAgent(request);
+  const clientIpFingerprint = fingerprintClientIp(request);
+  const userAgentFingerprint = fingerprintUserAgent(request);
   const origin = extractOrigin(request);
 
   if (!hasJsonContentType(request)) {
@@ -135,8 +175,8 @@ export function protectJsonWriteRequest(
       ok: false,
       status: 415,
       error: "Expected application/json request body.",
-      clientIpHash,
-      userAgent,
+      clientIpFingerprint,
+      userAgentFingerprint,
       origin,
     };
   }
@@ -147,8 +187,8 @@ export function protectJsonWriteRequest(
         ok: false,
         status: 403,
         error: "Missing Origin header.",
-        clientIpHash,
-        userAgent,
+        clientIpFingerprint,
+        userAgentFingerprint,
         origin,
       };
     }
@@ -159,31 +199,80 @@ export function protectJsonWriteRequest(
         ok: false,
         status: 403,
         error: "Cross-origin write requests are not allowed.",
-        clientIpHash,
-        userAgent,
+        clientIpFingerprint,
+        userAgentFingerprint,
         origin,
       };
     }
   }
 
   const nowMs = Date.now();
-  const rateLimitKey = `${options.rateLimitNamespace}:${clientIpHash}`;
+  const rateLimitKey = `${options.rateLimitNamespace}:${clientIpFingerprint}`;
   const allowed = consumeRateLimitBucket(rateLimitKey, nowMs, options.windowMs, options.maxRequests);
   if (!allowed) {
     return {
       ok: false,
       status: 429,
       error: "Too many shared champion write attempts. Try again later.",
-      clientIpHash,
-      userAgent,
+      clientIpFingerprint,
+      userAgentFingerprint,
       origin,
     };
   }
 
   return {
     ok: true,
-    clientIpHash,
-    userAgent,
+    clientIpFingerprint,
+    userAgentFingerprint,
     origin,
   };
+}
+
+export function getStatsAdminToken(): string {
+  const value = process.env.STATS_ADMIN_TOKEN?.trim() ?? "";
+  if (value.length > 0) {
+    return value;
+  }
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    console.warn(
+      "[stats-admin] WARNING: STATS_ADMIN_TOKEN is missing. Using dev fallback. "
+      + "Set STATS_ADMIN_TOKEN in Vercel before exposing admin stats routes.",
+    );
+  }
+  return DEV_FALLBACK_STATS_ADMIN_TOKEN;
+}
+
+export function authorizeStatsAdminRequest(request: Request): SharedChampionAdminAuthCheck {
+  const expectedToken = getStatsAdminToken();
+  const header = request.headers.get("authorization")?.trim() ?? "";
+  if (!header.startsWith("Bearer ")) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Missing Bearer token.",
+    };
+  }
+  const providedToken = header.slice("Bearer ".length).trim();
+  if (providedToken.length === 0) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Missing Bearer token.",
+    };
+  }
+
+  const expectedBuffer = Buffer.from(expectedToken, "utf8");
+  const providedBuffer = Buffer.from(providedToken, "utf8");
+  if (
+    expectedBuffer.length !== providedBuffer.length
+    || !timingSafeEqual(expectedBuffer, providedBuffer)
+  ) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Invalid admin token.",
+    };
+  }
+
+  return { ok: true };
 }

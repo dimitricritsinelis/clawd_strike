@@ -4,7 +4,7 @@ import { WorldColliders } from "./collision/WorldColliders";
 export type PlayerInputState = {
   forward: number;
   right: number;
-  walkHeld: boolean;
+  crouchHeld: boolean;
   jumpPressed: boolean;
 };
 
@@ -12,7 +12,9 @@ export const PLAYER_WIDTH_M = 0.6;
 export const PLAYER_HEIGHT_M = 1.8;
 export const PLAYER_EYE_HEIGHT_M = 1.7;
 export const RUN_SPEED_MPS = 6.0;
-export const WALK_SPEED_MPS = 3.0;
+export const CROUCH_HEIGHT_M = 1.2;
+export const CROUCH_EYE_HEIGHT_M = 1.1;
+export const CROUCH_SPEED_MPS = 2.0;
 export const GRAVITY_MPS2 = 20.0;
 export const JUMP_VELOCITY_MPS = 6.35;
 
@@ -37,6 +39,8 @@ export class PlayerController {
   private velocityZ = 0;
   private grounded = true;
   private horizontalSpeedMps = 0;
+  private currentHeight = PLAYER_HEIGHT_M;
+  private currentEyeHeight = PLAYER_EYE_HEIGHT_M;
   /** Coyote timer: counts down from COYOTE_TIME_S when the player leaves the ground. */
   private coyoteTimerS = 0;
   /** Jump buffer timer: set to JUMP_BUFFER_S on input; executes jump when grounded. */
@@ -69,6 +73,10 @@ export class PlayerController {
     const world = this.world;
     if (!world) return;
 
+    this.currentHeight = input.crouchHeld ? CROUCH_HEIGHT_M : PLAYER_HEIGHT_M;
+    this.currentEyeHeight = input.crouchHeld ? CROUCH_EYE_HEIGHT_M : PLAYER_EYE_HEIGHT_M;
+    this.solver.setHeight(this.currentHeight);
+
     const clampedDt = Math.min(Math.max(deltaSeconds, 0), MAX_FRAME_DT_S);
     if (clampedDt <= 0) return;
 
@@ -91,7 +99,7 @@ export class PlayerController {
         right *= invLength;
       }
 
-      const speedMps = input.walkHeld ? WALK_SPEED_MPS : RUN_SPEED_MPS;
+      const speedMps = input.crouchHeld ? CROUCH_SPEED_MPS : RUN_SPEED_MPS;
       const sinYaw = Math.sin(yaw);
       const cosYaw = Math.cos(yaw);
       const forwardX = -sinYaw;
@@ -177,6 +185,14 @@ export class PlayerController {
       hitZ: this.motionResult.hitZ,
       grounded: this.motionResult.grounded,
     };
+  }
+
+  getCurrentHeight(): number {
+    return this.currentHeight;
+  }
+
+  getCurrentEyeHeight(): number {
+    return this.currentEyeHeight;
   }
 
   isWithinPlayableBounds(): boolean {

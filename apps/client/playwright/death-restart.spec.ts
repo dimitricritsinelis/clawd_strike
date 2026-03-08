@@ -45,7 +45,6 @@ test("death restart returns the runtime to a fresh wave-1 run", async ({ page },
       window.agent_apply_action?.({
         moveX,
         moveZ: 1,
-        sprint: true,
         lookYawDelta,
         fire,
       });

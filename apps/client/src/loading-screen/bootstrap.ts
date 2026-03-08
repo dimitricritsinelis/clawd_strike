@@ -12,6 +12,8 @@ export type BootstrapLoadingScreenOptions = {
 
 export type LoadingScreenHandle = {
   teardown: () => void;
+  setTransitioning: (active: boolean) => void;
+  showBanner: (message: string) => void;
 };
 
 const DEFAULT_AUDIO: LoadingAmbientAudioOptions = {
@@ -72,6 +74,7 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
 
       const transitionToGame = options.handoff?.transitionToGame;
       if (transitionToGame) {
+        ui.setTransitioning(true);
         void transitionToGame({
           mode,
           playerName,
@@ -101,9 +104,8 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
   ui.setMuteState(loadingAmbient.isMuted());
   ui.setSharedChampion(sharedChampionSnapshot);
   ui.show();
-  // Fail-open: keep controls visible even if preload/init gets interrupted.
-  // We still run preload in the background and mark ready when done.
-  ui.setAssetReady(true);
+  ui.setAssetReady(false);
+  ui.setTransitioning(false);
 
   void preloadCriticalLoadingAssets().finally(() => {
     if (disposed) return;
@@ -163,6 +165,8 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
       ui: {
         visible: true,
         startVisible: uiState.startVisible,
+        assetsReady: uiState.assetsReady,
+        transitioning: uiState.transitioning,
         muteState: loadingAmbient.isMuted() ? "muted" : "unmuted",
         messageVisible: uiState.bannerVisible,
         selectedMode,
@@ -177,5 +181,15 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
   };
 
   options.handoff?.onLoadingReady?.();
-  return { teardown };
+  return {
+    teardown,
+    setTransitioning(active) {
+      if (disposed) return;
+      ui.setTransitioning(active);
+    },
+    showBanner(message) {
+      if (disposed) return;
+      ui.showBanner(message);
+    },
+  };
 }

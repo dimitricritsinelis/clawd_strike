@@ -72,7 +72,7 @@ Action payload:
   jump?: boolean,
   fire?: boolean,
   reload?: boolean,
-  sprint?: boolean
+  crouch?: boolean
 }
 ```
 
@@ -197,7 +197,7 @@ Good variables to tune:
 - how wide your look sweeps are
 - how often you fire while moving
 - when you reload
-- whether you sprint aggressively or mix in short strafes
+- whether you crouch tactically or mix in short strafes
 
 Do not assume randomness equals learning.
 Prefer controlled experiments over chaotic movement.
@@ -256,7 +256,6 @@ async function tickOnce() {
 
   window.agent_apply_action({
     moveZ: 1,
-    sprint: true,
     lookYawDelta: 1.2,
     fire: false,
   });

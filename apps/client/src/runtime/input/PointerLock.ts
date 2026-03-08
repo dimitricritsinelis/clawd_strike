@@ -1,80 +1,74 @@
 type PointerLockControllerOptions = {
-  mountEl: HTMLElement;
   lockEl: HTMLElement;
   onLockChange: (locked: boolean) => void;
   onMouseDelta: (deltaX: number, deltaY: number) => void;
 };
 
 export class PointerLockController {
-  private readonly hintEl: HTMLButtonElement;
-  private readonly onPointerDown = (): void => {
-    this.requestPointerLock();
-  };
+  private softLocked = false;
 
-  private readonly onHintClick = (): void => {
+  private readonly onPointerDown = (): void => {
+    if (this.isLocked()) return;
+    this.softLocked = true;
+    this.options.onLockChange(true);
     this.requestPointerLock();
   };
 
   private readonly onPointerLockChange = (): void => {
     const locked = document.pointerLockElement === this.options.lockEl;
+    this.softLocked = false;
     this.options.onLockChange(locked);
-    this.hintEl.style.display = locked ? "none" : "block";
-    if (!locked) {
-      this.hintEl.textContent = "Click to lock pointer";
-    }
   };
 
   private readonly onPointerLockError = (): void => {
-    this.hintEl.style.display = "block";
-    this.hintEl.textContent = "Pointer lock blocked. Click again.";
+    this.options.onLockChange(this.isLocked());
   };
 
   private readonly onMouseMove = (event: MouseEvent): void => {
-    if (document.pointerLockElement !== this.options.lockEl) return;
+    if (!this.isLocked()) return;
     this.options.onMouseDelta(event.movementX, event.movementY);
   };
 
-  constructor(private readonly options: PointerLockControllerOptions) {
-    this.hintEl = document.createElement("button");
-    this.hintEl.type = "button";
-    this.hintEl.textContent = "Click to lock pointer";
-    this.hintEl.style.position = "absolute";
-    this.hintEl.style.left = "50%";
-    this.hintEl.style.top = "50%";
-    this.hintEl.style.transform = "translate(-50%, -50%)";
-    this.hintEl.style.padding = "6px 10px";
-    this.hintEl.style.borderRadius = "8px";
-    this.hintEl.style.border = "1px solid rgba(0,0,0,0.28)";
-    this.hintEl.style.background = "rgba(255,255,255,0.82)";
-    this.hintEl.style.color = "#1e2b33";
-    this.hintEl.style.fontSize = "12px";
-    this.hintEl.style.fontFamily = "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
-    this.hintEl.style.letterSpacing = "0.01em";
-    this.hintEl.style.cursor = "pointer";
-    this.hintEl.style.zIndex = "10";
-  }
+  private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.code !== "Escape") return;
+    if (!this.softLocked) return;
+    if (document.pointerLockElement === this.options.lockEl) return;
+    this.releaseSoftLock();
+  };
+
+  private readonly onWindowBlur = (): void => {
+    this.releaseSoftLock();
+  };
+
+  private readonly onVisibilityChange = (): void => {
+    if (document.visibilityState === "visible") return;
+    this.releaseSoftLock();
+  };
+
+  constructor(private readonly options: PointerLockControllerOptions) {}
 
   init(): void {
-    this.options.mountEl.append(this.hintEl);
     this.options.lockEl.addEventListener("pointerdown", this.onPointerDown, { passive: true });
-    this.hintEl.addEventListener("click", this.onHintClick);
     document.addEventListener("pointerlockchange", this.onPointerLockChange);
     document.addEventListener("pointerlockerror", this.onPointerLockError);
     document.addEventListener("mousemove", this.onMouseMove);
-    this.onPointerLockChange();
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("blur", this.onWindowBlur);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
   }
 
   isLocked(): boolean {
-    return document.pointerLockElement === this.options.lockEl;
+    return document.pointerLockElement === this.options.lockEl || this.softLocked;
   }
 
   dispose(): void {
     this.options.lockEl.removeEventListener("pointerdown", this.onPointerDown);
-    this.hintEl.removeEventListener("click", this.onHintClick);
     document.removeEventListener("pointerlockchange", this.onPointerLockChange);
     document.removeEventListener("pointerlockerror", this.onPointerLockError);
     document.removeEventListener("mousemove", this.onMouseMove);
-    this.hintEl.remove();
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("blur", this.onWindowBlur);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
   }
 
   private requestPointerLock(): void {
@@ -89,5 +83,11 @@ export class PointerLockController {
     } catch {
       this.onPointerLockError();
     }
+  }
+
+  private releaseSoftLock(): void {
+    if (!this.softLocked) return;
+    this.softLocked = false;
+    this.options.onLockChange(false);
   }
 }

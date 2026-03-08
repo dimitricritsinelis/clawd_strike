@@ -10,7 +10,7 @@ const WALL_MANIFEST_URL =
   "/assets/textures/environment/bazaar/walls/bazaar_wall_textures_pack_v5/materials.json";
 const PBR_FLOORS_ENABLED = true;
 const PBR_WALLS_ENABLED = true;
-const RUNTIME_WARMUP_TIMEOUT_MS = 5_000;
+const RUNTIME_WARMUP_TIMEOUT_MS = 8_000;
 
 export type RuntimeWarmupAssets = {
   floorMaterials: FloorMaterialLibrary | null;

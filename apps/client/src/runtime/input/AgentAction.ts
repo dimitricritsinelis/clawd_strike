@@ -6,7 +6,7 @@ export type TickIntent = {
   jump: boolean;
   fire: boolean;
   reload: boolean;
-  sprint: boolean;
+  crouch: boolean;
 };
 
 export type AgentAction = Partial<TickIntent>;
@@ -23,7 +23,7 @@ export function resetTickIntent(intent: TickIntent): void {
   intent.jump = false;
   intent.fire = false;
   intent.reload = false;
-  intent.sprint = true;
+  intent.crouch = false;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -74,8 +74,8 @@ export function normalizeAgentAction(action: unknown): AgentAction | null {
   const reload = parseOptionalBool(candidate.reload);
   if (reload !== undefined) normalized.reload = reload;
 
-  const sprint = parseOptionalBool(candidate.sprint);
-  if (sprint !== undefined) normalized.sprint = sprint;
+  const crouch = parseOptionalBool(candidate.crouch);
+  if (crouch !== undefined) normalized.crouch = crouch;
 
   return normalized;
 }

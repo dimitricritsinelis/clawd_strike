@@ -19,6 +19,7 @@ function getCriticalAssetUrls(variant: DeviceVariant): string[] {
       "/loading-screen/assets/loading-button-enter-agent-mode-mobile.webp",
       "/loading-screen/assets/loading-mute-mobile.webp",
       "/loading-screen/assets/loading-info-mobile.webp",
+      "/loading-screen/assets/loading-world-champion-badge.png",
     ];
   }
 
@@ -32,6 +33,7 @@ function getCriticalAssetUrls(variant: DeviceVariant): string[] {
     "/loading-screen/assets/loading-button-enter-agent-mode-desktop.webp",
     "/loading-screen/assets/loading-mute-desktop.webp",
     "/loading-screen/assets/loading-info-desktop.webp",
+    "/loading-screen/assets/loading-world-champion-badge.png",
   ];
 }
 

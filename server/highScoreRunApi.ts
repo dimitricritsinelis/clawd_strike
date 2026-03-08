@@ -111,8 +111,8 @@ export async function handleSharedChampionRunStartRequest(
     await recordAuditEvent(store, {
       eventType: "run-start",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: writeCheck.error,
     });
     return errorResponse(writeCheck.status, writeCheck.error);
@@ -122,8 +122,8 @@ export async function handleSharedChampionRunStartRequest(
     await recordAuditEvent(store, {
       eventType: "run-start",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: "public-runs-disabled",
     });
     return publicRunsDisabledResponse();
@@ -136,8 +136,8 @@ export async function handleSharedChampionRunStartRequest(
     await recordAuditEvent(store, {
       eventType: "run-start",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: "invalid-json",
     });
     return errorResponse(400, "Invalid JSON body.");
@@ -148,8 +148,8 @@ export async function handleSharedChampionRunStartRequest(
     await recordAuditEvent(store, {
       eventType: "run-start",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: "invalid-start-payload",
     });
     return errorResponse(400, "Expected { playerName, controlMode, mapId }.");
@@ -164,8 +164,8 @@ export async function handleSharedChampionRunStartRequest(
       controlMode: parsedBody.controlMode,
       mapId: parsedBody.mapId,
       expiresAt: new Date(Date.now() + SHARED_CHAMPION_RUN_TOKEN_TTL_MS),
-      clientIpHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      clientIpFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
     });
 
     const responseBody: SharedChampionRunStartResponse = {
@@ -179,8 +179,8 @@ export async function handleSharedChampionRunStartRequest(
       eventType: "run-start",
       outcome: "accepted",
       runId: issued.runId,
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       payload: {
         playerName: issued.playerName,
         controlMode: issued.controlMode,
@@ -236,8 +236,8 @@ export async function handleSharedChampionRunFinishRequest(
     await recordAuditEvent(store, {
       eventType: "run-finish",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: writeCheck.error,
     });
     return buildRejectedFinishResponse(store, writeCheck.status, writeCheck.error);
@@ -247,8 +247,8 @@ export async function handleSharedChampionRunFinishRequest(
     await recordAuditEvent(store, {
       eventType: "run-finish",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: "public-runs-disabled",
     });
     return buildRejectedFinishResponse(store, 503, "public-runs-disabled");
@@ -261,8 +261,8 @@ export async function handleSharedChampionRunFinishRequest(
     await recordAuditEvent(store, {
       eventType: "run-finish",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: "invalid-json",
     });
     return buildRejectedFinishResponse(store, 400, "invalid-json");
@@ -273,8 +273,8 @@ export async function handleSharedChampionRunFinishRequest(
     await recordAuditEvent(store, {
       eventType: "run-finish",
       outcome: "rejected",
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       reason: "invalid-finish-payload",
     });
     return buildRejectedFinishResponse(store, 400, "invalid-finish-payload");
@@ -283,8 +283,8 @@ export async function handleSharedChampionRunFinishRequest(
   try {
     const consumed = await store.consumeRunToken({
       tokenHash: sha256Hex(parsedBody.runToken),
-      clientIpHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      clientIpFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
     });
 
     if (consumed.status !== "consumed" || !consumed.record) {
@@ -297,8 +297,8 @@ export async function handleSharedChampionRunFinishRequest(
         eventType: "run-finish",
         outcome: "rejected",
         runId: consumed.record?.runId ?? null,
-        ipHash: writeCheck.clientIpHash,
-        userAgent: writeCheck.userAgent,
+        ipFingerprint: writeCheck.clientIpFingerprint,
+        userAgentFingerprint: writeCheck.userAgentFingerprint,
         reason: consumed.status,
       });
       return buildRejectedFinishResponse(store, status, consumed.status);
@@ -316,8 +316,8 @@ export async function handleSharedChampionRunFinishRequest(
         eventType: "run-finish",
         outcome: "rejected",
         runId: consumed.record.runId,
-        ipHash: writeCheck.clientIpHash,
-        userAgent: writeCheck.userAgent,
+        ipFingerprint: writeCheck.clientIpFingerprint,
+        userAgentFingerprint: writeCheck.userAgentFingerprint,
         reason: validation.reason,
         payload: {
           mapId: consumed.record.mapId,
@@ -332,18 +332,21 @@ export async function handleSharedChampionRunFinishRequest(
       return buildRejectedFinishResponse(store, 422, validation.reason);
     }
 
-    const result = await store.submitCandidate({
-      playerName: consumed.record.playerName,
+    const result = await store.finalizeValidatedRun({
+      tokenRecord: consumed.record,
+      summary: parsedBody.summary,
+      elapsedMs: validation.elapsedMs,
       scoreHalfPoints: validation.computedScoreHalfPoints,
-      controlMode: consumed.record.controlMode,
+      clientIpFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
     });
 
     await recordAuditEvent(store, {
       eventType: "run-finish",
       outcome: "accepted",
       runId: consumed.record.runId,
-      ipHash: writeCheck.clientIpHash,
-      userAgent: writeCheck.userAgent,
+      ipFingerprint: writeCheck.clientIpFingerprint,
+      userAgentFingerprint: writeCheck.userAgentFingerprint,
       payload: {
         playerName: consumed.record.playerName,
         controlMode: consumed.record.controlMode,
@@ -351,6 +354,7 @@ export async function handleSharedChampionRunFinishRequest(
         elapsedMs: validation.elapsedMs,
         scoreHalfPoints: validation.computedScoreHalfPoints,
         updated: result.updated,
+        runId: result.run.runId,
         summary: parsedBody.summary,
       },
     });

@@ -131,7 +131,7 @@
   <body>
     <div id="app">
       <div id="overlay">
-        <div id="start" data-assets-ready="true">
+        <div id="start" data-assets-ready="false" data-transitioning="false">
           <button
             id="mute-toggle-btn"
             class="corner-toggle-btn is-unmuted"
@@ -166,6 +166,7 @@
                 width="180"
                 height="127"
                 alt=""
+                draggable="false"
                 aria-hidden="true"
               />
             </picture>
@@ -198,6 +199,7 @@
                 width="180"
                 height="127"
                 alt=""
+                draggable="false"
                 aria-hidden="true"
               />
             </picture>
@@ -208,6 +210,7 @@
                 class="info-screen-art-img"
                 src="/loading-screen/assets/info_screen.png"
                 alt="Game information and controls"
+                draggable="false"
               />
               <div class="info-screen-textbox">
                 <h2 class="info-screen-title">About the Game</h2>
@@ -248,6 +251,7 @@
                   width="1120"
                   height="747"
                   alt="Clawd Strike Logo"
+                  draggable="false"
                 />
               </picture>
             </div>
@@ -280,6 +284,7 @@
                     width="620"
                     height="413"
                     alt=""
+                    draggable="false"
                     aria-hidden="true"
                   />
                 </picture>
@@ -313,6 +318,7 @@
                     width="620"
                     height="413"
                     alt=""
+                    draggable="false"
                     aria-hidden="true"
                   />
                 </picture>
@@ -348,6 +354,7 @@
                     width="620"
                     height="413"
                     alt=""
+                    draggable="false"
                     aria-hidden="true"
                   />
                 </picture>
@@ -381,6 +388,7 @@
                     width="620"
                     height="413"
                     alt=""
+                    draggable="false"
                     aria-hidden="true"
                   />
                 </picture>
@@ -409,33 +417,25 @@
                 />
               </div>
             </div>
-            <section id="shared-champion-card" class="shared-champion-card" data-testid="loading-world-champion">
-              <div class="shared-champion-kicker">World Champion</div>
-              <div id="shared-champion-name" class="shared-champion-name" data-testid="loading-world-champion-name">
-                Loading champion
-              </div>
-              <div class="shared-champion-meta">
-                <span
-                  id="shared-champion-score"
-                  class="shared-champion-score"
-                  data-testid="loading-world-champion-score"
-                >
-                  --
-                </span>
-                <span
-                  id="shared-champion-mode"
-                  class="shared-champion-mode"
-                  data-testid="loading-world-champion-mode"
-                >
-                  SYNC
-                </span>
+            <section
+              id="shared-champion-card"
+              class="shared-champion-card"
+              data-testid="loading-world-champion"
+              aria-live="polite"
+            >
+              <div
+                id="shared-champion-name"
+                class="shared-champion-field shared-champion-name"
+                data-testid="loading-world-champion-name"
+              >
+                LOADING CHAMPION
               </div>
               <div
-                id="shared-champion-status"
-                class="shared-champion-status"
-                data-testid="loading-world-champion-status"
+                id="shared-champion-score"
+                class="shared-champion-field shared-champion-score"
+                data-testid="loading-world-champion-score"
               >
-                Fetching shared record
+                --
               </div>
             </section>
           </div>
