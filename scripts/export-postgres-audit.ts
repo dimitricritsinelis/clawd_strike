@@ -92,7 +92,7 @@ async function main(): Promise<void> {
 
   const result = await exportPostgresAudit({
     env,
-    outPath: options.outPath ?? undefined,
+    ...(options.outPath ? { outPath: options.outPath } : {}),
   });
 
   console.log(JSON.stringify(result, null, 2));

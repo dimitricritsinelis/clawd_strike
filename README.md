@@ -3,13 +3,11 @@ Authority: context
 Read when: tooling, docs
 Owns: quick start, basic command entry points, high-level repo map
 Do not use for: workflow policy, current task status, durable decisions, public contract rules
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 # Clawd Strike
 
 Web-based FPS focused on refining the Bazaar slice into a production-quality playable experience.
-
-Authority order: `AGENTS.md` -> `progress.md` -> the relevant spec or contract.
 
 ## Setup
 
@@ -23,7 +21,11 @@ pnpm dev
 ## Common Commands
 
 ```bash
+pnpm stm -- show active
+pnpm stm -- show card <id>
+pnpm stm -- validate
 pnpm typecheck
+pnpm test:stm
 pnpm test:server
 pnpm test:agent-export
 pnpm build
@@ -36,7 +38,7 @@ pnpm verify:skills-contract
 pnpm stats:admin -- --help
 ```
 
-Use the canonical playtest URL recorded in `progress.md`.
+Use the canonical playtest URL from the current short-term memory snapshot.
 
 ## Admin Stats
 
@@ -112,11 +114,3 @@ The exporter manages only generated starter files such as the mirrored `skills.m
 - `docs/decisions.md`: durable internal decisions
 - `docs/map-design/`: Bazaar map packet, source specs, and approved references
 - `apps/client/public/skills.md`: public browser-only contract served at `/skills.md`
-
-## Authorities
-- Internal policy: `AGENTS.md`
-- Current branch state: `progress.md`
-- Durable internal decisions: `docs/decisions.md`
-- Map geometry authority: `docs/map-design/specs/map_spec.json`
-- Map review shot contract: `docs/map-design/shots.json`
-- Public browser contract: `apps/client/public/skills.md`

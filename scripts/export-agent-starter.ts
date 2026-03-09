@@ -12,11 +12,18 @@ function hasFlag(argv: string[], flag: string): boolean {
 }
 
 function parseArgs(argv: string[]): ExportAgentStarterOptions {
-  return {
-    outDir: readFlagValue(argv, "--out"),
-    expectOrigin: readFlagValue(argv, "--expect-origin"),
+  const options: ExportAgentStarterOptions = {
     dryRun: hasFlag(argv, "--dry-run"),
   };
+  const outDir = readFlagValue(argv, "--out");
+  const expectOrigin = readFlagValue(argv, "--expect-origin");
+  if (outDir) {
+    options.outDir = outDir;
+  }
+  if (expectOrigin) {
+    options.expectOrigin = expectOrigin;
+  }
+  return options;
 }
 
 const options = parseArgs(process.argv.slice(2));

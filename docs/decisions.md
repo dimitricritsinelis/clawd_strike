@@ -3,20 +3,20 @@ Authority: normative
 Read when: map, visuals, ai, gameplay, ui, public-contract, perf, tooling, docs
 Owns: durable internal decisions that future tasks should not rediscover
 Do not use for: current task status, temporary bug lists, per-task notes, public browser-agent behavior details
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 # Durable Decisions
 
-## DEC-001: Five-file authority model
-- Active repo-owned Markdown is limited to `README.md`, `AGENTS.md`, `progress.md`, `docs/decisions.md`, and public `apps/client/public/skills.md`.
+## DEC-001: Authority surfaces are role-based
 - `AGENTS.md` is the only normative internal implementation doc.
-- Tool shims such as `CLAUDE.md` may point to the authority files, but they may not restate or redefine policy.
+- One current short-term memory surface owns active coordination state, and `docs/decisions.md` owns durable internal decisions.
+- `README.md` is quick start only, `docs/map-design/layout-reference.md` is generated reference evidence, and `apps/client/public/skills.md` is the public browser-only contract.
+- Tool shims such as `CLAUDE.md` may point to authority surfaces, but they may not restate or redefine policy.
 
-## DEC-002: Two-layer memory model
-- `progress.md` is the only short-term memory layer.
-- `docs/decisions.md` is the only durable prose memory layer.
-- Durable structured truth should live in specs and contracts such as `docs/map-design/specs/map_spec.json`, `docs/map-design/shots.json`, and `apps/client/public/skills.md`.
-- `artifacts/`, generated outputs, bundled skill docs, and external archive material are evidence only and are never authoritative.
+## DEC-002: Structured truth outranks prose summaries
+- Durable structured truth lives in specs and contracts such as `docs/map-design/specs/map_spec.json`, `docs/map-design/shots.json`, and `apps/client/public/skills.md`.
+- Generated views, artifacts, bundled skill docs, and other evidence surfaces are never authoritative over their owning specs and contracts.
+- Prefer code, scripts, specs, and runtime contracts over new prose when they can answer the question.
 
 ## DEC-003: Map authority and runtime generation
 - Map geometry authority order is `docs/map-design/specs/map_spec.json` -> `docs/map-design/refs/bazaar_slice_v2_2_detailed_birdseye.png` -> `docs/map-design/blockout/topdown_layout.svg`.

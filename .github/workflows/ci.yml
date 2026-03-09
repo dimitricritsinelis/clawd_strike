@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Validate STM
+        run: pnpm stm -- validate
+
       - name: Server Tests
         run: pnpm test:server
 
