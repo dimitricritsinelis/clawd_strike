@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 export const DEFAULT_BASE_URL = "http://127.0.0.1:5174";
 export const DEFAULT_MAP_ID = "bazaar-map";
 export const DEFAULT_AGENT_NAME = "SmokeRunner";
+export const DEFAULT_HUMAN_NAME = "HumanProbe";
 export const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 export const DEFAULT_RUNTIME_READY_TIMEOUT_MS = 90_000;
 export const DEFAULT_ROUTE_TICK_MS = 100;
@@ -90,10 +91,8 @@ export function buildRuntimeUrl(baseUrl, options = {}) {
   const url = new URL("/", parseBaseUrl(baseUrl));
   url.searchParams.set("map", mapId);
   url.searchParams.set("autostart", autostart);
-
-  if (agentName) {
-    url.searchParams.set("name", trimAgentName(agentName));
-  }
+  const fallbackName = autostart === "human" ? DEFAULT_HUMAN_NAME : DEFAULT_AGENT_NAME;
+  url.searchParams.set("name", trimAgentName(agentName, fallbackName));
   if (shot) {
     url.searchParams.set("shot", shot);
   }

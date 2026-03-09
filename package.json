@@ -5,7 +5,8 @@
   "packageManager": "pnpm@10.28.2",
   "dependencies": {
     "@vercel/functions": "^3.2.10",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
@@ -17,8 +18,13 @@
     "dev": "pnpm --filter @clawd-strike/client dev -- --port 5174",
     "build": "pnpm --filter @clawd-strike/client build",
     "preview": "pnpm --filter @clawd-strike/client preview",
+    "export:agent-starter": "tsx scripts/export-agent-starter.ts",
+    "export:postgres-audit": "tsx scripts/export-postgres-audit.ts",
     "reconcile:shared-champion": "tsx scripts/reconcile-shared-champion.ts",
+    "validate:shared-champion-constraints": "tsx scripts/validate-shared-champion-constraints.ts",
     "stats:admin": "bash apps/client/scripts/admin-stats.sh",
+    "test:agent-export": "tsx --test scripts/export-agent-starter.test.ts",
+    "test:postgres-audit": "tsx --test scripts/export-postgres-audit.test.ts",
     "typecheck": "pnpm --filter @clawd-strike/client exec tsc -p ../../tsconfig.json --noEmit && pnpm --filter @clawd-strike/client typecheck",
     "test:server": "tsx --test ./server/highScoreStoreImpl.test.ts",
     "test:playwright": "pnpm --filter @clawd-strike/client test:playwright",

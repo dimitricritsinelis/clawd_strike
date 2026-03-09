@@ -1,13 +1,22 @@
 import { LoadingAmbientAudio } from "./audio";
-import { OVERLAY_PRELOAD_TIMEOUT_MS, preloadLoadingScreenAssets } from "./assets";
+import {
+  OVERLAY_PRELOAD_TIMEOUT_MS,
+  getLoadingScreenAmbientAudioSources,
+  preloadLoadingScreenAssets,
+} from "./assets";
 import type { LoadingAmbientAudioOptions } from "./audio";
-import type { LoadingScreenHandoff, LoadingScreenMode } from "./types";
+import type { LoadingScreenHandoff, LoadingScreenInitialNameEntry, LoadingScreenMode } from "./types";
 import { createLoadingScreenUI } from "./ui";
 import { getSharedChampionSnapshot, loadSharedChampion } from "../shared/sharedChampionClient";
+import {
+  PUBLIC_AGENT_API_VERSION,
+  PUBLIC_AGENT_CONTRACT,
+} from "../../../shared/publicAgentContract";
 
 export type BootstrapLoadingScreenOptions = {
   handoff?: LoadingScreenHandoff;
   audio?: Partial<LoadingAmbientAudioOptions>;
+  initialNameEntry?: LoadingScreenInitialNameEntry | null;
 };
 
 export type LoadingScreenHandle = {
@@ -17,7 +26,7 @@ export type LoadingScreenHandle = {
 };
 
 const DEFAULT_AUDIO: LoadingAmbientAudioOptions = {
-  src: "/loading-screen/assets/ClawdStriker_Audio_Loading_Trimmed.mp3",
+  sources: getLoadingScreenAmbientAudioSources(),
   gain: 0.45,
   playFromSec: 0,
   loopStartSec: 0,
@@ -25,8 +34,6 @@ const DEFAULT_AUDIO: LoadingAmbientAudioOptions = {
   startDelayMs: 0,
 };
 
-const PUBLIC_AGENT_API_VERSION = 1;
-const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
 const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const OVERLAY_LOADING_BANNER = "Loading menu art...";
 const OVERLAY_FAILURE_BANNER = "Menu art unavailable";
@@ -109,16 +116,20 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
   ui.setBackgroundReady(false);
   ui.setAssetReady(false);
   ui.setTransitioning(false);
+  if (options.initialNameEntry) {
+    ui.primeNameEntry(options.initialNameEntry);
+  }
 
   void (async () => {
-    const backgroundPreload = await preloadLoadingScreenAssets("background");
-    if (disposed) return;
-    if (backgroundPreload.failedUrls.length > 0) {
-      console.warn(`[loading-screen] background asset preload failed: ${backgroundPreload.failedUrls.join(", ")}`);
-    }
-
-    ui.setBackgroundReady(true);
-    ui.hydrateVisibleOverlayAssets();
+    const backgroundPreloadPromise = preloadLoadingScreenAssets("background").then((backgroundPreload) => {
+      if (disposed) return backgroundPreload;
+      if (backgroundPreload.failedUrls.length > 0) {
+        console.warn(`[loading-screen] background asset preload failed: ${backgroundPreload.failedUrls.join(", ")}`);
+      }
+      ui.setBackgroundReady(true);
+      return backgroundPreload;
+    });
+    const mainMenuSurfacePromise = ui.prepareMainMenuSurface();
 
     let overlayTimedOut = false;
     const overlayTimeoutId = window.setTimeout(() => {
@@ -128,20 +139,14 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
       ui.showBanner(OVERLAY_LOADING_BANNER, { persist: true });
     }, OVERLAY_PRELOAD_TIMEOUT_MS);
 
-    const overlayPreload = await preloadLoadingScreenAssets("overlay");
+    const mainMenuReady = await mainMenuSurfacePromise;
     window.clearTimeout(overlayTimeoutId);
     if (disposed) return;
 
-    if (overlayPreload.failedUrls.length > 0) {
-      console.warn(`[loading-screen] overlay asset preload failed: ${overlayPreload.failedUrls.join(", ")}`);
-      ui.showBanner(OVERLAY_FAILURE_BANNER, { persist: true });
-      return;
-    }
-
-    const overlayImagesReady = await ui.waitForVisibleOverlayAssets();
+    await backgroundPreloadPromise;
     if (disposed) return;
-    if (!overlayImagesReady) {
-      console.warn("[loading-screen] overlay DOM assets failed to resolve after preload");
+    if (!mainMenuReady) {
+      console.warn("[loading-screen] main menu surface failed to resolve");
       ui.showBanner(OVERLAY_FAILURE_BANNER, { persist: true });
       return;
     }
@@ -208,6 +213,8 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
         startVisible: uiState.startVisible,
         backgroundReady: uiState.backgroundReady,
         assetsReady: uiState.assetsReady,
+        nameEntryReady: uiState.nameEntryReady,
+        infoReady: uiState.infoReady,
         transitioning: uiState.transitioning,
         muteState: loadingAmbient.isMuted() ? "muted" : "unmuted",
         messageVisible: uiState.bannerVisible,

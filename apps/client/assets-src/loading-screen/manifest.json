@@ -1,0 +1,206 @@
+{
+  "images": [
+    {
+      "key": "background",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-bg-desktop.png",
+          "outputBase": "loading-bg-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-bg-mobile.png",
+          "outputBase": "loading-bg-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "muteIcon",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-mute-desktop.png",
+          "outputBase": "loading-mute-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-mute-mobile.png",
+          "outputBase": "loading-mute-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "infoIcon",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-info-desktop.png",
+          "outputBase": "loading-info-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-info-mobile.png",
+          "outputBase": "loading-info-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "logo",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-logo-desktop.png",
+          "outputBase": "loading-logo-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-logo-mobile.png",
+          "outputBase": "loading-logo-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "buttonHuman",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-button-human-desktop.png",
+          "outputBase": "loading-button-human-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-button-human-mobile.png",
+          "outputBase": "loading-button-human-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "buttonAgent",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-button-agent-desktop.png",
+          "outputBase": "loading-button-agent-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-button-agent-mobile.png",
+          "outputBase": "loading-button-agent-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "buttonSkillMd",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-button-skill-md-desktop.png",
+          "outputBase": "loading-button-skill-md-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-button-skill-md-mobile.png",
+          "outputBase": "loading-button-skill-md-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "buttonEnterAgentMode",
+      "profile": "standard",
+      "variants": {
+        "desktop": {
+          "master": "loading-button-enter-agent-mode-desktop.png",
+          "outputBase": "loading-button-enter-agent-mode-desktop",
+          "formats": ["avif", "webp", "png"]
+        },
+        "mobile": {
+          "master": "loading-button-enter-agent-mode-mobile.png",
+          "outputBase": "loading-button-enter-agent-mode-mobile",
+          "formats": ["avif", "webp", "png"]
+        }
+      }
+    },
+    {
+      "key": "nameplate",
+      "profile": "heroPanel",
+      "variants": {
+        "desktop": {
+          "master": "loading-nameplate-callsign.png",
+          "outputBase": "loading-nameplate-callsign-desktop",
+          "formats": ["webp", "png"],
+          "width": 768
+        },
+        "mobile": {
+          "master": "loading-nameplate-callsign.png",
+          "outputBase": "loading-nameplate-callsign-mobile",
+          "formats": ["webp", "png"],
+          "width": 640
+        }
+      }
+    },
+    {
+      "key": "worldChampionBadge",
+      "profile": "heroPanel",
+      "variants": {
+        "desktop": {
+          "master": "loading-world-champion-badge.png",
+          "outputBase": "loading-world-champion-badge-desktop",
+          "formats": ["webp", "png"],
+          "width": 768
+        },
+        "mobile": {
+          "master": "loading-world-champion-badge.png",
+          "outputBase": "loading-world-champion-badge-mobile",
+          "formats": ["webp", "png"],
+          "width": 640
+        }
+      }
+    },
+    {
+      "key": "infoScreen",
+      "profile": "heroPanel",
+      "variants": {
+        "desktop": {
+          "master": "info_screen.png",
+          "outputBase": "info-screen-desktop",
+          "formats": ["webp", "png"],
+          "width": 1280
+        },
+        "mobile": {
+          "master": "info_screen.png",
+          "outputBase": "info-screen-mobile",
+          "formats": ["webp", "png"],
+          "width": 800
+        }
+      }
+    }
+  ],
+  "audio": [
+    {
+      "key": "loadingAmbient",
+      "master": "ClawdStriker_Audio_Loading_Trimmed.mp3",
+      "outputs": [
+        {
+          "format": "ogg",
+          "filename": "loading-ambient.ogg",
+          "mime": "audio/ogg; codecs=opus",
+          "bitrateKbps": 64
+        },
+        {
+          "format": "mp3",
+          "filename": "ClawdStriker_Audio_Loading_Trimmed.mp3",
+          "mime": "audio/mpeg",
+          "copySource": true
+        }
+      ]
+    }
+  ]
+}

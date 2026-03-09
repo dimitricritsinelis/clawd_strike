@@ -44,9 +44,11 @@ function parseSubmissionBody(value: unknown): SharedChampionPostRequest | null {
 
   const telemetry = parseTelemetry(record.telemetry);
   if (!telemetry) return null;
+  const playerName = sanitizeSharedChampionName(record.playerName, record.controlMode);
+  if (playerName === null) return null;
 
   return {
-    playerName: sanitizeSharedChampionName(record.playerName, record.controlMode),
+    playerName,
     score: normalizeScore(parsedScore),
     controlMode: record.controlMode,
     telemetry,

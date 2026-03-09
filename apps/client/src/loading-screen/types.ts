@@ -1,8 +1,16 @@
+import type { PlayerNameValidationReason } from "../../../shared/playerName";
+
 export type LoadingScreenMode = "human" | "agent";
 
 export type RuntimeLaunchSelection = {
   mode: LoadingScreenMode;
   playerName: string;
+};
+
+export type LoadingScreenInitialNameEntry = {
+  mode: LoadingScreenMode;
+  playerName: string;
+  validationReason: Exclude<PlayerNameValidationReason, "valid">;
 };
 
 export type LoadingScreenHandoff = {

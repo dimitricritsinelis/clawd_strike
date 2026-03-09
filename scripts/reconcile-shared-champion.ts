@@ -93,6 +93,9 @@ async function main(): Promise<void> {
   console.log(`skipped existing runs: ${report.skippedExistingRuns}`);
   console.log(`orphaned accepted finishes: ${report.orphanedAcceptedFinishes}`);
   console.log(`malformed accepted finishes: ${report.malformedAcceptedFinishes}`);
+  console.log(`invalid champion rows: ${report.invalidChampionRows}`);
+  console.log(`invalid run-token names: ${report.invalidRunTokenNames}`);
+  console.log(`invalid run rows: ${report.invalidRunRows}`);
   if (report.insertedRunIds.length > 0) {
     console.log(`inserted run ids: ${report.insertedRunIds.join(", ")}`);
   }
@@ -101,6 +104,15 @@ async function main(): Promise<void> {
   }
   if (report.malformedRunIds.length > 0) {
     console.log(`malformed run ids: ${report.malformedRunIds.join(", ")}`);
+  }
+  if (report.invalidChampionBoardKeys.length > 0) {
+    console.log(`invalid champion boards: ${report.invalidChampionBoardKeys.join(", ")}`);
+  }
+  if (report.invalidRunTokenRunIds.length > 0) {
+    console.log(`invalid run-token ids: ${report.invalidRunTokenRunIds.join(", ")}`);
+  }
+  if (report.invalidRunIds.length > 0) {
+    console.log(`invalid run ids: ${report.invalidRunIds.join(", ")}`);
   }
   if (report.championDrift) {
     console.log(`champion drift: ${report.championDrift.hasDrift ? "YES" : "no"}`);

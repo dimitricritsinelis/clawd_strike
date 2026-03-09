@@ -1,4 +1,11 @@
-export const HIGH_SCORE_PLAYER_NAME_MAX_LENGTH = 15;
+import {
+  PLAYER_NAME_MAX_LENGTH,
+  normalizeValidatedPlayerName,
+  parseStoredPlayerName,
+  sanitizeValidatedPlayerName,
+} from "./playerName";
+
+export const HIGH_SCORE_PLAYER_NAME_MAX_LENGTH = PLAYER_NAME_MAX_LENGTH;
 export const HIGH_SCORE_MAP_ID_MAX_LENGTH = 64;
 export const SITEWIDE_CHAMPION_SCOPE = "sitewide";
 export const SITEWIDE_CHAMPION_BOARD_KEY = "default";
@@ -123,17 +130,14 @@ export function isSharedChampionRunDeathCause(value: unknown): value is SharedCh
 }
 
 export function clampSharedChampionName(value: string): string {
-  return value.trim().slice(0, HIGH_SCORE_PLAYER_NAME_MAX_LENGTH);
+  return normalizeValidatedPlayerName(value);
 }
 
 export function sanitizeSharedChampionName(
   value: unknown,
-  controlMode: SharedChampionControlMode,
-): string {
-  const fallback = controlMode === "agent" ? "Agent" : "Operator";
-  if (typeof value !== "string") return fallback;
-  const normalized = clampSharedChampionName(value);
-  return normalized.length > 0 ? normalized : fallback;
+  _controlMode?: SharedChampionControlMode,
+): string | null {
+  return sanitizeValidatedPlayerName(value);
 }
 
 export function sanitizeSharedChampionMapId(value: unknown): string {
@@ -217,7 +221,7 @@ export function createSharedChampion(input: {
     : new Date(input.updatedAt).toISOString();
 
   return {
-    holderName: clampSharedChampionName(input.holderName),
+    holderName: normalizeValidatedPlayerName(input.holderName),
     score: normalizeScore(input.score),
     controlMode: input.controlMode,
     scope: SITEWIDE_CHAMPION_SCOPE,
@@ -232,12 +236,14 @@ export function parseSharedChampion(value: unknown): SharedChampion | null {
   if (!isSharedChampionControlMode(record.controlMode)) return null;
   if (typeof record.holderName !== "string") return null;
   if (typeof record.updatedAt !== "string") return null;
+  const holderName = parseStoredPlayerName(record.holderName);
+  if (holderName === null) return null;
 
   const updatedAt = new Date(record.updatedAt);
   if (Number.isNaN(updatedAt.getTime())) return null;
 
   return createSharedChampion({
-    holderName: record.holderName,
+    holderName,
     score: normalizeScore(record.score),
     controlMode: record.controlMode,
     updatedAt,

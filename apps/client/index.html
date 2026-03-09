@@ -9,15 +9,15 @@
     <link
       rel="preload"
       as="image"
-      href="/loading-screen/assets/loading-bg-desktop.webp"
-      type="image/webp"
+      href="/loading-screen/assets/loading-bg-desktop.avif"
+      type="image/avif"
       media="(min-width: 821px)"
     />
     <link
       rel="preload"
       as="image"
-      href="/loading-screen/assets/loading-bg-mobile.webp"
-      type="image/webp"
+      href="/loading-screen/assets/loading-bg-mobile.avif"
+      type="image/avif"
       media="(max-width: 820px)"
     />
 
@@ -38,8 +38,18 @@
               <picture>
                 <source
                   media="(max-width: 820px)"
+                  data-srcset="/loading-screen/assets/loading-mute-mobile.avif"
+                  type="image/avif"
+                />
+                <source
+                  media="(max-width: 820px)"
                   data-srcset="/loading-screen/assets/loading-mute-mobile.webp"
                   type="image/webp"
+                />
+                <source
+                  media="(min-width: 821px)"
+                  data-srcset="/loading-screen/assets/loading-mute-desktop.avif"
+                  type="image/avif"
                 />
                 <source
                   media="(min-width: 821px)"
@@ -61,8 +71,18 @@
               <picture>
                 <source
                   media="(max-width: 820px)"
+                  data-srcset="/loading-screen/assets/loading-info-mobile.avif"
+                  type="image/avif"
+                />
+                <source
+                  media="(max-width: 820px)"
                   data-srcset="/loading-screen/assets/loading-info-mobile.webp"
                   type="image/webp"
+                />
+                <source
+                  media="(min-width: 821px)"
+                  data-srcset="/loading-screen/assets/loading-info-desktop.avif"
+                  type="image/avif"
                 />
                 <source
                   media="(min-width: 821px)"
@@ -85,8 +105,18 @@
                 <picture>
                   <source
                     media="(max-width: 820px)"
+                    data-srcset="/loading-screen/assets/loading-logo-mobile.avif"
+                    type="image/avif"
+                  />
+                  <source
+                    media="(max-width: 820px)"
                     data-srcset="/loading-screen/assets/loading-logo-mobile.webp"
                     type="image/webp"
+                  />
+                  <source
+                    media="(min-width: 821px)"
+                    data-srcset="/loading-screen/assets/loading-logo-desktop.avif"
+                    type="image/avif"
                   />
                   <source
                     media="(min-width: 821px)"
@@ -108,8 +138,18 @@
                   <picture>
                     <source
                       media="(max-width: 820px)"
+                      data-srcset="/loading-screen/assets/loading-button-human-mobile.avif"
+                      type="image/avif"
+                    />
+                    <source
+                      media="(max-width: 820px)"
                       data-srcset="/loading-screen/assets/loading-button-human-mobile.webp"
                       type="image/webp"
+                    />
+                    <source
+                      media="(min-width: 821px)"
+                      data-srcset="/loading-screen/assets/loading-button-human-desktop.avif"
+                      type="image/avif"
                     />
                     <source
                       media="(min-width: 821px)"
@@ -132,8 +172,18 @@
                   <picture>
                     <source
                       media="(max-width: 820px)"
+                      data-srcset="/loading-screen/assets/loading-button-agent-mobile.avif"
+                      type="image/avif"
+                    />
+                    <source
+                      media="(max-width: 820px)"
                       data-srcset="/loading-screen/assets/loading-button-agent-mobile.webp"
                       type="image/webp"
+                    />
+                    <source
+                      media="(min-width: 821px)"
+                      data-srcset="/loading-screen/assets/loading-button-agent-desktop.avif"
+                      type="image/avif"
                     />
                     <source
                       media="(min-width: 821px)"
@@ -158,8 +208,18 @@
                   <picture>
                     <source
                       media="(max-width: 820px)"
+                      data-srcset="/loading-screen/assets/loading-button-skill-md-mobile.avif"
+                      type="image/avif"
+                    />
+                    <source
+                      media="(max-width: 820px)"
                       data-srcset="/loading-screen/assets/loading-button-skill-md-mobile.webp"
                       type="image/webp"
+                    />
+                    <source
+                      media="(min-width: 821px)"
+                      data-srcset="/loading-screen/assets/loading-button-skill-md-desktop.avif"
+                      type="image/avif"
                     />
                     <source
                       media="(min-width: 821px)"
@@ -182,8 +242,18 @@
                   <picture>
                     <source
                       media="(max-width: 820px)"
+                      data-srcset="/loading-screen/assets/loading-button-enter-agent-mode-mobile.avif"
+                      type="image/avif"
+                    />
+                    <source
+                      media="(max-width: 820px)"
                       data-srcset="/loading-screen/assets/loading-button-enter-agent-mode-mobile.webp"
                       type="image/webp"
+                    />
+                    <source
+                      media="(min-width: 821px)"
+                      data-srcset="/loading-screen/assets/loading-button-enter-agent-mode-desktop.avif"
+                      type="image/avif"
                     />
                     <source
                       media="(min-width: 821px)"
@@ -211,7 +281,7 @@
                 </div>
               </div>
               <div class="actions actions-nameplate">
-                <div class="name-entry" data-bg-url="/loading-screen/assets/loading-nameplate-callsign.png">
+                <div class="name-entry" data-bg-asset-key="nameplate">
                   <span class="name-rivets" aria-hidden="true"></span>
                   <input
                     type="text"
@@ -230,7 +300,7 @@
                 class="shared-champion-card"
                 data-testid="loading-world-champion"
                 aria-live="polite"
-                data-bg-url="/loading-screen/assets/loading-world-champion-badge.png"
+                data-bg-asset-key="worldChampionBadge"
               >
                 <div
                   id="shared-champion-name"
@@ -251,12 +321,24 @@
           </div>
           <div id="info-screen" aria-hidden="true">
             <article class="info-screen-art">
-              <img
-                class="info-screen-art-img"
-                data-src="/loading-screen/assets/info_screen.png"
-                alt="Game information and controls"
-                draggable="false"
-              />
+              <picture class="info-screen-art-picture">
+                <source
+                  media="(max-width: 820px)"
+                  data-srcset="/loading-screen/assets/info-screen-mobile.webp"
+                  type="image/webp"
+                />
+                <source
+                  media="(min-width: 821px)"
+                  data-srcset="/loading-screen/assets/info-screen-desktop.webp"
+                  type="image/webp"
+                />
+                <img
+                  class="info-screen-art-img"
+                  data-src="/loading-screen/assets/info-screen-desktop.png"
+                  alt="Game information and controls"
+                  draggable="false"
+                />
+              </picture>
               <div class="info-screen-textbox">
                 <h2 class="info-screen-title">About the Game</h2>
                 <p class="info-screen-copy">
