@@ -1,9 +1,13 @@
 import "./styles.css";
 import type { LoadingScreenHandle } from "./loading-screen/bootstrap";
 import { bootstrapLoadingScreen } from "./loading-screen/bootstrap";
-import type { LoadingScreenMode, RuntimeLaunchSelection } from "./loading-screen/types";
+import type {
+  LoadingScreenInitialNameEntry,
+  LoadingScreenMode,
+  RuntimeLaunchSelection,
+} from "./loading-screen/types";
 import type { RuntimeWarmupAssets } from "./runtime/warmup";
-import { sanitizeRuntimePlayerName } from "./runtime/utils/UrlParams";
+import { clampPlayerNameInput, validatePlayerName } from "../../shared/playerName";
 
 type LaunchState = "idle" | "warming" | "revealing" | "active";
 type RuntimeHandle = {
@@ -23,6 +27,11 @@ let warmupPromise: Promise<RuntimeWarmupAssets | null> | null = null;
 let warmupAssets: RuntimeWarmupAssets | null = null;
 let launchState: LaunchState = "idle";
 
+type AutoStartResolution = {
+  runtimeLaunchSelection: RuntimeLaunchSelection | null;
+  initialNameEntry: LoadingScreenInitialNameEntry | null;
+};
+
 function startWarmup(): void {
   if (warmupPromise) return;
 
@@ -41,22 +50,41 @@ function startWarmup(): void {
     });
 }
 
-function parseAutoStartSelection(search: string): RuntimeLaunchSelection | null {
+function parseAutoStartSelection(search: string): AutoStartResolution {
   const params = new URLSearchParams(search);
   const rawMode = params.get("autostart")?.trim().toLowerCase();
   if (rawMode !== "human" && rawMode !== "agent") {
-    return null;
+    return {
+      runtimeLaunchSelection: null,
+      initialNameEntry: null,
+    };
   }
 
   const mode = rawMode as LoadingScreenMode;
   const rawName = params.get("name") ?? params.get("player") ?? params.get("playerName");
+  const validation = validatePlayerName(rawName);
+  if (!validation.ok) {
+    return {
+      runtimeLaunchSelection: null,
+      initialNameEntry: {
+        mode,
+        playerName: clampPlayerNameInput(rawName),
+        validationReason: validation.reason,
+      },
+    };
+  }
+
   return {
-    mode,
-    playerName: sanitizeRuntimePlayerName(rawName, mode),
+    runtimeLaunchSelection: {
+      mode,
+      playerName: validation.normalized,
+    },
+    initialNameEntry: null,
   };
 }
 
-let runtimeLaunchSelection: RuntimeLaunchSelection | null = parseAutoStartSelection(window.location.search);
+const autoStartResolution = parseAutoStartSelection(window.location.search);
+let runtimeLaunchSelection: RuntimeLaunchSelection | null = autoStartResolution.runtimeLaunchSelection;
 
 function getOverlayElement(): HTMLElement | null {
   const overlay = document.querySelector<HTMLElement>("#overlay");
@@ -131,7 +159,7 @@ async function transitionToGame(selection?: RuntimeLaunchSelection): Promise<voi
   if (selection) {
     runtimeLaunchSelection = {
       mode: selection.mode,
-      playerName: sanitizeRuntimePlayerName(selection.playerName, selection.mode),
+      playerName: selection.playerName,
     };
   }
   launchState = "warming";
@@ -170,6 +198,7 @@ async function transitionToGame(selection?: RuntimeLaunchSelection): Promise<voi
 }
 
 loadingHandle = bootstrapLoadingScreen({
+  initialNameEntry: autoStartResolution.initialNameEntry,
   handoff: {
     onLoadingReady: startWarmup,
     transitionToGame,

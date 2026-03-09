@@ -2,6 +2,7 @@ import { attachDatabasePool } from "@vercel/functions";
 import { Pool, type PoolClient, type PoolConfig } from "pg";
 import {
   HIGH_SCORE_MAP_ID_MAX_LENGTH,
+  HIGH_SCORE_PLAYER_NAME_MAX_LENGTH,
   SHARED_CHAMPION_SCORE_RULESET,
   SITEWIDE_CHAMPION_BOARD_KEY,
   createSharedChampion,
@@ -15,6 +16,9 @@ import {
   type SharedChampionPostRequest,
   type SharedChampionRunSummary,
 } from "../apps/shared/highScore.js";
+import {
+  parseStoredPlayerName,
+} from "../apps/shared/playerName.js";
 import {
   createRunCursor,
   deriveRunFields,
@@ -186,6 +190,13 @@ const CREATE_RUNS_INDEX_SQL = `
   CREATE INDEX IF NOT EXISTS idx_shared_champion_runs_champion_updated
     ON shared_champion_runs (champion_updated, created_at DESC);
 `;
+
+const PLAYER_NAME_SQL_PATTERN = "^[A-Za-z0-9 ._''-]{1,15}$";
+const PLAYER_NAME_KEY_SQL_PATTERN = "^[a-z0-9 ._''-]{1,15}$";
+const SHARED_CHAMPION_SCORES_HOLDER_NAME_CONSTRAINT = "shared_champion_scores_holder_name_contract_v1";
+const SHARED_CHAMPION_RUN_TOKENS_PLAYER_NAME_CONSTRAINT = "shared_champion_run_tokens_player_name_contract_v1";
+const SHARED_CHAMPION_RUNS_PLAYER_NAME_CONSTRAINT = "shared_champion_runs_player_name_contract_v1";
+const SHARED_CHAMPION_RUNS_PLAYER_NAME_KEY_CONSTRAINT = "shared_champion_runs_player_name_key_contract_v1";
 
 const CREATE_DAILY_ROLLUPS_VIEW_SQL = `
   CREATE OR REPLACE VIEW shared_champion_daily_rollups_v1 AS
@@ -637,6 +648,18 @@ type AcceptedFinishAuditRow = {
   created_at: Date;
 };
 
+type InvalidChampionNameRow = {
+  board_key: string;
+};
+
+type InvalidRunTokenNameRow = {
+  run_id: string;
+};
+
+type InvalidRunNameRow = {
+  run_id: string;
+};
+
 type ChampionSnapshotRow = {
   board_key: string;
   score: number;
@@ -675,16 +698,110 @@ export type SharedChampionStorageReconcileReport = {
   skippedExistingRuns: number;
   orphanedAcceptedFinishes: number;
   malformedAcceptedFinishes: number;
+  invalidChampionRows: number;
+  invalidRunTokenNames: number;
+  invalidRunRows: number;
   insertedRunIds: string[];
   skippedRunIds: string[];
   orphanedRunIds: string[];
   malformedRunIds: string[];
+  invalidChampionBoardKeys: string[];
+  invalidRunTokenRunIds: string[];
+  invalidRunIds: string[];
   championDrift: SharedChampionStorageDriftReport | null;
 };
 
-function mapRowToChampion(row: ChampionRow): SharedChampion {
+export type SharedChampionConstraintValidationReport = {
+  validatedConstraints: string[];
+  alreadyPresentConstraints: string[];
+  connectionEnvKey: SharedChampionConnectionEnvKey;
+  connectionSslModeBefore: string | null;
+  connectionSslModeAfter: string | null;
+};
+
+const warnedMalformedChampionRows = new Set<string>();
+
+function getNameContractExpression(columnName: string, lowercaseOnly = false): string {
+  const pattern = lowercaseOnly ? PLAYER_NAME_KEY_SQL_PATTERN : PLAYER_NAME_SQL_PATTERN;
+  const alphanumericPattern = lowercaseOnly ? "[a-z0-9]" : "[A-Za-z0-9]";
+  return [
+    `char_length(${columnName}) BETWEEN 1 AND ${HIGH_SCORE_PLAYER_NAME_MAX_LENGTH}`,
+    `${columnName} ~ E'${pattern}'`,
+    `${columnName} ~ E'${alphanumericPattern}'`,
+    `${columnName} = btrim(${columnName})`,
+    `position('  ' in ${columnName}) = 0`,
+  ].join("\n      AND ");
+}
+
+async function ensureTableConstraint(
+  client: QueryableClient,
+  tableName: string,
+  constraintName: string,
+  checkExpression: string,
+): Promise<void> {
+  const exists = await client.query<{ exists: boolean }>(
+    `
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = $1
+          AND conrelid = $2::regclass
+      ) AS exists;
+    `,
+    [constraintName, tableName],
+  );
+  if (exists.rows[0]?.exists === true) {
+    return;
+  }
+
+  await client.query(
+    `
+      ALTER TABLE ${tableName}
+      ADD CONSTRAINT ${constraintName}
+      CHECK (
+        ${checkExpression}
+      ) NOT VALID;
+    `,
+  );
+}
+
+async function hasTableConstraint(
+  client: QueryableClient,
+  tableName: string,
+  constraintName: string,
+): Promise<boolean> {
+  const exists = await client.query<{ exists: boolean }>(
+    `
+      SELECT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = $1
+          AND conrelid = $2::regclass
+      ) AS exists;
+    `,
+    [constraintName, tableName],
+  );
+  return exists.rows[0]?.exists === true;
+}
+
+function warnMalformedChampionRow(context: string, holderName: string): void {
+  const warningKey = `${context}:${holderName}`;
+  if (warnedMalformedChampionRows.has(warningKey)) {
+    return;
+  }
+  warnedMalformedChampionRows.add(warningKey);
+  console.warn(`[shared-champion] ignoring malformed champion row from ${context}: ${JSON.stringify(holderName)}`);
+}
+
+function mapRowToChampion(row: ChampionRow, context: string): SharedChampion | null {
+  const holderName = parseStoredPlayerName(row.holder_name);
+  if (holderName === null) {
+    warnMalformedChampionRow(context, row.holder_name);
+    return null;
+  }
+
   return createSharedChampion({
-    holderName: row.holder_name,
+    holderName,
     score: row.score,
     controlMode: row.holder_mode,
     updatedAt: row.updated_at,
@@ -742,9 +859,17 @@ function roundMetric(value: number | null, digits = 2): number {
   return Math.round(value * factor) / factor;
 }
 
+function requireSharedChampionName(value: unknown, controlMode: SharedChampionControlMode): string {
+  const normalized = sanitizeSharedChampionName(value, controlMode);
+  if (normalized === null) {
+    throw new Error("Expected a validated shared champion player name.");
+  }
+  return normalized;
+}
+
 function normalizeSubmission(input: SharedChampionPostRequest): SharedChampionPostRequest {
   return {
-    playerName: sanitizeSharedChampionName(input.playerName, input.controlMode),
+    playerName: requireSharedChampionName(input.playerName, input.controlMode),
     score: normalizeScore(input.score),
     controlMode: input.controlMode,
     ...(input.telemetry ? { telemetry: input.telemetry } : {}),
@@ -764,7 +889,7 @@ function normalizeRunTokenInput(input: {
   return {
     runId: input.runId,
     tokenHash: input.tokenHash.trim(),
-    playerName: sanitizeSharedChampionName(input.playerName, input.controlMode),
+    playerName: requireSharedChampionName(input.playerName, input.controlMode),
     controlMode: input.controlMode,
     mapId: sanitizeSharedChampionMapId(input.mapId),
     expiresAt: input.expiresAt,
@@ -921,17 +1046,21 @@ function createBackfilledRunRecord(
     return null;
   }
 
-  return normalizeRunRecord({
-    tokenRecord: mapBackfillTokenRow(tokenRow),
-    summary: parsedPayload.summary,
-    elapsedMs: validation.elapsedMs,
-    score: validation.computedScore,
-    championUpdated: parsedPayload.championUpdated,
-    clientIpFingerprint: tokenRow.claim_ip_fingerprint ?? tokenRow.created_ip_fingerprint,
-    userAgentFingerprint: tokenRow.claim_user_agent_fingerprint ?? tokenRow.created_user_agent_fingerprint,
-    buildId: null,
-    createdAt: tokenRow.claimed_at ?? auditRow.created_at,
-  });
+  try {
+    return normalizeRunRecord({
+      tokenRecord: mapBackfillTokenRow(tokenRow),
+      summary: parsedPayload.summary,
+      elapsedMs: validation.elapsedMs,
+      score: validation.computedScore,
+      championUpdated: parsedPayload.championUpdated,
+      clientIpFingerprint: tokenRow.claim_ip_fingerprint ?? tokenRow.created_ip_fingerprint,
+      userAgentFingerprint: tokenRow.claim_user_agent_fingerprint ?? tokenRow.created_user_agent_fingerprint,
+      buildId: null,
+      createdAt: tokenRow.claimed_at ?? auditRow.created_at,
+    });
+  } catch {
+    return null;
+  }
 }
 
 export function planSharedChampionAcceptedRunBackfill(input: {
@@ -983,10 +1112,16 @@ export function planSharedChampionAcceptedRunBackfill(input: {
     skippedExistingRuns: skippedRunIds.length,
     orphanedAcceptedFinishes: orphanedRunIds.length,
     malformedAcceptedFinishes: malformedRunIds.length,
+    invalidChampionRows: 0,
+    invalidRunTokenNames: 0,
+    invalidRunRows: 0,
     insertedRunIds,
     skippedRunIds,
     orphanedRunIds,
     malformedRunIds,
+    invalidChampionBoardKeys: [],
+    invalidRunTokenRunIds: [],
+    invalidRunIds: [],
     championDrift: null,
   };
 }
@@ -1388,7 +1523,9 @@ export function resolveSharedChampionReconcileConnectionSelection(
 export function resolveSharedChampionReconcileConnectionString(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  return resolveSharedChampionReconcileConnectionSelection(env).connectionString;
+  return normalizePgConnectionString(
+    resolveSharedChampionReconcileConnectionSelection(env).connectionString,
+  ).connectionString;
 }
 
 export function resolvePgConnectionString(
@@ -1399,7 +1536,7 @@ export function resolvePgConnectionString(
   if (env === process.env) {
     maybeWarnOnConnectionAlias(kind, selection);
   }
-  return selection.connectionString;
+  return normalizePgConnectionString(selection.connectionString).connectionString;
 }
 
 function hasPgConnectionString(kind: PoolKind): boolean {
@@ -1407,6 +1544,47 @@ function hasPgConnectionString(kind: PoolKind): boolean {
     return resolvePgConnectionString(kind).length > 0;
   } catch {
     return false;
+  }
+}
+
+export function normalizePgConnectionString(connectionString: string): {
+  connectionString: string;
+  sslModeBefore: string | null;
+  sslModeAfter: string | null;
+} {
+  try {
+    const parsedUrl = new URL(connectionString);
+    const sslModeBefore = parsedUrl.searchParams.get("sslmode")?.trim().toLowerCase() ?? null;
+    const isLocalHost = parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1";
+
+    if (isLocalHost || sslModeBefore === null || sslModeBefore === "disable" || sslModeBefore === "verify-full") {
+      return {
+        connectionString,
+        sslModeBefore,
+        sslModeAfter: sslModeBefore,
+      };
+    }
+
+    if (sslModeBefore === "prefer" || sslModeBefore === "require" || sslModeBefore === "verify-ca") {
+      parsedUrl.searchParams.set("sslmode", "verify-full");
+      return {
+        connectionString: parsedUrl.toString(),
+        sslModeBefore,
+        sslModeAfter: "verify-full",
+      };
+    }
+
+    return {
+      connectionString,
+      sslModeBefore,
+      sslModeAfter: sslModeBefore,
+    };
+  } catch {
+    return {
+      connectionString,
+      sslModeBefore: null,
+      sslModeAfter: null,
+    };
   }
 }
 
@@ -1494,6 +1672,12 @@ async function migrateLegacyHalfPointScoreColumn(
 export async function runSharedChampionSchemaMaintenance(client: QueryableClient): Promise<void> {
   await client.query(CREATE_HIGH_SCORE_TABLE_SQL);
   await migrateLegacyHalfPointScoreColumn(client, "shared_champion_scores");
+  await ensureTableConstraint(
+    client,
+    "shared_champion_scores",
+    SHARED_CHAMPION_SCORES_HOLDER_NAME_CONSTRAINT,
+    getNameContractExpression("holder_name"),
+  );
 
   await client.query(CREATE_SUBMISSIONS_LOG_TABLE_SQL);
   await client.query(ALTER_SUBMISSIONS_LOG_TABLE_SQL);
@@ -1507,6 +1691,12 @@ export async function runSharedChampionSchemaMaintenance(client: QueryableClient
   await client.query(ALTER_RUN_TOKEN_TABLE_SQL);
   await client.query(DROP_LEGACY_RUN_TOKEN_COLUMNS_SQL);
   await client.query(CREATE_RUN_TOKEN_INDEX_SQL);
+  await ensureTableConstraint(
+    client,
+    "shared_champion_run_tokens",
+    SHARED_CHAMPION_RUN_TOKENS_PLAYER_NAME_CONSTRAINT,
+    getNameContractExpression("player_name"),
+  );
 
   await client.query(CREATE_AUDIT_TABLE_SQL);
   await client.query(ALTER_AUDIT_TABLE_SQL);
@@ -1516,6 +1706,19 @@ export async function runSharedChampionSchemaMaintenance(client: QueryableClient
   await client.query(DROP_ROLLUPS_VIEWS_SQL);
   await migrateLegacyHalfPointScoreColumn(client, "shared_champion_runs");
   await client.query(CREATE_RUNS_INDEX_SQL);
+  await ensureTableConstraint(
+    client,
+    "shared_champion_runs",
+    SHARED_CHAMPION_RUNS_PLAYER_NAME_CONSTRAINT,
+    getNameContractExpression("player_name"),
+  );
+  await ensureTableConstraint(
+    client,
+    "shared_champion_runs",
+    SHARED_CHAMPION_RUNS_PLAYER_NAME_KEY_CONSTRAINT,
+    `${getNameContractExpression("player_name_key", true)}
+      AND player_name_key = lower(player_name)`,
+  );
 
   await client.query(CREATE_DAILY_ROLLUPS_VIEW_SQL);
   await client.query(CREATE_NAME_ROLLUPS_VIEW_SQL);
@@ -1576,10 +1779,63 @@ async function backfillAcceptedFinishRuns(
     skippedExistingRuns,
     orphanedAcceptedFinishes: plan.orphanedAcceptedFinishes,
     malformedAcceptedFinishes: plan.malformedAcceptedFinishes,
+    invalidChampionRows: 0,
+    invalidRunTokenNames: 0,
+    invalidRunRows: 0,
     insertedRunIds,
     skippedRunIds,
     orphanedRunIds: plan.orphanedRunIds,
     malformedRunIds: plan.malformedRunIds,
+    invalidChampionBoardKeys: [],
+    invalidRunTokenRunIds: [],
+    invalidRunIds: [],
+  };
+}
+
+async function collectInvalidNameReport(
+  client: QueryableClient,
+): Promise<Pick<
+  SharedChampionStorageReconcileReport,
+  | "invalidChampionRows"
+  | "invalidRunTokenNames"
+  | "invalidRunRows"
+  | "invalidChampionBoardKeys"
+  | "invalidRunTokenRunIds"
+  | "invalidRunIds"
+>> {
+  const championRows = await client.query<InvalidChampionNameRow>(`
+    SELECT board_key
+    FROM shared_champion_scores
+    WHERE NOT (
+      ${getNameContractExpression("holder_name")}
+    );
+  `);
+  const runTokenRows = await client.query<InvalidRunTokenNameRow>(`
+    SELECT run_id
+    FROM shared_champion_run_tokens
+    WHERE NOT (
+      ${getNameContractExpression("player_name")}
+    );
+  `);
+  const runRows = await client.query<InvalidRunNameRow>(`
+    SELECT run_id
+    FROM shared_champion_runs
+    WHERE NOT (
+      ${getNameContractExpression("player_name")}
+    )
+      OR NOT (
+        ${getNameContractExpression("player_name_key", true)}
+      )
+      OR player_name_key <> lower(player_name);
+  `);
+
+  return {
+    invalidChampionRows: championRows.rows.length,
+    invalidRunTokenNames: runTokenRows.rows.length,
+    invalidRunRows: runRows.rows.length,
+    invalidChampionBoardKeys: championRows.rows.map((row) => row.board_key),
+    invalidRunTokenRunIds: runTokenRows.rows.map((row) => row.run_id),
+    invalidRunIds: runRows.rows.map((row) => row.run_id),
   };
 }
 
@@ -1637,15 +1893,87 @@ export async function reconcileSharedChampionStorage(options: {
     await client.query("BEGIN");
     await runSharedChampionSchemaMaintenance(client);
     const backfill = await backfillAcceptedFinishRuns(client);
+    const invalidNames = await collectInvalidNameReport(client);
     const championDrift = await computeChampionDrift(client);
     await client.query("COMMIT");
     return {
       ...backfill,
+      ...invalidNames,
       championDrift,
     };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     throw error;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
+export async function validateSharedChampionConstraints(options: {
+  env?: NodeJS.ProcessEnv;
+  connectionString?: string;
+} = {}): Promise<SharedChampionConstraintValidationReport> {
+  const env = options.env ?? process.env;
+  const selection = options.connectionString
+    ? {
+        connectionString: options.connectionString,
+        envKey: "POSTGRES_URL_NON_POOLING" as SharedChampionConnectionEnvKey,
+      }
+    : resolveSharedChampionReconcileConnectionSelection(env);
+  const normalizedConnection = normalizePgConnectionString(selection.connectionString);
+  const pool = new Pool({
+    connectionString: normalizedConnection.connectionString,
+    max: 1,
+    idleTimeoutMillis: 5_000,
+    ssl: resolveSslConfig(normalizedConnection.connectionString),
+  });
+  const client = await pool.connect();
+
+  const constraints: Array<{ tableName: string; constraintName: string }> = [
+    {
+      tableName: "shared_champion_scores",
+      constraintName: SHARED_CHAMPION_SCORES_HOLDER_NAME_CONSTRAINT,
+    },
+    {
+      tableName: "shared_champion_run_tokens",
+      constraintName: SHARED_CHAMPION_RUN_TOKENS_PLAYER_NAME_CONSTRAINT,
+    },
+    {
+      tableName: "shared_champion_runs",
+      constraintName: SHARED_CHAMPION_RUNS_PLAYER_NAME_CONSTRAINT,
+    },
+    {
+      tableName: "shared_champion_runs",
+      constraintName: SHARED_CHAMPION_RUNS_PLAYER_NAME_KEY_CONSTRAINT,
+    },
+  ];
+
+  try {
+    await runSharedChampionSchemaMaintenance(client);
+
+    const alreadyPresentConstraints: string[] = [];
+    for (const constraint of constraints) {
+      if (await hasTableConstraint(client, constraint.tableName, constraint.constraintName)) {
+        alreadyPresentConstraints.push(constraint.constraintName);
+      }
+    }
+
+    const validatedConstraints: string[] = [];
+    for (const constraint of constraints) {
+      await client.query(
+        `ALTER TABLE ${constraint.tableName} VALIDATE CONSTRAINT ${constraint.constraintName};`,
+      );
+      validatedConstraints.push(constraint.constraintName);
+    }
+
+    return {
+      validatedConstraints,
+      alreadyPresentConstraints,
+      connectionEnvKey: selection.envKey,
+      connectionSslModeBefore: normalizedConnection.sslModeBefore,
+      connectionSslModeAfter: normalizedConnection.sslModeAfter,
+    };
   } finally {
     client.release();
     await pool.end();
@@ -1775,7 +2103,7 @@ export function createPostgresSharedChampionStore(): SharedChampionStore {
       await ensureSchemaReady();
       const result = await getPool("write").query<ChampionRow>(SELECT_CHAMPION_SQL, [SITEWIDE_CHAMPION_BOARD_KEY]);
       const row = result.rows[0];
-      return row ? mapRowToChampion(row) : null;
+      return row ? mapRowToChampion(row, "shared_champion_scores") : null;
     },
     async submitCandidate(input) {
       await ensureSchemaReady();
@@ -1789,7 +2117,7 @@ export function createPostgresSharedChampionStore(): SharedChampionStore {
       const row = result.rows[0] ?? null;
       return {
         updated: row?.updated === true,
-        champion: row ? mapRowToChampion(row) : null,
+        champion: row ? mapRowToChampion(row, "shared_champion_scores") : null,
       };
     },
     async isRateLimited(clientIpFingerprint) {
@@ -1872,7 +2200,7 @@ export function createPostgresSharedChampionStore(): SharedChampionStore {
         const championResult = await client.query<ChampionMutationRow>(UPSERT_CHAMPION_SQL, [
           SITEWIDE_CHAMPION_BOARD_KEY,
           normalizeScore(input.score),
-          sanitizeSharedChampionName(input.tokenRecord.playerName, input.tokenRecord.controlMode),
+          requireSharedChampionName(input.tokenRecord.playerName, input.tokenRecord.controlMode),
           input.tokenRecord.controlMode,
         ]);
         const championRow = championResult.rows[0] ?? null;
@@ -1889,7 +2217,7 @@ export function createPostgresSharedChampionStore(): SharedChampionStore {
         }
         return {
           updated,
-          champion: championRow ? mapRowToChampion(championRow) : null,
+          champion: championRow ? mapRowToChampion(championRow, "shared_champion_scores") : null,
           run,
         };
       });

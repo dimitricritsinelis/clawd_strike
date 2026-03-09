@@ -1,13 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { Pool, type PoolClient } from "pg";
 
 import { authorizeStatsAdminRequest } from "./highScoreSecurity.js";
 import {
+  createSharedChampion,
+  parseSharedChampion,
+} from "../apps/shared/highScore.js";
+import {
+  deriveRunFields,
+  parseStatsFilters,
+} from "./highScoreStats.js";
+import {
   planSharedChampionAcceptedRunBackfill,
+  normalizePgConnectionString,
   resolvePgConnectionSelection,
   resolvePgConnectionString,
   resolveSharedChampionReconcileConnectionString,
   runSharedChampionSchemaMaintenance,
+  validateSharedChampionConstraints,
 } from "./highScoreStoreImpl.js";
 
 test("prefers explicit write and read overrides when they are configured", () => {
@@ -40,6 +51,41 @@ test("accepts Vercel generic Postgres aliases for gameplay writes", () => {
     DATABASE_URL: "postgres://database-url",
   } as NodeJS.ProcessEnv;
   assert.equal(resolvePgConnectionString("write", databaseUrlEnv), "postgres://database-url");
+});
+
+test("normalizes legacy SSL modes to verify-full while preserving local disable semantics", () => {
+  assert.deepEqual(
+    normalizePgConnectionString("postgres://db.example.com/app?sslmode=require"),
+    {
+      connectionString: "postgres://db.example.com/app?sslmode=verify-full",
+      sslModeBefore: "require",
+      sslModeAfter: "verify-full",
+    },
+  );
+  assert.deepEqual(
+    normalizePgConnectionString("postgres://db.example.com/app?sslmode=prefer"),
+    {
+      connectionString: "postgres://db.example.com/app?sslmode=verify-full",
+      sslModeBefore: "prefer",
+      sslModeAfter: "verify-full",
+    },
+  );
+  assert.deepEqual(
+    normalizePgConnectionString("postgres://db.example.com/app?sslmode=verify-ca"),
+    {
+      connectionString: "postgres://db.example.com/app?sslmode=verify-full",
+      sslModeBefore: "verify-ca",
+      sslModeAfter: "verify-full",
+    },
+  );
+  assert.deepEqual(
+    normalizePgConnectionString("postgres://localhost/app?sslmode=disable"),
+    {
+      connectionString: "postgres://localhost/app?sslmode=disable",
+      sslModeBefore: "disable",
+      sslModeAfter: "disable",
+    },
+  );
 });
 
 test("accepts non-pooling aliases and write fallback when read-specific config is absent", () => {
@@ -137,6 +183,131 @@ test("schema maintenance includes shared_champion_runs and rollup views", async 
   assert(statements.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS shared_champion_runs")));
   assert(statements.some((statement) => statement.includes("CREATE OR REPLACE VIEW shared_champion_daily_rollups_v1")));
   assert(statements.some((statement) => statement.includes("CREATE OR REPLACE VIEW shared_champion_name_rollups_v1")));
+  assert(statements.some((statement) => statement.includes("shared_champion_scores_holder_name_contract_v1")));
+  assert(statements.some((statement) => statement.includes("shared_champion_run_tokens_player_name_contract_v1")));
+  assert(statements.some((statement) => statement.includes("shared_champion_runs_player_name_contract_v1")));
+  assert(statements.some((statement) => statement.includes("shared_champion_runs_player_name_key_contract_v1")));
+});
+
+test("constraint validation runs schema maintenance first and validates each name constraint", async () => {
+  const statements: string[] = [];
+  const originalConnect = Pool.prototype.connect;
+  const originalEnd = Pool.prototype.end;
+
+  const mockClient = {
+    async query<T extends Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: T[] }> {
+      statements.push(text);
+      if (text.includes("information_schema.columns")) {
+        const tableName = values?.[0];
+        const columnName = values?.[1];
+        if (tableName === "shared_champion_scores" && columnName === "score") {
+          return { rows: [{ exists: true } as unknown as T] };
+        }
+        if (tableName === "shared_champion_scores" && columnName === "score_half_points") {
+          return { rows: [{ exists: false } as unknown as T] };
+        }
+        if (tableName === "shared_champion_runs" && columnName === "score") {
+          return { rows: [{ exists: true } as unknown as T] };
+        }
+        if (tableName === "shared_champion_runs" && columnName === "score_half_points") {
+          return { rows: [{ exists: false } as unknown as T] };
+        }
+        return { rows: [{ exists: false } as unknown as T] };
+      }
+      if (text.includes("FROM pg_constraint")) {
+        return { rows: [{ exists: true } as unknown as T] };
+      }
+      return { rows: [] };
+    },
+    release() {},
+  };
+
+  Pool.prototype.connect = async function connect() {
+    return mockClient as unknown as PoolClient;
+  };
+  Pool.prototype.end = async function end() {
+    return undefined as void;
+  };
+
+  try {
+    const report = await validateSharedChampionConstraints({
+      env: {
+        POSTGRES_URL_NON_POOLING: "postgres://db.example.com/app?sslmode=require",
+      } as NodeJS.ProcessEnv,
+    });
+
+    assert.deepEqual(report.validatedConstraints, [
+      "shared_champion_scores_holder_name_contract_v1",
+      "shared_champion_run_tokens_player_name_contract_v1",
+      "shared_champion_runs_player_name_contract_v1",
+      "shared_champion_runs_player_name_key_contract_v1",
+    ]);
+    assert.deepEqual(report.alreadyPresentConstraints, report.validatedConstraints);
+    assert.equal(report.connectionEnvKey, "POSTGRES_URL_NON_POOLING");
+    assert.equal(report.connectionSslModeBefore, "require");
+    assert.equal(report.connectionSslModeAfter, "verify-full");
+    assert(statements.some((statement) => statement.includes("CREATE TABLE IF NOT EXISTS shared_champion_runs")));
+    assert(statements.some((statement) => statement.includes("VALIDATE CONSTRAINT shared_champion_scores_holder_name_contract_v1")));
+    assert(statements.some((statement) => statement.includes("VALIDATE CONSTRAINT shared_champion_run_tokens_player_name_contract_v1")));
+    assert(statements.some((statement) => statement.includes("VALIDATE CONSTRAINT shared_champion_runs_player_name_contract_v1")));
+    assert(statements.some((statement) => statement.includes("VALIDATE CONSTRAINT shared_champion_runs_player_name_key_contract_v1")));
+  } finally {
+    Pool.prototype.connect = originalConnect;
+    Pool.prototype.end = originalEnd;
+  }
+});
+
+test("invalid admin stats playerName filters fail instead of mapping to Unknown", () => {
+  assert.throws(
+    () => parseStatsFilters(new URL("https://example.test/api/admin/stats/overview?playerName=Bad%3CName")),
+    /playerName is invalid/,
+  );
+});
+
+test("shared champion parsing rejects malformed stored names instead of coercing to Unknown", () => {
+  assert.throws(
+    () => createSharedChampion({
+      holderName: "Bad<Name",
+      score: 10,
+      controlMode: "agent",
+      updatedAt: "2026-03-08T00:00:00.000Z",
+    }),
+    /validated player name/i,
+  );
+
+  assert.equal(
+    parseSharedChampion({
+      holderName: "Bad<Name",
+      score: 10,
+      controlMode: "agent",
+      updatedAt: "2026-03-08T00:00:00.000Z",
+      scope: "sitewide",
+    }),
+    null,
+  );
+});
+
+test("deriveRunFields rejects malformed stored player names", () => {
+  assert.throws(
+    () => deriveRunFields({
+      playerName: "Bad<Name",
+      mapId: "bazaar-map",
+      summary: {
+        survivalTimeS: 1,
+        kills: 1,
+        headshots: 0,
+        headshotsPerWave: [0],
+        shotsFired: 1,
+        shotsHit: 1,
+        accuracy: 100,
+        finalScore: 5,
+        deathCause: "enemy-fire",
+      },
+      score: 5,
+      elapsedMs: 1000,
+    }),
+    /Invalid stored player name/,
+  );
 });
 
 test("backfill planning is conservative and idempotent", () => {
@@ -155,9 +326,9 @@ test("backfill planning is conservative and idempotent", () => {
           accuracy: 100,
           shotsHit: 10,
           headshots: 0,
-          headshotsPerWave: [0, 0],
+          headshotsPerWave: [0],
           deathCause: "enemy-fire",
-          finalScore: 52,
+          finalScore: 50,
           shotsFired: 10,
           survivalTimeS: 6,
         },
@@ -248,7 +419,44 @@ test("backfill planning is conservative and idempotent", () => {
         claim_user_agent_fingerprint: "claim-ua",
       },
     ],
+    [
+      "bad-name",
+      {
+        run_id: "bad-name",
+        player_name: "Bad<Name",
+        control_mode: "human" as const,
+        map_id: "bazaar-map",
+        issued_at: new Date("2026-03-08T02:08:10.000Z"),
+        expires_at: new Date("2026-03-08T02:38:10.000Z"),
+        claimed_at: new Date("2026-03-08T02:08:20.000Z"),
+        created_ip_fingerprint: "created-ip",
+        created_user_agent_fingerprint: "created-ua",
+        claim_ip_fingerprint: "claim-ip",
+        claim_user_agent_fingerprint: "claim-ua",
+      },
+    ],
   ]);
+
+  acceptedAudits.push({
+    id: "67",
+    run_id: "bad-name",
+    created_at: new Date("2026-03-08T02:08:20.000Z"),
+    payload: {
+      updated: true,
+      elapsedMs: 1000,
+      summary: {
+        kills: 1,
+        accuracy: 100,
+        shotsHit: 1,
+        headshots: 0,
+        headshotsPerWave: [0],
+        deathCause: "enemy-fire",
+        finalScore: 5,
+        shotsFired: 1,
+        survivalTimeS: 1,
+      },
+    },
+  });
 
   const report = planSharedChampionAcceptedRunBackfill({
     acceptedAudits,
@@ -259,16 +467,16 @@ test("backfill planning is conservative and idempotent", () => {
   assert.equal(report.insertedRuns, 1);
   assert.equal(report.skippedExistingRuns, 1);
   assert.equal(report.orphanedAcceptedFinishes, 1);
-  assert.equal(report.malformedAcceptedFinishes, 1);
+  assert.equal(report.malformedAcceptedFinishes, 2);
   assert.deepEqual(report.insertedRunIds, ["b312c727-6912-4dc4-87a6-9a5cdb92cc26"]);
   assert.deepEqual(report.skippedRunIds, ["already-present"]);
   assert.deepEqual(report.orphanedRunIds, ["missing-token"]);
-  assert.deepEqual(report.malformedRunIds, ["bad-payload"]);
+  assert.deepEqual(report.malformedRunIds, ["bad-payload", "bad-name"]);
   assert.equal(report.inserts.length, 1);
   assert.equal(report.inserts[0]?.buildId, null);
   assert.equal(report.inserts[0]?.createdAt, claimedAt.toISOString());
   assert.equal(report.inserts[0]?.playerName, "Dimitri");
-  assert.equal(report.inserts[0]?.score, 52);
+  assert.equal(report.inserts[0]?.score, 50);
   assert.equal(report.inserts[0]?.clientIpFingerprint, "claim-ip");
   assert.equal(report.inserts[0]?.userAgentFingerprint, "claim-ua");
 });

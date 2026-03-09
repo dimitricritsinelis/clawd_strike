@@ -32,6 +32,8 @@ export default defineConfig({
           ...process.env,
           VERCEL_ENV: process.env.VERCEL_ENV ?? "production",
           SESSION_SECRET: process.env.SESSION_SECRET ?? "clawd-strike-playwright-session-secret-32chars",
+          SHARED_CHAMPION_ADMIN_TOKEN: process.env.SHARED_CHAMPION_ADMIN_TOKEN
+            ?? "clawd-strike-playwright-shared-champion-admin-token",
           STATS_ADMIN_TOKEN: process.env.STATS_ADMIN_TOKEN ?? "clawd-strike-dev-stats-admin-token",
           PRIVACY_HASH_SECRET: process.env.PRIVACY_HASH_SECRET ?? "clawd-strike-playwright-privacy-secret-32chars",
         },

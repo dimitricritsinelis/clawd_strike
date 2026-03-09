@@ -52,7 +52,11 @@ body {
   background-image:
     radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
     linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
-    url("/loading-screen/assets/loading-bg-desktop.webp");
+    image-set(
+      url("/loading-screen/assets/loading-bg-desktop.avif") type("image/avif") 1x,
+      url("/loading-screen/assets/loading-bg-desktop.webp") type("image/webp") 1x,
+      url("/loading-screen/assets/loading-bg-desktop.png") type("image/png") 1x
+    );
 
   background-size: cover;
   background-position: center center;
@@ -446,6 +450,9 @@ body {
   position: relative;
   transform: translateY(calc(104px + clamp(24px, 5vh, 72px)));
 }
+#start #info-screen .info-screen-art-picture {
+  display: block;
+}
 #start #info-screen .info-screen-art-img {
   width: min(100%, 980px);
   max-width: 100%;
@@ -621,6 +628,11 @@ body {
   color: #231207;
   text-shadow: 0 1px 0 rgba(255, 240, 212, 0.34);
 }
+#start .name-input[aria-invalid="true"],
+#start .name-input[aria-invalid="true"]:focus {
+  color: #9c332b;
+  text-shadow: 0 1px 0 rgba(255, 224, 213, 0.26);
+}
 #start .name-input::selection {
   background: transparent;
   color: #2f1a0b;
@@ -704,7 +716,11 @@ body {
     background-image:
       radial-gradient(circle at 50% 48%, rgba(220, 165, 92, 0.16), rgba(20, 11, 5, 0.54) 74%),
       linear-gradient(180deg, rgba(15, 8, 3, 0.18), rgba(8, 5, 3, 0.7)),
-      url("/loading-screen/assets/loading-bg-mobile.webp");
+      image-set(
+        url("/loading-screen/assets/loading-bg-mobile.avif") type("image/avif") 1x,
+        url("/loading-screen/assets/loading-bg-mobile.webp") type("image/webp") 1x,
+        url("/loading-screen/assets/loading-bg-mobile.png") type("image/png") 1x
+      );
   }
 }
 #mode-banner {

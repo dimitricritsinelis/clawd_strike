@@ -10,6 +10,11 @@ Required capability:
 - You must be able to execute JavaScript in the page context, or use an equivalent browser-automation bridge that can call page globals.
 - If you can only click, type, and read the screen, you can navigate the menu, but you cannot control gameplay in Agent mode.
 
+Companion starter repo:
+- Separate public repo: `https://github.com/dimitricritsinelis/clawd-strike-agent-starter`
+- Use that repo for runnable Playwright starter code, troubleshooting, and issue reporting.
+- If that repo and this document ever disagree, follow this `/skills.md` contract.
+
 Goal:
 - Enter Agent mode.
 - Play repeated runs.
@@ -38,17 +43,22 @@ High-score rule:
 5. Press `Enter`
 
 Name rule:
+- Name is required before the game starts
 - Max length is `15`
+- Allowed characters are ASCII letters, numbers, spaces, and `-`, `_`, `.`, `'`
+- Invalid or blocked names keep you on the loading screen and mark the input invalid
 
 ### Fast-path URL
 
-You can skip the menu with:
+You can skip the menu only when `name` is present and valid:
 
 `https://clawd-strike.vercel.app/?autostart=agent&name=<AGENT_NAME>`
 
 Example:
 
 `https://clawd-strike.vercel.app/?autostart=agent&name=AutoAgent`
+
+If `name` is missing or invalid, runtime will not autostart and the page will return to the focused name-entry field.
 
 ## 2) Public Runtime API
 

@@ -1,7 +1,19 @@
-import type { LoadingScreenMode } from "./types";
+import type { LoadingScreenInitialNameEntry, LoadingScreenMode } from "./types";
+import {
+  getDeviceVariant,
+  getLoadingScreenFallbackAssetUrl,
+  getLoadingScreenImageSetValue,
+  preloadLoadingScreenAsset,
+  type LoadingScreenImageAssetKey,
+} from "./assets";
 import {
   type SharedChampionSnapshot,
 } from "../../../shared/highScore";
+import {
+  clampPlayerNameInput,
+  validatePlayerName,
+  type PlayerNameValidationReason,
+} from "../../../shared/playerName";
 
 type LoadingScreenUICallbacks = {
   onWarmupAudio: () => void;
@@ -16,11 +28,13 @@ type BannerOptions = {
 export type LoadingScreenUI = {
   show: () => void;
   dispose: () => void;
+  primeNameEntry: (state: LoadingScreenInitialNameEntry) => void;
   setBackgroundReady: (ready: boolean) => void;
   setAssetReady: (ready: boolean) => void;
   setTransitioning: (active: boolean) => void;
-  hydrateVisibleOverlayAssets: () => void;
-  waitForVisibleOverlayAssets: () => Promise<boolean>;
+  prepareMainMenuSurface: () => Promise<boolean>;
+  prepareNameEntrySurface: () => Promise<boolean>;
+  prepareInfoSurface: () => Promise<boolean>;
   warmLazyAssets: () => void;
   setSharedChampion: (snapshot: SharedChampionSnapshot) => void;
   setMuteState: (muted: boolean) => void;
@@ -32,12 +46,16 @@ export type LoadingScreenUI = {
     bannerVisible: boolean;
     backgroundReady: boolean;
     assetsReady: boolean;
+    nameEntryReady: boolean;
+    infoReady: boolean;
     transitioning: boolean;
   };
 };
 
 const SKILLS_MD_PLACEHOLDER_URL = "/skills.md";
 const AGENT_NAME_STORAGE_KEY = "clawd-strike:last-agent-name";
+const NAME_INPUT_DEFAULT_PLACEHOLDER = "ENTER NAME";
+const MENU_ART_FAILURE_BANNER = "Menu art unavailable";
 
 function getRequiredEl<T extends Element>(selector: string): T {
   const el = document.querySelector<T>(selector);
@@ -45,16 +63,11 @@ function getRequiredEl<T extends Element>(selector: string): T {
   return el;
 }
 
-function clampNameToMaxLength(raw: string, maxLength: number): string {
-  if (maxLength <= 0) return raw.trim();
-  return raw.trim().slice(0, maxLength);
-}
-
-function readPersistedAgentName(maxLength: number): string {
+function readPersistedAgentName(): string {
   try {
     const stored = window.localStorage.getItem(AGENT_NAME_STORAGE_KEY);
     if (!stored) return "";
-    return clampNameToMaxLength(stored, maxLength);
+    return clampPlayerNameInput(stored);
   } catch {
     return "";
   }
@@ -131,12 +144,6 @@ function hydrateDeferredSources(root: ParentNode): HTMLImageElement[] {
   return images;
 }
 
-function hydrateDeferredBackgroundImage(element: HTMLElement): void {
-  const backgroundUrl = element.dataset.bgUrl;
-  if (!backgroundUrl || element.style.backgroundImage.length > 0) return;
-  element.style.backgroundImage = `url("${backgroundUrl}")`;
-}
-
 function isImageReady(image: HTMLImageElement): boolean {
   return image.currentSrc.length > 0 && image.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
 }
@@ -165,6 +172,38 @@ function waitForHydratedImages(images: HTMLImageElement[]): Promise<boolean> {
 
     tick();
   });
+}
+
+const deferredBackgroundImageLoads = new WeakMap<HTMLElement, Promise<boolean>>();
+
+function loadDeferredBackgroundImage(element: HTMLElement): Promise<boolean> {
+  const existingPromise = deferredBackgroundImageLoads.get(element);
+  if (existingPromise) return existingPromise;
+
+  const assetKey = element.dataset.bgAssetKey?.trim() as LoadingScreenImageAssetKey | undefined;
+  if (!assetKey) {
+    return Promise.resolve(true);
+  }
+  if (element.style.backgroundImage.length > 0) {
+    return Promise.resolve(true);
+  }
+
+  const loadPromise = preloadLoadingScreenAsset({ key: assetKey }).then((loaded) => {
+    if (!loaded) {
+      deferredBackgroundImageLoads.delete(element);
+      return false;
+    }
+
+    if (element.style.backgroundImage.length === 0) {
+      const variant = getDeviceVariant();
+      element.style.backgroundImage = `url("${getLoadingScreenFallbackAssetUrl(assetKey, variant)}")`;
+      element.style.backgroundImage = getLoadingScreenImageSetValue(assetKey, variant);
+    }
+    return true;
+  });
+
+  deferredBackgroundImageLoads.set(element, loadPromise);
+  return loadPromise;
 }
 
 type IdleCapableWindow = Window & {
@@ -211,23 +250,41 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   let disposed = false;
   let bannerTimer: number | null = null;
   let pendingMode: LoadingScreenMode | null = null;
-  let visibleOverlayImages: HTMLImageElement[] = [];
-  let overlayAssetsHydrated = false;
-  let infoAssetsHydrated = false;
-  let nameEntryArtHydrated = false;
+  let mainMenuSurfacePromise: Promise<boolean> | null = null;
+  let nameEntrySurfacePromise: Promise<boolean> | null = null;
+  let infoSurfacePromise: Promise<boolean> | null = null;
   let lazyWarmupHandle: number | null = null;
-  const playerNameMaxLength = playerNameInput.maxLength > 0 ? playerNameInput.maxLength : 15;
-  let persistedAgentName = readPersistedAgentName(playerNameMaxLength);
+  let surfaceRequestToken = 0;
+  let persistedAgentName = readPersistedAgentName();
   if (persistedAgentName.length > 0) {
     playerNameInput.value = persistedAgentName;
   }
   start.dataset.agentSubmenu = "false";
   start.dataset.nameEntryVisible = "false";
+  start.dataset.nameEntryReady = "false";
   start.dataset.infoVisible = "false";
+  start.dataset.infoReady = "false";
   start.dataset.backgroundReady = "false";
   start.dataset.assetsReady = "false";
   start.dataset.transitioning = "false";
   loadingScreenOverlay.setAttribute("aria-hidden", "true");
+
+  function setNameInputValidationState(reason: PlayerNameValidationReason): void {
+    const invalid = reason !== "valid";
+    playerNameInput.setAttribute("aria-invalid", invalid ? "true" : "false");
+    if (invalid) {
+      playerNameInput.dataset.validationReason = reason;
+      return;
+    }
+
+    delete playerNameInput.dataset.validationReason;
+  }
+
+  function syncNameInputValidationState() {
+    const result = validatePlayerName(playerNameInput.value);
+    setNameInputValidationState(result.reason);
+    return result;
+  }
 
   function clearBannerTimer() {
     if (bannerTimer === null) return;
@@ -260,23 +317,46 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     modeBanner.textContent = "";
   }
 
-  function ensureVisibleOverlayAssetsHydrated() {
-    if (overlayAssetsHydrated) return;
-    visibleOverlayImages = hydrateDeferredSources(loadingScreenOverlay);
-    hydrateDeferredBackgroundImage(sharedChampionCard);
-    overlayAssetsHydrated = true;
+  function cancelPendingSurfaceReveal() {
+    surfaceRequestToken += 1;
   }
 
-  function ensureInfoScreenAssetsHydrated() {
-    if (infoAssetsHydrated) return;
-    hydrateDeferredSources(infoScreen);
-    infoAssetsHydrated = true;
+  function prepareMainMenuSurface(): Promise<boolean> {
+    if (mainMenuSurfacePromise) return mainMenuSurfacePromise;
+
+    const overlayImages = hydrateDeferredSources(loadingScreenOverlay);
+    mainMenuSurfacePromise = Promise.all([
+      waitForHydratedImages(overlayImages),
+      loadDeferredBackgroundImage(sharedChampionCard),
+    ]).then(([imagesReady, championReady]) => imagesReady && championReady);
+    return mainMenuSurfacePromise;
   }
 
-  function ensureNameEntryArtHydrated() {
-    if (nameEntryArtHydrated) return;
-    hydrateDeferredBackgroundImage(nameEntry);
-    nameEntryArtHydrated = true;
+  function prepareNameEntrySurface(): Promise<boolean> {
+    if (nameEntrySurfacePromise) return nameEntrySurfacePromise;
+
+    nameEntrySurfacePromise = loadDeferredBackgroundImage(nameEntry).then((ready) => {
+      start.dataset.nameEntryReady = ready ? "true" : "false";
+      if (!ready) {
+        nameEntrySurfacePromise = null;
+      }
+      return ready;
+    });
+    return nameEntrySurfacePromise;
+  }
+
+  function prepareInfoSurface(): Promise<boolean> {
+    if (infoSurfacePromise) return infoSurfacePromise;
+
+    const surfaceImages = hydrateDeferredSources(infoScreen);
+    infoSurfacePromise = waitForHydratedImages(surfaceImages).then((ready) => {
+      start.dataset.infoReady = ready ? "true" : "false";
+      if (!ready) {
+        infoSurfacePromise = null;
+      }
+      return ready;
+    });
+    return infoSurfacePromise;
   }
 
   function queueLazyAssetWarmup() {
@@ -284,8 +364,8 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     lazyWarmupHandle = scheduleIdleWork(() => {
       lazyWarmupHandle = null;
       if (disposed) return;
-      ensureInfoScreenAssetsHydrated();
-      ensureNameEntryArtHydrated();
+      void prepareInfoSurface();
+      void prepareNameEntrySurface();
     });
   }
 
@@ -329,27 +409,67 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   }
 
   function resetToPrimaryButtons() {
+    cancelPendingSurfaceReveal();
     pendingMode = null;
-    playerNameInput.placeholder = "ENTER NAME";
+    playerNameInput.placeholder = NAME_INPUT_DEFAULT_PLACEHOLDER;
+    setNameInputValidationState("valid");
     start.dataset.nameEntryVisible = "false";
     start.dataset.agentSubmenu = "false";
     start.dataset.infoVisible = "false";
+    infoScreen.setAttribute("aria-hidden", "true");
   }
 
-  function revealNameEntry(mode: LoadingScreenMode) {
-    ensureNameEntryArtHydrated();
+  function revealNameEntry(
+    mode: LoadingScreenMode,
+    options: {
+      prefillValue?: string;
+      shouldFocus?: boolean;
+    } = {},
+  ) {
     pendingMode = mode;
     playerNameInput.placeholder = mode === "agent" ? "AGENT NAME" : "HUMAN NAME";
-    if (mode === "agent" && persistedAgentName.length > 0) {
+    if (typeof options.prefillValue === "string") {
+      playerNameInput.value = clampPlayerNameInput(options.prefillValue);
+    } else if (mode === "agent" && persistedAgentName.length > 0) {
       playerNameInput.value = persistedAgentName;
     }
+    syncNameInputValidationState();
     start.dataset.agentSubmenu = "false";
     start.dataset.nameEntryVisible = "true";
-    window.requestAnimationFrame(() => {
-      playerNameInput.focus();
-      const caretPos = playerNameInput.value.length;
-      playerNameInput.setSelectionRange(caretPos, caretPos);
-    });
+    if (options.shouldFocus !== false) {
+      const focusInput = () => {
+        if (disposed) return;
+        if (start.dataset.assetsReady !== "true") {
+          window.requestAnimationFrame(focusInput);
+          return;
+        }
+        playerNameInput.focus();
+        const caretPos = playerNameInput.value.length;
+        playerNameInput.setSelectionRange(caretPos, caretPos);
+      };
+      window.requestAnimationFrame(focusInput);
+    }
+  }
+
+  async function revealNameEntryWhenReady(
+    mode: LoadingScreenMode,
+    options: {
+      prefillValue?: string;
+      shouldFocus?: boolean;
+    } = {},
+  ): Promise<boolean> {
+    const requestToken = ++surfaceRequestToken;
+    const ready = await prepareNameEntrySurface();
+    if (disposed || requestToken !== surfaceRequestToken) {
+      return false;
+    }
+    if (!ready) {
+      showBanner(MENU_ART_FAILURE_BANNER);
+      return false;
+    }
+
+    revealNameEntry(mode, options);
+    return true;
   }
 
   function hideNameEntry() {
@@ -360,15 +480,26 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     });
   }
 
-  function showInfoScreen() {
-    if (start.dataset.infoVisible === "true") return;
-    ensureInfoScreenAssetsHydrated();
+  async function showInfoScreenWhenReady(): Promise<boolean> {
+    if (start.dataset.infoVisible === "true") return true;
+    const requestToken = ++surfaceRequestToken;
+    const ready = await prepareInfoSurface();
+    if (disposed || requestToken !== surfaceRequestToken) {
+      return false;
+    }
+    if (!ready) {
+      showBanner(MENU_ART_FAILURE_BANNER);
+      return false;
+    }
+
     start.dataset.infoVisible = "true";
     infoScreen.setAttribute("aria-hidden", "false");
     closeNameAndModePanels();
+    return true;
   }
 
   function closeInfoScreen() {
+    cancelPendingSurfaceReveal();
     if (start.dataset.infoVisible !== "true") return;
     start.dataset.infoVisible = "false";
     infoScreen.setAttribute("aria-hidden", "true");
@@ -382,35 +513,43 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       });
       return;
     }
-    showInfoScreen();
+    void showInfoScreenWhenReady();
   }
 
   function closeNameAndModePanels() {
     pendingMode = null;
-    playerNameInput.placeholder = "ENTER NAME";
+    playerNameInput.placeholder = NAME_INPUT_DEFAULT_PLACEHOLDER;
+    setNameInputValidationState("valid");
     start.dataset.nameEntryVisible = "false";
     start.dataset.agentSubmenu = "false";
   }
 
   function submitPendingModeSelection() {
     if (!pendingMode) return;
-    const sanitizedPlayerName = clampNameToMaxLength(playerNameInput.value, playerNameMaxLength);
-    if (pendingMode === "agent" && sanitizedPlayerName.length > 0) {
-      persistedAgentName = sanitizedPlayerName;
-      writePersistedAgentName(sanitizedPlayerName);
+    const validation = syncNameInputValidationState();
+    if (!validation.ok) {
+      return;
     }
-    callbacks.onSelectMode(pendingMode, sanitizedPlayerName);
+
+    playerNameInput.value = validation.normalized;
+    if (pendingMode === "agent") {
+      persistedAgentName = validation.normalized;
+      writePersistedAgentName(validation.normalized);
+    }
+    callbacks.onSelectMode(pendingMode, validation.normalized);
   }
 
   function onSelectHuman() {
     if (disposed) return;
-    revealNameEntry("human");
+    void revealNameEntryWhenReady("human");
   }
 
   function onSelectAgent() {
     if (disposed) return;
+    cancelPendingSurfaceReveal();
     pendingMode = null;
-    playerNameInput.placeholder = "ENTER NAME";
+    playerNameInput.placeholder = NAME_INPUT_DEFAULT_PLACEHOLDER;
+    setNameInputValidationState("valid");
     start.dataset.nameEntryVisible = "false";
     start.dataset.agentSubmenu = "true";
   }
@@ -426,6 +565,13 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     submitPendingModeSelection();
   }
 
+  function onNameInput(event: Event) {
+    if (disposed) return;
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    syncNameInputValidationState();
+  }
+
   function onOpenSkillsMd() {
     if (disposed) return;
     showBanner("Opening skills.md");
@@ -434,7 +580,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
 
   function onEnterAgentMode() {
     if (disposed) return;
-    revealNameEntry("agent");
+    void revealNameEntryWhenReady("agent");
   }
 
   function onGlobalKeyDown(event: KeyboardEvent) {
@@ -465,6 +611,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   multiPlayerBtn.addEventListener("click", onSelectAgent);
   skillsMdBtn.addEventListener("click", onOpenSkillsMd);
   enterAgentModeBtn.addEventListener("click", onEnterAgentMode);
+  playerNameInput.addEventListener("input", onNameInput);
   playerNameInput.addEventListener("keydown", onNameInputKeyDown);
 
   function setSharedChampion(snapshot: SharedChampionSnapshot) {
@@ -501,6 +648,14 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
     show() {
       start.style.display = "grid";
     },
+    primeNameEntry(state) {
+      void revealNameEntryWhenReady(state.mode, {
+        prefillValue: state.playerName,
+      }).then((revealed) => {
+        if (!revealed || disposed || pendingMode !== state.mode) return;
+        setNameInputValidationState(state.validationReason);
+      });
+    },
     setBackgroundReady(ready) {
       const nextValue = ready ? "true" : "false";
       if (start.dataset.backgroundReady === nextValue) return;
@@ -520,12 +675,14 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       if (start.dataset.transitioning === nextValue) return;
       start.dataset.transitioning = nextValue;
     },
-    hydrateVisibleOverlayAssets() {
-      ensureVisibleOverlayAssetsHydrated();
+    prepareMainMenuSurface() {
+      return prepareMainMenuSurface();
     },
-    waitForVisibleOverlayAssets() {
-      ensureVisibleOverlayAssetsHydrated();
-      return waitForHydratedImages(visibleOverlayImages);
+    prepareNameEntrySurface() {
+      return prepareNameEntrySurface();
+    },
+    prepareInfoSurface() {
+      return prepareInfoSurface();
     },
     warmLazyAssets() {
       queueLazyAssetWarmup();
@@ -549,6 +706,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       multiPlayerBtn.removeEventListener("click", onSelectAgent);
       skillsMdBtn.removeEventListener("click", onOpenSkillsMd);
       enterAgentModeBtn.removeEventListener("click", onEnterAgentMode);
+      playerNameInput.removeEventListener("input", onNameInput);
       playerNameInput.removeEventListener("keydown", onNameInputKeyDown);
     },
     setMuteState(muted) {
@@ -574,6 +732,8 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
         bannerVisible: modeBanner.classList.contains("show"),
         backgroundReady: start.dataset.backgroundReady === "true",
         assetsReady: start.dataset.assetsReady === "true",
+        nameEntryReady: start.dataset.nameEntryReady === "true",
+        infoReady: start.dataset.infoReady === "true",
         transitioning: start.dataset.transitioning === "true",
       };
     },

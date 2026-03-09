@@ -25,7 +25,9 @@ pnpm dev
 ```bash
 pnpm typecheck
 pnpm test:server
+pnpm test:agent-export
 pnpm build
+pnpm export:agent-starter -- --out ../clawd-strike-agent-starter
 pnpm reconcile:shared-champion -- --help
 pnpm test:playwright
 pnpm qa:completion
@@ -76,9 +78,32 @@ Pull production envs locally, reconcile the schema/history against the unpooled 
 
 ```bash
 vercel env pull .env.production.local --environment=production
-pnpm reconcile:shared-champion -- --env-file .env.production.local
+pnpm reconcile:shared-champion -- --env-file .env.production.local --json
+pnpm validate:shared-champion-constraints -- --env-file .env.production.local
 BASE_URL="https://clawd-strike.vercel.app" STATS_ADMIN_TOKEN="your-token" pnpm stats:admin -- overview
 ```
+
+Recommended sequence:
+1. Run `pnpm reconcile:shared-champion -- --env-file .env.production.local --json`
+2. Confirm `invalidChampionRows`, `invalidRunTokenNames`, and `invalidRunRows` are all `0`
+3. Run `pnpm validate:shared-champion-constraints -- --env-file .env.production.local`
+4. Review the reported `sslmode before/after` values and stats overview
+
+## Agent Starter Export
+
+The public agent starter kit lives in a separate git repository. Export the managed public-safe artifacts into a sibling checkout:
+
+```bash
+pnpm export:agent-starter -- --out ../clawd-strike-agent-starter
+```
+
+Optional guard when the remote exists:
+
+```bash
+pnpm export:agent-starter -- --out ../clawd-strike-agent-starter --expect-origin https://github.com/dimitricritsinelis/clawd-strike-agent-starter
+```
+
+The exporter manages only generated starter files such as the mirrored `skills.md`, starter code, CI workflow, and manifest. Keep README, troubleshooting docs, and issue templates in the separate repo itself.
 
 ## Directory Map
 - `apps/client/src/runtime/`: gameplay runtime, simulation, rendering, HUD, weapons, bots

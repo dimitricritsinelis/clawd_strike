@@ -42,8 +42,10 @@ function parseRunStartBody(value: unknown): SharedChampionRunStartRequest | null
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (!isSharedChampionControlMode(record.controlMode)) return null;
+  const playerName = sanitizeSharedChampionName(record.playerName, record.controlMode);
+  if (playerName === null) return null;
   return {
-    playerName: sanitizeSharedChampionName(record.playerName, record.controlMode),
+    playerName,
     controlMode: record.controlMode,
     mapId: sanitizeSharedChampionMapId(record.mapId),
   };

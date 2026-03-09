@@ -1,7 +1,8 @@
+import { sanitizeValidatedPlayerName } from "../../../../shared/playerName";
+
 const DEFAULT_MAP_ID = "bazaar-map";
 const DEFAULT_PROP_PROFILE = "subtle";
 const DEFAULT_FLOOR_QUALITY = "1k";
-export const PLAYER_NAME_MAX_LENGTH = 15;
 
 export type RuntimeSpawnId = "A" | "B";
 export type RuntimeControlMode = "human" | "agent";
@@ -21,7 +22,7 @@ export type RuntimePropChaosOptions = {
 export type RuntimeUrlParams = {
   mapId: string;
   controlMode: RuntimeControlMode;
-  playerName: string;
+  playerName: string | null;
   shot: string | null;
   spawn: RuntimeSpawnId;
   debug: boolean;
@@ -148,13 +149,8 @@ function parseControlMode(modeValue: string | null, autostartValue: string | nul
 
 export function sanitizeRuntimePlayerName(
   value: string | null | undefined,
-  mode: RuntimeControlMode,
-): string {
-  const fallback = mode === "agent" ? "Agent" : "Operator";
-  if (!value) return fallback;
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return fallback;
-  return trimmed.slice(0, PLAYER_NAME_MAX_LENGTH);
+): string | null {
+  return sanitizeValidatedPlayerName(value);
 }
 
 export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
@@ -190,7 +186,7 @@ export function parseRuntimeUrlParams(search: string): RuntimeUrlParams {
 
   const mapId = rawMapId && rawMapId.trim().length > 0 ? rawMapId.trim() : DEFAULT_MAP_ID;
   const controlMode = parseControlMode(rawControlMode, rawAutostart);
-  const playerName = sanitizeRuntimePlayerName(rawPlayerName, controlMode);
+  const playerName = sanitizeRuntimePlayerName(rawPlayerName);
   const shot = rawShot && rawShot.trim().length > 0 ? rawShot.trim() : null;
   const spawn = rawSpawn?.trim().toUpperCase() === "B" ? "B" : "A";
   const debug = parseBooleanFlag(rawDebug);

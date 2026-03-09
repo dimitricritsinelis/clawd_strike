@@ -6,6 +6,8 @@ import {
 } from "../scripts/lib/runtimePlaywright.mjs";
 
 const STATS_ADMIN_TOKEN = process.env.STATS_ADMIN_TOKEN ?? "clawd-strike-dev-stats-admin-token";
+const SHARED_CHAMPION_ADMIN_TOKEN = process.env.SHARED_CHAMPION_ADMIN_TOKEN
+  ?? "clawd-strike-playwright-shared-champion-admin-token";
 
 function formatScore(score: number): string {
   return score.toLocaleString("en-US");
@@ -206,6 +208,39 @@ async function getSessionToken(request: APIRequestContext, baseUrl: string): Pro
   return data.token as string;
 }
 
+async function postDirectChampionWrite(
+  request: APIRequestContext,
+  baseUrl: string,
+  body: {
+    playerName: string;
+    score: number;
+    controlMode: "human" | "agent";
+    telemetry?: ReturnType<typeof buildTelemetryForScore>;
+    sessionToken?: string;
+  },
+) {
+  const response = await request.post(new URL("/api/high-score", baseUrl).toString(), {
+    failOnStatusCode: false,
+    headers: {
+      ...originHeaders(baseUrl),
+      "content-type": "application/json",
+      "x-shared-champion-admin-token": SHARED_CHAMPION_ADMIN_TOKEN,
+    },
+    data: {
+      playerName: body.playerName,
+      score: body.score,
+      controlMode: body.controlMode,
+      telemetry: body.telemetry ?? buildTelemetryForScore(body.score),
+      sessionToken: body.sessionToken,
+    },
+  });
+
+  return {
+    response,
+    body: await response.json().catch(() => null),
+  };
+}
+
 async function startValidatedRun(
   request: APIRequestContext,
   baseUrl: string,
@@ -403,6 +438,49 @@ test("api blocks raw writes and only accepts validated run submissions", async (
   expect(await textPlainStart.json()).toEqual({
     error: "Expected application/json request body.",
   });
+});
+
+test("run-start and direct-write APIs reject missing, invalid, and blocked player names", async ({ request }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL as string;
+  const sessionToken = await getSessionToken(request, baseUrl);
+
+  for (const playerName of ["", "Bad<Name", "Sh1thead"]) {
+    const started = await startValidatedRun(request, baseUrl, {
+      playerName,
+      controlMode: "agent",
+    });
+    expect(started.response.status()).toBe(400);
+    expect(started.body).toEqual({
+      error: "Expected { playerName, controlMode, mapId }.",
+    });
+
+    const directWrite = await postDirectChampionWrite(request, baseUrl, {
+      playerName,
+      score: 25,
+      controlMode: "agent",
+      sessionToken,
+    });
+    expect(directWrite.response.status()).toBe(400);
+    expect(directWrite.body).toEqual({
+      error: "Expected { playerName, score, controlMode, telemetry, sessionToken }.",
+    });
+  }
+
+  const validStart = await startValidatedRun(request, baseUrl, {
+    playerName: "Valid-Agent",
+    controlMode: "agent",
+  });
+  expect(validStart.response.ok()).toBe(true);
+
+  const validDirectWrite = await postDirectChampionWrite(request, baseUrl, {
+    playerName: "ValidAgent",
+    score: 10,
+    controlMode: "agent",
+    sessionToken,
+  });
+  expect(validDirectWrite.response.ok()).toBe(true);
+  expect(validDirectWrite.body.updated).toEqual(expect.any(Boolean));
+  expect(validDirectWrite.body).toHaveProperty("champion");
 });
 
 test("validated run submissions keep strict overwrite rules", async ({ request }, testInfo) => {
@@ -952,4 +1030,44 @@ test("keeps the game bootable when the shared champion API is unavailable", asyn
   expect(state.sharedChampion).toBeNull();
   await expect(page.getByTestId("hud-world-champion-name")).toHaveText("Unavailable");
   await expect(page.getByTestId("hud-world-champion-mode")).toHaveText("OFFLINE");
+});
+
+test("treats malformed shared champion payloads as no champion instead of Unknown", async ({ page }, testInfo) => {
+  const baseUrl = testInfo.project.use.baseURL as string;
+
+  await page.route("**/api/high-score", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({
+        champion: {
+          holderName: "Bad<Name",
+          score: 77,
+          controlMode: "agent",
+          scope: "sitewide",
+          updatedAt: "2026-03-08T12:00:00.000Z",
+        },
+      }),
+    });
+  });
+
+  await page.goto(new URL("/", baseUrl).toString(), { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("loading-world-champion-name")).toHaveText("CLAIM THE CROWN");
+  await expect(page.getByTestId("loading-world-champion-score")).toHaveText("9999");
+
+  await gotoAgentRuntimeViaUi(page, {
+    baseUrl,
+    agentName: "NullChamp",
+  });
+
+  const state = await readDocumentedAgentState(page);
+  expect(state.runtimeReady).toBe(true);
+  expect(state.sharedChampion).toBeNull();
+  await expect(page.getByTestId("hud-world-champion-name")).toHaveText("No champion yet");
+  await expect(page.getByTestId("hud-world-champion-mode")).toHaveText("OPEN");
 });

@@ -1,5 +1,8 @@
 export type LoadingAmbientAudioOptions = {
-  src: string;
+  sources: Array<{
+    src: string;
+    type: string;
+  }>;
   gain: number;
   playFromSec: number;
   loopStartSec: number;
@@ -8,7 +11,16 @@ export type LoadingAmbientAudioOptions = {
 };
 
 const DEFAULT_OPTIONS: LoadingAmbientAudioOptions = {
-  src: "/loading-screen/assets/ClawdStriker_Audio_Loading_Trimmed.mp3",
+  sources: [
+    {
+      src: "/loading-screen/assets/loading-ambient.ogg",
+      type: "audio/ogg; codecs=opus",
+    },
+    {
+      src: "/loading-screen/assets/ClawdStriker_Audio_Loading_Trimmed.mp3",
+      type: "audio/mpeg",
+    },
+  ],
   gain: 0.45,
   playFromSec: 0,
   loopStartSec: 0,
@@ -24,10 +36,21 @@ export class LoadingAmbientAudio {
   private startedOnce = false;
   private pendingStartDelayId: ReturnType<typeof setTimeout> | null = null;
 
+  private pickSource(audio: HTMLAudioElement) {
+    for (const source of this.options.sources) {
+      const support = audio.canPlayType(source.type);
+      if (support === "probably" || support === "maybe") {
+        return source.src;
+      }
+    }
+    return this.options.sources[0]?.src ?? "";
+  }
+
   private getOrCreateAudio(): HTMLAudioElement {
     if (this.audio) return this.audio;
 
-    const audio = new Audio(this.options.src);
+    const audio = new Audio();
+    audio.src = this.pickSource(audio);
     audio.preload = "auto";
     audio.loop = !Number.isFinite(this.options.loopEndSec);
     audio.muted = this.muted;

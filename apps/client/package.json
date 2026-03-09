@@ -6,13 +6,16 @@
   "scripts": {
     "gen:maps": "node scripts/gen-map-runtime.mjs",
     "gen:layout-reference": "node scripts/gen-layout-reference.mjs",
+    "assets:loading-screen": "node scripts/optimize-loading-screen-assets.mjs",
     "review:shot-pair": "node scripts/review-shot-pair.mjs",
     "capture:shots": "node scripts/capture-map-shots.mjs",
     "bot:smoke": "node scripts/bot-intelligence-smoke.mjs",
     "smoke:headshot-kill-perf": "node scripts/headshot-kill-perf-smoke.mjs",
+    "smoke:loading-screen-perf": "node scripts/loading-screen-perf-smoke.mjs",
     "smoke:wave-ammo-reset": "node scripts/wave-ammo-reset-smoke.mjs",
     "smoke:no-context": "node scripts/no-context-agent-smoke.mjs",
     "verify:skills-contract": "node scripts/verify-skills-contract.mjs",
+    "verify:loading-screen-assets": "node scripts/verify-loading-screen-assets.mjs",
     "qa:completion": "node scripts/qa-completion-gate.mjs && node scripts/bot-intelligence-smoke.mjs",
     "smoke:agent": "node scripts/agent-smoke-runner.mjs",
     "qa:autonomous": "pnpm qa:completion",
@@ -33,8 +36,10 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@types/three": "^0.181.0",
+    "ffmpeg-static": "^5.3.0",
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0",
+    "sharp": "^0.34.5",
     "typescript": "^5.7.3",
     "vite": "^6.0.11"
   }

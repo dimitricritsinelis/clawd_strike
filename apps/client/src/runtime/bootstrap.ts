@@ -27,7 +27,7 @@ import { PauseMenu } from "./ui/PauseMenu";
 import { ControlsOverlay } from "./ui/ControlsOverlay";
 import { FadeOverlay } from "./ui/FadeOverlay";
 import { HeadshotBanner } from "./ui/HeadshotBanner";
-import { parseRuntimeUrlParams, sanitizeRuntimePlayerName, type RuntimeControlMode } from "./utils/UrlParams";
+import { parseRuntimeUrlParams, type RuntimeControlMode } from "./utils/UrlParams";
 import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
 import { BulletHoleManager } from "./effects/BulletHoleManager";
 import type { RuntimeWarmupAssets } from "./warmup";
@@ -47,6 +47,10 @@ import {
   type SharedChampionRunSummary,
   type SharedChampionSnapshot,
 } from "../../../shared/highScore";
+import {
+  PUBLIC_AGENT_API_VERSION,
+  PUBLIC_AGENT_CONTRACT,
+} from "../../../shared/publicAgentContract";
 
 type ViewModelInstance = InstanceType<typeof import("./weapons/Ak47ViewModel")["Ak47ViewModel"]>;
 
@@ -62,8 +66,6 @@ const PBR_WALLS_ENABLED = true;
 const MAP_PROPS_ENABLED = false;
 const DOOR_MODELS_ENABLED = true;
 const RUNTIME_TEXT_API_VERSION = 4;
-const PUBLIC_AGENT_API_VERSION = 1;
-const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
 const SCORE_STORAGE_PREFIX = "clawd-strike:score-best";
 const SCORE_RULESET_KEY = SHARED_CHAMPION_SCORE_RULESET;
 const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
@@ -725,10 +727,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const runtimeRoot = createRuntimeRoot(appRoot);
   const parsedUrlParams = parseRuntimeUrlParams(window.location.search);
   const controlMode = options.controlMode ?? parsedUrlParams.controlMode;
-  const playerName = sanitizeRuntimePlayerName(
-    options.playerName ?? parsedUrlParams.playerName,
-    controlMode,
-  );
+  const playerName = options.playerName ?? parsedUrlParams.playerName;
+  if (!playerName) {
+    throw new Error("Runtime requires a validated player name.");
+  }
   const runtimeParams = {
     ...parsedUrlParams,
     controlMode,

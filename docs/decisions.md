@@ -82,3 +82,14 @@ Last updated: 2026-03-08
 - Production deployments should set explicit `POSTGRES_WRITE_URL` and `POSTGRES_READ_URL` even though runtime alias fallback remains supported for compatibility.
 - Admin stats must fail closed in production when `STATS_ADMIN_TOKEN` is missing; the built-in fallback token is development-only.
 - Shared champion schema/history reconciliation runs through a dedicated operator command using an unpooled Postgres URL rather than relying on the first live request to bootstrap storage.
+
+## DEC-015: Public agent starter kit is a separate repo fed by one-way export
+- The public agent starter kit lives in a separate git repository with its own history, package metadata, README, issue templates, and CI.
+- The game repo remains authoritative for the live `/skills.md` contract, the public browser/runtime API, and the export logic that produces starter artifacts.
+- Export flow is one-way from the game repo into the starter repo. The game runtime must not import from the starter repo, and the starter repo must not become a workspace package, submodule, or subtree of the game repo.
+- The exporter manages only public-safe generated files such as the mirrored `skills.md`, starter helper code, CI workflow, and manifest/checksums. Human-facing repo docs and issue templates stay owned in the separate repo.
+
+## DEC-016: Shared champion Postgres URLs normalize legacy SSL modes to verify-full
+- Shared champion Postgres URLs may arrive from provider env vars with legacy `sslmode=prefer`, `sslmode=require`, or `sslmode=verify-ca`.
+- Repo runtime behavior should normalize those modes to `sslmode=verify-full` before handing the URL to `pg`, preserving the repo’s current strict certificate-validation intent while avoiding the current driver warning.
+- Production operators should validate shared-champion DB constraints through a dedicated command after reconcile reports a clean database, instead of relying on reconcile side effects.

@@ -45,6 +45,9 @@ function canUseSharedChampionNetwork(): boolean {
   if (typeof window === "undefined") {
     return true;
   }
+  if (import.meta.env.DEV) {
+    return true;
+  }
   return !LOCAL_PREVIEW_HOSTNAMES.has(window.location.hostname);
 }
 

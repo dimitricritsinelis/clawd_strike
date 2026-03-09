@@ -2,12 +2,15 @@ import {
   HIGH_SCORE_MAP_ID_MAX_LENGTH,
   SHARED_CHAMPION_SCORE_RULESET,
   SHARED_CHAMPION_WAVE_ENEMY_COUNT,
-  clampSharedChampionName,
   sanitizeSharedChampionMapId,
   type SharedChampionControlMode,
   type SharedChampionRunDeathCause,
   type SharedChampionRunSummary,
 } from "../apps/shared/highScore.js";
+import {
+  normalizeValidatedPlayerName,
+  parseStoredPlayerName,
+} from "../apps/shared/playerName.js";
 
 export const STATS_ADMIN_DEFAULT_LIMIT = 50;
 export const STATS_ADMIN_MAX_LIMIT = 200;
@@ -148,7 +151,7 @@ export type DerivedSharedChampionRunFields = {
 };
 
 export function normalizePlayerNameKey(value: string): string {
-  return clampSharedChampionName(value).trim().toLowerCase();
+  return normalizeValidatedPlayerName(value).toLowerCase();
 }
 
 export function resolveBuildId(): string | null {
@@ -181,7 +184,10 @@ export function deriveRunFields(input: {
   elapsedMs: number;
   buildId?: string | null;
 }): DerivedSharedChampionRunFields {
-  const normalizedPlayerName = clampSharedChampionName(input.playerName);
+  const normalizedPlayerName = parseStoredPlayerName(input.playerName);
+  if (normalizedPlayerName === null) {
+    throw new Error("Invalid stored player name.");
+  }
   const waveProgress = deriveWaveProgress(input.summary.kills);
   return {
     playerName: normalizedPlayerName,
@@ -261,8 +267,11 @@ function normalizeMapIdFilter(value: string | null): string | null {
 
 function normalizePlayerNameFilter(value: string | null): string | null {
   if (!value) return null;
-  const normalized = clampSharedChampionName(value);
-  return normalized.length > 0 ? normalized : null;
+  const normalized = parseStoredPlayerName(value);
+  if (normalized === null) {
+    throw new Error("playerName is invalid.");
+  }
+  return normalized;
 }
 
 export function parseStatsFilters(url: URL): ResolvedSharedChampionStatsFilters {
