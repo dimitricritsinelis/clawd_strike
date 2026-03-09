@@ -13,6 +13,7 @@ Original prompt: can we make the font on the champion icon bigger, while ensure 
 - `ui-flow`
 
 ## Current Status (<=10 lines)
+- Branch `codex/champion-badge-font` is pushed and PR `#10` is open against `main`.
 - Increased only the loading-screen shared-champion badge font-size variables in `apps/client/src/styles.css`; the badge field boxes, offsets, and placement were left unchanged.
 - Ready-state badge sizing now uses `clamp(13px, 1.18vw, 19px)` for the champion name and `clamp(15px, 1.34vw, 21px)` for the score.
 - Unavailable, loading, and empty badge states were raised proportionally so fallback typography still matches the same badge layout.
@@ -41,9 +42,9 @@ pnpm --filter @clawd-strike/client exec vite --host --port 4175
 - Validation: `pnpm typecheck`, `pnpm build`, `PW_PORT=4175 pnpm test:playwright`
 
 ## Next 3 Tasks
-1. If the badge needs more presence, continue adjusting only the shared-champion font variables before changing the field boxes.
-2. If requested, align the runtime HUD and death-screen champion typography with the loading-screen badge treatment.
-3. Keep an eye on very long champion names, since a larger font will truncate earlier by design inside the unchanged name slot.
+1. Wait for review on PR `#10`.
+2. If the badge needs more presence, continue adjusting only the shared-champion font variables before changing the field boxes.
+3. If requested, align the runtime HUD and death-screen champion typography with the loading-screen badge treatment.
 
 ## Known Issues / Risks
 - Longer champion names will hit ellipsis slightly sooner because the badge width and alignment were intentionally preserved.
