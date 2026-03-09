@@ -7,19 +7,17 @@ Last updated: 2026-03-09
 
 # progress.md — Clawd Strike Status
 
-Original prompt: i want you to do a full audit of everything that is being stored in the postgress DB, what tables, what do they do, what data they collect, and then lets export all of the current data into a excel spreadsheet, on my desktop. each table can be a sheet in the excel file
+Original prompt: PLEASE IMPLEMENT THIS PLAN: Reject Malformed Legacy Run Tokens
 
 ## Active Change Tag
-- `tooling`
+- `combat-gameplay`
 
 ## Current Status (<=10 lines)
-- Added a read-only Postgres audit exporter at `scripts/export-postgres-audit.ts` backed by `scripts/lib/postgresAuditExport.ts`.
-- The exporter discovers the live `public` schema from `information_schema`, uses the read-URL fallback chain, and avoids store paths that trigger schema maintenance.
-- Workbook output includes `audit_summary` plus one sheet per live base table/view, with `shared_champion_daily_rollups_v1` exported as `daily_rollups_v1` to satisfy Excel sheet-name limits.
-- `audit_summary` now captures relation purpose, collected fields, logical relationships, retention/cleanup notes, row counts, timestamp ranges, and live column schema text.
-- JSON/JSONB columns are exported as compact JSON text so JSON `null` remains distinguishable from SQL `NULL`; non-JSON SQL nulls export as blank cells.
-- Added `pnpm export:postgres-audit` and `pnpm test:postgres-audit`.
-- Validation on 2026-03-09: `pnpm test:postgres-audit`, `pnpm export:postgres-audit -- --env-file .env.production.local --out /Users/dimitri/Desktop/clawd-strike-postgres-audit-2026-03-08.xlsx`, workbook reopen + sheet/count verification, `pnpm typecheck`, `pnpm build`.
+- Hardened `POST /api/run/finish` so malformed legacy `shared_champion_run_tokens.player_name` rows are rejected deterministically instead of falling into the generic `500` catch path.
+- The finish handler now normalizes stored token names before validation/finalization; names that sanitize cleanly continue through the accepted path with canonicalized audit payloads.
+- Added server regression coverage for both branches: malformed legacy names now return `422` with `reason: "invalid-run-token-player-name"`, and whitespace-drift legacy names still finalize successfully after normalization.
+- Validation on 2026-03-09: `pnpm test:server`, `pnpm typecheck`, `pnpm build`, `pnpm --filter @clawd-strike/client exec playwright test playwright/shared-champion.spec.ts --grep "validated run submissions keep strict overwrite rules"`.
+- Additional runtime smoke on 2026-03-09: `develop-web-game` Playwright client against `http://127.0.0.1:4174/?map=bazaar-map`; screenshot rendered the loading screen correctly and `state-0.json` showed no boot failure.
 
 ## Canonical Playtest URL
 - `http://127.0.0.1:4174/?map=bazaar-map`
@@ -29,23 +27,23 @@ Original prompt: i want you to do a full audit of everything that is being store
 
 ## How to Run (real commands only)
 ```bash
-pnpm test:postgres-audit
-pnpm export:postgres-audit -- --env-file .env.production.local --out /Users/dimitri/Desktop/clawd-strike-postgres-audit-2026-03-08.xlsx
+pnpm test:server
 pnpm typecheck
 pnpm build
+pnpm --filter @clawd-strike/client exec playwright test playwright/shared-champion.spec.ts --grep "validated run submissions keep strict overwrite rules"
 ```
 
 ## Last Completed Prompt
-- Title: Audit live Postgres storage and export the current data to Excel
-- Changed: added a read-only Postgres audit/export CLI, workbook generation helper, focused export tests, and produced `/Users/dimitri/Desktop/clawd-strike-postgres-audit-2026-03-08.xlsx`.
-- Files: `package.json`, `pnpm-lock.yaml`, `scripts/export-postgres-audit.ts`, `scripts/export-postgres-audit.test.ts`, `scripts/lib/postgresAuditExport.ts`
-- Validation: see the Current Status validation line above.
+- Title: Reject malformed legacy run-token names without returning 500
+- Changed: normalized consumed token names in `handleSharedChampionRunFinishRequest`, rejected invalid stored token names with `422 invalid-run-token-player-name`, and added request-level server regressions for reject/normalize paths.
+- Files: `server/highScoreRunApi.ts`, `server/highScoreStoreImpl.test.ts`, `progress.md`
+- Validation: see the Current Status validation lines above.
 
 ## Next 3 Tasks
-1. If this workbook format is useful, add a companion CSV/JSON export mode for downstream analysis without Excel.
-2. Decide whether to add a second audit sheet for indexes/constraints if operators want more schema-level detail in the workbook itself.
-3. If this becomes a recurring operator task, consider wrapping the export command in an automation or admin helper flow.
+1. Run `pnpm reconcile:shared-champion -- --env-file .env.production.local --json` against production and confirm `invalidRunTokenNames` is `0` so no legacy malformed token rows remain live.
+2. If production still contains invalid token rows, repair or expire those rows before validating the name constraints, then rerun the reconcile and constraint commands.
+3. Consider adding a production-only operator check or alert for non-zero `invalidRunTokenNames` so this class of legacy data issue is caught before it reaches player traffic.
 
 ## Known Issues / Risks
-- The exporter intentionally includes raw stored fingerprint hashes and audit payload JSON because the request was for a full storage audit; handle the workbook as sensitive internal data.
-- Root `pnpm typecheck` still does not typecheck `scripts/**/*.ts`; the focused export test covers the new helper logic, but script-level TS compile enforcement remains a separate tooling follow-up.
+- This patch hardens request handling only; it does not clean malformed historical DB rows automatically.
+- The repo still has unrelated uncommitted tooling/docs changes from the prior Vercel-domain task; they were left untouched by this gameplay fix.

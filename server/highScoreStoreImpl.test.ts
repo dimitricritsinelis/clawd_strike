@@ -3,6 +3,7 @@ import test from "node:test";
 import { Pool, type PoolClient } from "pg";
 
 import { authorizeStatsAdminRequest } from "./highScoreSecurity.js";
+import { handleSharedChampionRunFinishRequest } from "./highScoreRunApi.js";
 import {
   createSharedChampion,
   parseSharedChampion,
@@ -12,14 +13,92 @@ import {
   parseStatsFilters,
 } from "./highScoreStats.js";
 import {
+  createInMemorySharedChampionStore,
   planSharedChampionAcceptedRunBackfill,
   normalizePgConnectionString,
   resolvePgConnectionSelection,
   resolvePgConnectionString,
   resolveSharedChampionReconcileConnectionString,
   runSharedChampionSchemaMaintenance,
+  type SharedChampionAuditEvent,
+  type SharedChampionStore,
   validateSharedChampionConstraints,
 } from "./highScoreStoreImpl.js";
+
+function createValidRunFinishSummary() {
+  return {
+    survivalTimeS: 1,
+    kills: 1,
+    headshots: 0,
+    headshotsPerWave: [0],
+    shotsFired: 1,
+    shotsHit: 1,
+    accuracy: 100,
+    finalScore: 5,
+    deathCause: "enemy-fire" as const,
+  };
+}
+
+function createRunFinishRequest(input: {
+  runToken?: string;
+  summary?: unknown;
+} = {}): Request {
+  return new Request("https://example.test/api/run/finish", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      origin: "https://example.test",
+      "user-agent": "shared-champion-test-agent",
+    },
+    body: JSON.stringify({
+      runToken: input.runToken ?? "test-run-token",
+      summary: input.summary ?? createValidRunFinishSummary(),
+    }),
+  });
+}
+
+function createSharedChampionStoreStub(
+  overrides: Partial<SharedChampionStore> = {},
+): SharedChampionStore {
+  return {
+    async getChampion() {
+      return null;
+    },
+    async submitCandidate() {
+      throw new Error("unused");
+    },
+    async isRateLimited() {
+      return false;
+    },
+    async logSubmission() {},
+    async issueRunToken() {
+      throw new Error("unused");
+    },
+    async consumeRunToken() {
+      return {
+        status: "missing" as const,
+        record: null,
+      };
+    },
+    async finalizeValidatedRun() {
+      throw new Error("unused");
+    },
+    async recordAuditEvent() {},
+    async getStatsOverview() {
+      throw new Error("unused");
+    },
+    async listRuns() {
+      throw new Error("unused");
+    },
+    async listNames() {
+      throw new Error("unused");
+    },
+    async listDaily() {
+      throw new Error("unused");
+    },
+    ...overrides,
+  };
+}
 
 test("prefers explicit write and read overrides when they are configured", () => {
   const env = {
@@ -308,6 +387,122 @@ test("deriveRunFields rejects malformed stored player names", () => {
     }),
     /Invalid stored player name/,
   );
+});
+
+test("run finish rejects malformed legacy token names instead of returning 500", async () => {
+  const champion = createSharedChampion({
+    holderName: "Clean Champ",
+    score: 77,
+    controlMode: "agent",
+    updatedAt: "2026-03-08T12:00:00.000Z",
+  });
+  const auditEvents: SharedChampionAuditEvent[] = [];
+  let finalizeCalls = 0;
+  const store = createSharedChampionStoreStub({
+    async getChampion() {
+      return champion;
+    },
+    async consumeRunToken() {
+      return {
+        status: "consumed" as const,
+        record: {
+          runId: "legacy-run",
+          playerName: "Bad<Name",
+          controlMode: "human" as const,
+          mapId: "bazaar-map",
+          issuedAt: "2026-03-08T00:00:00.000Z",
+          expiresAt: "2026-03-08T00:30:00.000Z",
+          claimedAt: "2026-03-08T00:00:01.000Z",
+        },
+      };
+    },
+    async finalizeValidatedRun() {
+      finalizeCalls += 1;
+      throw new Error("finalizeValidatedRun should not be called for malformed legacy names");
+    },
+    async recordAuditEvent(event) {
+      auditEvents.push(event);
+    },
+  });
+
+  const response = await handleSharedChampionRunFinishRequest(createRunFinishRequest(), store);
+  assert.equal(response.status, 422);
+  assert.deepEqual(await response.json(), {
+    accepted: false,
+    updated: false,
+    champion,
+    reason: "invalid-run-token-player-name",
+  });
+  assert.equal(finalizeCalls, 0);
+  assert.equal(auditEvents.length, 1);
+  assert.equal(auditEvents[0]?.eventType, "run-finish");
+  assert.equal(auditEvents[0]?.outcome, "rejected");
+  assert.equal(auditEvents[0]?.runId, "legacy-run");
+  assert.equal(auditEvents[0]?.reason, "invalid-run-token-player-name");
+  assert.deepEqual(auditEvents[0]?.payload, {
+    mapId: "bazaar-map",
+    playerName: "Bad<Name",
+    controlMode: "human",
+  });
+  assert.match(auditEvents[0]?.ipFingerprint ?? "", /^[0-9a-f]{64}$/);
+  assert.match(auditEvents[0]?.userAgentFingerprint ?? "", /^[0-9a-f]{64}$/);
+});
+
+test("run finish normalizes valid legacy token names before finalizing", async () => {
+  const finalizeStore = createInMemorySharedChampionStore();
+  const auditEvents: SharedChampionAuditEvent[] = [];
+  const finalizeInputs: Array<Parameters<SharedChampionStore["finalizeValidatedRun"]>[0]> = [];
+  const store = createSharedChampionStoreStub({
+    async consumeRunToken() {
+      return {
+        status: "consumed" as const,
+        record: {
+          runId: "normalized-run",
+          playerName: "  Legacy   Name  ",
+          controlMode: "agent" as const,
+          mapId: "bazaar-map",
+          issuedAt: "2026-03-08T00:00:00.000Z",
+          expiresAt: "2026-03-08T00:30:00.000Z",
+          claimedAt: "2026-03-08T00:00:01.000Z",
+        },
+      };
+    },
+    async finalizeValidatedRun(input) {
+      finalizeInputs.push(input);
+      return finalizeStore.finalizeValidatedRun(input);
+    },
+    async recordAuditEvent(event) {
+      auditEvents.push(event);
+    },
+  });
+
+  const response = await handleSharedChampionRunFinishRequest(createRunFinishRequest(), store);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    accepted: true,
+    updated: true,
+    champion: createSharedChampion({
+      holderName: "Legacy Name",
+      score: 5,
+      controlMode: "agent",
+      updatedAt: "2026-03-08T00:00:01.000Z",
+    }),
+    reason: null,
+  });
+  assert.equal(finalizeInputs.length, 1);
+  assert.equal(finalizeInputs[0]?.tokenRecord.playerName, "Legacy Name");
+  assert.equal(auditEvents.length, 1);
+  assert.equal(auditEvents[0]?.outcome, "accepted");
+  assert.deepEqual(auditEvents[0]?.payload, {
+    playerName: "Legacy Name",
+    controlMode: "agent",
+    mapId: "bazaar-map",
+    elapsedMs: 1000,
+    score: 5,
+    updated: true,
+    runId: "normalized-run",
+    summary: createValidRunFinishSummary(),
+  });
 });
 
 test("backfill planning is conservative and idempotent", () => {
