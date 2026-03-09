@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { Pool, type PoolClient } from "pg";
 
 import { authorizeStatsAdminRequest } from "./highScoreSecurity.js";
@@ -99,6 +102,27 @@ function createSharedChampionStoreStub(
     ...overrides,
   };
 }
+
+test("shared server modules use explicit .js suffixes for relative imports", () => {
+  const sharedDir = fileURLToPath(new URL("../apps/shared/", import.meta.url));
+  const sourceFiles = readdirSync(sharedDir)
+    .filter((entry) => entry.endsWith(".ts"))
+    .sort();
+  const missingJsSuffixes: string[] = [];
+  const importSpecifierPattern = /(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?["'](\.{1,2}\/[^"']+)["']/g;
+
+  for (const sourceFile of sourceFiles) {
+    const sourcePath = path.join(sharedDir, sourceFile);
+    const sourceText = readFileSync(sourcePath, "utf8");
+    for (const match of sourceText.matchAll(importSpecifierPattern)) {
+      const specifier = match[1];
+      if (!specifier || specifier.endsWith(".js")) continue;
+      missingJsSuffixes.push(`${sourceFile}: ${specifier}`);
+    }
+  }
+
+  assert.deepEqual(missingJsSuffixes, []);
+});
 
 test("prefers explicit write and read overrides when they are configured", () => {
   const env = {

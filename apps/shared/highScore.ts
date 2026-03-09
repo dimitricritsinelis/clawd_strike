@@ -3,7 +3,7 @@ import {
   normalizeValidatedPlayerName,
   parseStoredPlayerName,
   sanitizeValidatedPlayerName,
-} from "./playerName";
+} from "./playerName.js";
 
 export const HIGH_SCORE_PLAYER_NAME_MAX_LENGTH = PLAYER_NAME_MAX_LENGTH;
 export const HIGH_SCORE_MAP_ID_MAX_LENGTH = 64;

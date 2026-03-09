@@ -1,4 +1,4 @@
-import { PLAYER_NAME_MAX_LENGTH } from "./playerName";
+import { PLAYER_NAME_MAX_LENGTH } from "./playerName.js";
 
 export const PUBLIC_AGENT_API_VERSION = 1;
 export const PUBLIC_AGENT_CONTRACT = "public-agent-v1";
