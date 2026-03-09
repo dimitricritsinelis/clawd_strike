@@ -306,10 +306,36 @@ export async function handleSharedChampionRunFinishRequest(
       return buildRejectedFinishResponse(store, status, consumed.status);
     }
 
-    const claimedAtMs = consumed.record.claimedAt
-      ? Date.parse(consumed.record.claimedAt)
+    const normalizedTokenPlayerName = sanitizeSharedChampionName(
+      consumed.record.playerName,
+      consumed.record.controlMode,
+    );
+    if (normalizedTokenPlayerName === null) {
+      await recordAuditEvent(store, {
+        eventType: "run-finish",
+        outcome: "rejected",
+        runId: consumed.record.runId,
+        ipFingerprint: writeCheck.clientIpFingerprint,
+        userAgentFingerprint: writeCheck.userAgentFingerprint,
+        reason: "invalid-run-token-player-name",
+        payload: {
+          mapId: consumed.record.mapId,
+          playerName: consumed.record.playerName,
+          controlMode: consumed.record.controlMode,
+        },
+      });
+      return buildRejectedFinishResponse(store, 422, "invalid-run-token-player-name");
+    }
+
+    const tokenRecord = {
+      ...consumed.record,
+      playerName: normalizedTokenPlayerName,
+    };
+
+    const claimedAtMs = tokenRecord.claimedAt
+      ? Date.parse(tokenRecord.claimedAt)
       : Date.now();
-    const issuedAtMs = Date.parse(consumed.record.issuedAt);
+    const issuedAtMs = Date.parse(tokenRecord.issuedAt);
     const elapsedMs = Math.max(0, claimedAtMs - issuedAtMs);
     const validation = validateSharedChampionRunSummary(parsedBody.summary, elapsedMs);
 
@@ -317,14 +343,14 @@ export async function handleSharedChampionRunFinishRequest(
       await recordAuditEvent(store, {
         eventType: "run-finish",
         outcome: "rejected",
-        runId: consumed.record.runId,
+        runId: tokenRecord.runId,
         ipFingerprint: writeCheck.clientIpFingerprint,
         userAgentFingerprint: writeCheck.userAgentFingerprint,
         reason: validation.reason,
         payload: {
-          mapId: consumed.record.mapId,
-          playerName: consumed.record.playerName,
-          controlMode: consumed.record.controlMode,
+          mapId: tokenRecord.mapId,
+          playerName: tokenRecord.playerName,
+          controlMode: tokenRecord.controlMode,
           elapsedMs: validation.elapsedMs,
           maxKills: validation.maxKills,
           maxShotsFired: validation.maxShotsFired,
@@ -335,7 +361,7 @@ export async function handleSharedChampionRunFinishRequest(
     }
 
     const result = await store.finalizeValidatedRun({
-      tokenRecord: consumed.record,
+      tokenRecord,
       summary: parsedBody.summary,
       elapsedMs: validation.elapsedMs,
       score: validation.computedScore,
@@ -346,13 +372,13 @@ export async function handleSharedChampionRunFinishRequest(
     await recordAuditEvent(store, {
       eventType: "run-finish",
       outcome: "accepted",
-      runId: consumed.record.runId,
+      runId: tokenRecord.runId,
       ipFingerprint: writeCheck.clientIpFingerprint,
       userAgentFingerprint: writeCheck.userAgentFingerprint,
       payload: {
-        playerName: consumed.record.playerName,
-        controlMode: consumed.record.controlMode,
-        mapId: consumed.record.mapId,
+        playerName: tokenRecord.playerName,
+        controlMode: tokenRecord.controlMode,
+        mapId: tokenRecord.mapId,
         elapsedMs: validation.elapsedMs,
         score: validation.computedScore,
         updated: result.updated,
