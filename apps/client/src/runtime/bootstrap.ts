@@ -31,6 +31,7 @@ import { parseRuntimeUrlParams, type RuntimeControlMode } from "./utils/UrlParam
 import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
 import { BulletHoleManager } from "./effects/BulletHoleManager";
 import type { RuntimeWarmupAssets } from "./warmup";
+import { isLocalhostHostname } from "../shared/hostEnvironment";
 import {
   getSharedChampionSnapshot,
   loadSharedChampion,
@@ -68,7 +69,6 @@ const DOOR_MODELS_ENABLED = true;
 const RUNTIME_TEXT_API_VERSION = 4;
 const SCORE_STORAGE_PREFIX = "clawd-strike:score-best";
 const SCORE_RULESET_KEY = SHARED_CHAMPION_SCORE_RULESET;
-const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const AGENT_VISIBLE_RENDER_INTERVAL_MS = 1000 / 30;
 const AGENT_BACKGROUND_STEP_INTERVAL_MS = 500;
 const TEXTURE_STABLE_WINDOW_MS = 500;
@@ -736,6 +736,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     controlMode,
     playerName,
   };
+  const isLocalHostRuntime = isLocalhostHostname(window.location.hostname);
+  const isLocalHumanRuntime = isLocalHostRuntime && runtimeParams.controlMode === "human";
   const warmupAssets = options.warmup ?? null;
   const warmupTimedOut = warmupAssets?.timedOut === true;
   const performanceSafeFallback = warmupTimedOut;
@@ -768,6 +770,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, runtimeParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
+  ammoHud.setGodModeEnabled(isLocalHumanRuntime);
   const healthHud = new HealthHud(runtimeRoot);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
@@ -1090,7 +1093,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         }
       }
     },
-    unlimitedHealth: runtimeParams.unlimitedHealth,
+    ...(isLocalHumanRuntime ? { playerRunSpeedMps: 9 } : {}),
+    unlimitedHealth: isLocalHumanRuntime,
     ...(runtimeParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
   });
 
@@ -1403,7 +1407,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let wasAlive = !game.getIsDead();
   beginSharedChampionRun();
   const pendingAgentActions: AgentAction[] = [];
-  const isInternalDebugSurface = import.meta.env.DEV || INTERNAL_DEBUG_HOSTNAMES.has(window.location.hostname);
+  const isInternalDebugSurface = import.meta.env.DEV || isLocalHostRuntime;
   const applyQueuedAgentActions = (): void => {
     if (pendingAgentActions.length === 0) return;
     if (runtimeParams.controlMode === "agent") {

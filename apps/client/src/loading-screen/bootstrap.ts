@@ -12,6 +12,7 @@ import {
   PUBLIC_AGENT_API_VERSION,
   PUBLIC_AGENT_CONTRACT,
 } from "../../../shared/publicAgentContract";
+import { isLocalhostHostname } from "../shared/hostEnvironment";
 
 export type BootstrapLoadingScreenOptions = {
   handoff?: LoadingScreenHandoff;
@@ -34,13 +35,12 @@ const DEFAULT_AUDIO: LoadingAmbientAudioOptions = {
   startDelayMs: 0,
 };
 
-const INTERNAL_DEBUG_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const OVERLAY_LOADING_BANNER = "Loading menu art...";
 const OVERLAY_FAILURE_BANNER = "Menu art unavailable";
 
 export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = {}): LoadingScreenHandle {
   const isVirtualTime = typeof window.__vt_pending !== "undefined";
-  const isInternalDebugSurface = import.meta.env.DEV || INTERNAL_DEBUG_HOSTNAMES.has(window.location.hostname);
+  const isInternalDebugSurface = import.meta.env.DEV || isLocalhostHostname(window.location.hostname);
 
   const loadingAmbient = new LoadingAmbientAudio({ ...DEFAULT_AUDIO, ...(options.audio ?? {}) });
   let disposed = false;

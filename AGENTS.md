@@ -72,7 +72,9 @@ Relevant authority: <owning spec or contract>
 ```
 
 ## Completion
-- End every task with `pnpm typecheck`, `pnpm build`, targeted validation, and STM updates at claim/progress/status/finish.
+- Default dev iteration should use `pnpm dev` and fast local checks; use `pnpm typecheck`, `pnpm build`, and full validation on finish/release checkpoints.
+- Targeted validation commands should be selected based on the primary change tag and run before task completion.
+- Keep STM updates at claim/progress/status/finish.
 - Keep the STM snapshot compact and current; collapse finished work into one-line rollups.
 - Keep `docs/decisions.md` short and durable; add entries only for lasting behavior changes.
 - Keep internal agent tooling separate from the repo root authority surface and from public `apps/client/public/skills.md`.

@@ -11,10 +11,9 @@ import {
   type SharedChampionSnapshot,
   type SharedChampionSnapshotStatus,
 } from "../../../shared/highScore";
+import { isLocalhostHostname } from "./hostEnvironment";
 
 const SHARED_CHAMPION_ENDPOINT = SHARED_CHAMPION_SCORE_WRITE_ENDPOINT;
-const LOCAL_PREVIEW_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
-
 export type SharedChampionRunSession = {
   runToken: string;
   issuedAt: string;
@@ -48,7 +47,7 @@ function canUseSharedChampionNetwork(): boolean {
   if (import.meta.env.DEV) {
     return true;
   }
-  return !LOCAL_PREVIEW_HOSTNAMES.has(window.location.hostname);
+  return !isLocalhostHostname(window.location.hostname);
 }
 
 export async function loadSharedChampionWithMeta(options: { force?: boolean } = {}): Promise<LoadSharedChampionResult> {

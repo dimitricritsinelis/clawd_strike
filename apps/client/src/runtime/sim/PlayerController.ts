@@ -12,11 +12,12 @@ export const PLAYER_WIDTH_M = 0.6;
 export const PLAYER_HEIGHT_M = 1.8;
 export const PLAYER_EYE_HEIGHT_M = 1.7;
 export const RUN_SPEED_MPS = 6.0;
-export const CROUCH_HEIGHT_M = 1.2;
-export const CROUCH_EYE_HEIGHT_M = 1.1;
-export const CROUCH_SPEED_MPS = 2.0;
+export const CROUCH_HEIGHT_M = 1.4;
+export const CROUCH_EYE_HEIGHT_M = 1.3;
+export const CROUCH_SPEED_MPS = 3.0;
 export const GRAVITY_MPS2 = 20.0;
 export const JUMP_VELOCITY_MPS = 6.35;
+const MIN_RUN_SPEED_MPS = 0;
 
 /** Coyote time: player can still jump for this many seconds after walking off a ledge. */
 const COYOTE_TIME_S = 0.1;
@@ -41,6 +42,14 @@ export class PlayerController {
   private horizontalSpeedMps = 0;
   private currentHeight = PLAYER_HEIGHT_M;
   private currentEyeHeight = PLAYER_EYE_HEIGHT_M;
+  private readonly runSpeedMps: number;
+
+  constructor(runSpeedOverrideMps = RUN_SPEED_MPS) {
+    const normalizedRunSpeed = Number.isFinite(runSpeedOverrideMps)
+      ? Math.max(MIN_RUN_SPEED_MPS, runSpeedOverrideMps)
+      : RUN_SPEED_MPS;
+    this.runSpeedMps = normalizedRunSpeed;
+  }
   /** Coyote timer: counts down from COYOTE_TIME_S when the player leaves the ground. */
   private coyoteTimerS = 0;
   /** Jump buffer timer: set to JUMP_BUFFER_S on input; executes jump when grounded. */
@@ -99,7 +108,7 @@ export class PlayerController {
         right *= invLength;
       }
 
-      const speedMps = input.crouchHeld ? CROUCH_SPEED_MPS : RUN_SPEED_MPS;
+      const speedMps = input.crouchHeld ? CROUCH_SPEED_MPS : this.runSpeedMps;
       const sinYaw = Math.sin(yaw);
       const cosYaw = Math.cos(yaw);
       const forwardX = -sinYaw;

@@ -38,6 +38,7 @@ const DEFAULT_FOV = 75;
 const LOOK_SENSITIVITY = 0.002;
 const MIN_PITCH = -(Math.PI / 2) + 0.001;
 const MAX_PITCH = (Math.PI / 2) - 0.001;
+const EYE_HEIGHT_LERP_RATE = 17.1;
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
 const AGENT_LOOK_ACCUM_LIMIT_DEG = 540;
@@ -100,6 +101,7 @@ type GameOptions = {
   };
   onWeaponShot?: (shot: WeaponShotPayload) => void;
   unlimitedHealth?: boolean;
+  playerRunSpeedMps?: number;
 };
 
 type SpawnPose = {
@@ -118,7 +120,7 @@ export class Game {
   private readonly pressedKeys = new Set<string>();
   private readonly lookDirection = new Vector3();
   private readonly cameraForward = new Vector3();
-  private readonly playerController = new PlayerController();
+  private readonly playerController: PlayerController;
   private weapon = new Ak47Weapon({ seed: 1 });
   private readonly tickIntent: TickIntent = {
     moveX: 0,
@@ -330,6 +332,7 @@ export class Game {
     this.onTogglePerfHud = options.onTogglePerfHud ?? null;
     this.onWeaponShot = options.onWeaponShot ?? null;
     this.unlimitedHealth = options.unlimitedHealth ?? false;
+    this.playerController = new PlayerController(options.playerRunSpeedMps);
 
     this.setupLighting();
     this.setupInitialView();
@@ -1032,9 +1035,8 @@ export class Game {
   private updateCameraFromPlayer(deltaSeconds = 1.0): void {
     const position = this.playerController.getPosition();
     const targetEyeHeight = this.playerController.getCurrentEyeHeight();
-    const lerpRate = 10.0;
     this.smoothedEyeHeight += (targetEyeHeight - this.smoothedEyeHeight) *
-      Math.min(1, deltaSeconds * lerpRate);
+      Math.min(1, deltaSeconds * EYE_HEIGHT_LERP_RATE);
     this.camera.position.set(position.x, position.y + this.smoothedEyeHeight, position.z);
     this.applyAnglesToCamera();
   }
