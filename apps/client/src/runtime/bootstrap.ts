@@ -738,6 +738,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   };
   const isLocalHostRuntime = isLocalhostHostname(window.location.hostname);
   const isLocalHumanRuntime = isLocalHostRuntime && runtimeParams.controlMode === "human";
+  const effectiveUnlimitedHealth =
+    isLocalHostRuntime && (isLocalHumanRuntime || runtimeParams.unlimitedHealth);
   const warmupAssets = options.warmup ?? null;
   const warmupTimedOut = warmupAssets?.timedOut === true;
   const performanceSafeFallback = warmupTimedOut;
@@ -770,7 +772,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, runtimeParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
-  ammoHud.setGodModeEnabled(isLocalHumanRuntime);
+  ammoHud.setGodModeEnabled(effectiveUnlimitedHealth);
   const healthHud = new HealthHud(runtimeRoot);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
@@ -1094,7 +1096,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       }
     },
     ...(isLocalHumanRuntime ? { playerRunSpeedMps: 9 } : {}),
-    unlimitedHealth: isLocalHumanRuntime,
+    unlimitedHealth: effectiveUnlimitedHealth,
     ...(runtimeParams.debug ? { onTogglePerfHud: () => perfHud.toggle() } : {}),
   });
 
