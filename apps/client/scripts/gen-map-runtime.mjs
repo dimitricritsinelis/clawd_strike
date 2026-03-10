@@ -344,6 +344,98 @@ function deriveBlockoutSpec(spec, zones) {
           });
         })()
       : [];
+  const windowLayoutOverrides =
+    wallDetailsRaw && typeof wallDetailsRaw.window_layout_overrides !== "undefined"
+      ? (() => {
+          if (!Array.isArray(wallDetailsRaw.window_layout_overrides)) {
+            fail("wall_details.window_layout_overrides must be an array when provided");
+          }
+
+          return wallDetailsRaw.window_layout_overrides.map((override, index) => {
+            if (!override || typeof override !== "object") {
+              fail(`wall_details.window_layout_overrides[${index}] must be an object`);
+            }
+
+            const zoneId = ensureString(override.zoneId, `wall_details.window_layout_overrides[${index}].zoneId`);
+            if (!zones.some((zone) => zone.id === zoneId)) {
+              fail(`wall_details.window_layout_overrides[${index}].zoneId '${zoneId}' does not match a known zone`);
+            }
+
+            const face = ensureString(override.face, `wall_details.window_layout_overrides[${index}].face`);
+            if (!["north", "south", "east", "west"].includes(face)) {
+              fail(`wall_details.window_layout_overrides[${index}].face must be one of north/south/east/west`);
+            }
+
+            const segmentOrdinal = asNumber(
+              override.segmentOrdinal,
+              `wall_details.window_layout_overrides[${index}].segmentOrdinal`,
+            );
+            if (!Number.isInteger(segmentOrdinal) || segmentOrdinal <= 0) {
+              fail(`wall_details.window_layout_overrides[${index}].segmentOrdinal must be an integer > 0`);
+            }
+
+            if (!Array.isArray(override.windows) || override.windows.length === 0) {
+              fail(`wall_details.window_layout_overrides[${index}].windows must be a non-empty array`);
+            }
+
+            const windows = override.windows.map((window, windowIndex) => {
+              if (!window || typeof window !== "object") {
+                fail(`wall_details.window_layout_overrides[${index}].windows[${windowIndex}] must be an object`);
+              }
+
+              const headShape = ensureString(
+                window.headShape,
+                `wall_details.window_layout_overrides[${index}].windows[${windowIndex}].headShape`,
+              );
+              if (!["rect", "pointed_arch"].includes(headShape)) {
+                fail(`wall_details.window_layout_overrides[${index}].windows[${windowIndex}].headShape is not supported`);
+              }
+
+              const glassStyle = ensureString(
+                window.glassStyle,
+                `wall_details.window_layout_overrides[${index}].windows[${windowIndex}].glassStyle`,
+              );
+              if (!["stained_glass_bright", "stained_glass_dim"].includes(glassStyle)) {
+                fail(`wall_details.window_layout_overrides[${index}].windows[${windowIndex}].glassStyle is not supported`);
+              }
+
+              const width = asNumber(
+                window.width,
+                `wall_details.window_layout_overrides[${index}].windows[${windowIndex}].width`,
+              );
+              const height = asNumber(
+                window.height,
+                `wall_details.window_layout_overrides[${index}].windows[${windowIndex}].height`,
+              );
+              if (width <= 0 || height <= 0) {
+                fail(`wall_details.window_layout_overrides[${index}].windows[${windowIndex}] dimensions must be > 0`);
+              }
+
+              return {
+                centerS: asNumber(
+                  window.centerS,
+                  `wall_details.window_layout_overrides[${index}].windows[${windowIndex}].centerS`,
+                ),
+                sillY: asNumber(
+                  window.sillY,
+                  `wall_details.window_layout_overrides[${index}].windows[${windowIndex}].sillY`,
+                ),
+                width,
+                height,
+                headShape,
+                glassStyle,
+              };
+            });
+
+            return {
+              zoneId,
+              face,
+              segmentOrdinal,
+              windows,
+            };
+          });
+        })()
+      : [];
 
   return {
     mapId: MAP_ID,
@@ -360,6 +452,7 @@ function deriveBlockoutSpec(spec, zones) {
       density: Math.max(0, Math.min(1.25, wallDetailDensity)),
       maxProtrusion: Math.max(0.02, Math.min(0.2, wallDetailMaxProtrusion)),
       facade_overrides: facadeOverrides,
+      window_layout_overrides: windowLayoutOverrides,
       ...(typeof wallDetailSeed === "number" ? { seed: Math.trunc(wallDetailSeed) } : {}),
     },
     zones,

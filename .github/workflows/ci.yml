@@ -26,6 +26,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Browsers
+        run: pnpm --filter @clawd-strike/client exec playwright install chromium
+
       - name: Generate runtime maps
         run: pnpm --filter @clawd-strike/client gen:maps
 

@@ -60,6 +60,25 @@ export type RuntimeFacadeOverride = {
   preset: RuntimeFacadeOverridePreset;
 };
 
+export type WindowHeadShape = "rect" | "pointed_arch";
+export type WindowGlassStyle = "stained_glass_bright" | "stained_glass_dim";
+
+export type RuntimeAuthoredWindow = {
+  centerS: number;
+  sillY: number;
+  width: number;
+  height: number;
+  headShape: WindowHeadShape;
+  glassStyle: WindowGlassStyle;
+};
+
+export type RuntimeWindowLayoutOverride = {
+  zoneId: string;
+  face: RuntimeFacadeFace;
+  segmentOrdinal: number;
+  windows: RuntimeAuthoredWindow[];
+};
+
 export type RuntimeWallDetailOptions = {
   enabled: boolean;
   seed?: number;
@@ -67,6 +86,7 @@ export type RuntimeWallDetailOptions = {
   density: number;
   maxProtrusion: number;
   facadeOverrides: RuntimeFacadeOverride[];
+  windowLayoutOverrides: RuntimeWindowLayoutOverride[];
 };
 
 export type RuntimeAnchor = {
@@ -207,6 +227,7 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
       density: DEFAULT_WALL_DETAIL_DENSITY,
       maxProtrusion: DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M,
       facadeOverrides: [],
+      windowLayoutOverrides: [],
     };
   }
 
@@ -233,6 +254,7 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
     density,
     maxProtrusion,
     facadeOverrides: [],
+    windowLayoutOverrides: [],
   };
 
   if (typeof obj.seed !== "undefined") {
@@ -271,6 +293,73 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
         zoneId,
         face,
         preset,
+      };
+    });
+  }
+
+  if (typeof obj.window_layout_overrides !== "undefined") {
+    if (!Array.isArray(obj.window_layout_overrides)) {
+      failParse(`${source}.window_layout_overrides`, "expected array");
+    }
+
+    resolved.windowLayoutOverrides = obj.window_layout_overrides.map((rawOverride, index) => {
+      const override = asObject(rawOverride, `${source}.window_layout_overrides[${index}]`);
+      const zoneId = asString(override.zoneId, `${source}.window_layout_overrides[${index}].zoneId`);
+      const face = asString(override.face, `${source}.window_layout_overrides[${index}].face`);
+      if (face !== "north" && face !== "south" && face !== "east" && face !== "west") {
+        failParse(`${source}.window_layout_overrides[${index}].face`, "expected 'north', 'south', 'east', or 'west'");
+      }
+      const segmentOrdinal = asPositiveNumber(
+        override.segmentOrdinal,
+        `${source}.window_layout_overrides[${index}].segmentOrdinal`,
+      );
+      if (!Number.isInteger(segmentOrdinal)) {
+        failParse(`${source}.window_layout_overrides[${index}].segmentOrdinal`, "expected integer > 0");
+      }
+      if (!Array.isArray(override.windows) || override.windows.length === 0) {
+        failParse(`${source}.window_layout_overrides[${index}].windows`, "expected non-empty array");
+      }
+
+      const windows = override.windows.map((rawWindow, windowIndex) => {
+        const window = asObject(rawWindow, `${source}.window_layout_overrides[${index}].windows[${windowIndex}]`);
+        const headShapeRaw = asString(
+          window.headShape,
+          `${source}.window_layout_overrides[${index}].windows[${windowIndex}].headShape`,
+        );
+        if (headShapeRaw !== "rect" && headShapeRaw !== "pointed_arch") {
+          failParse(
+            `${source}.window_layout_overrides[${index}].windows[${windowIndex}].headShape`,
+            "expected 'rect' or 'pointed_arch'",
+          );
+        }
+        const glassStyleRaw = asString(
+          window.glassStyle,
+          `${source}.window_layout_overrides[${index}].windows[${windowIndex}].glassStyle`,
+        );
+        if (glassStyleRaw !== "stained_glass_bright" && glassStyleRaw !== "stained_glass_dim") {
+          failParse(
+            `${source}.window_layout_overrides[${index}].windows[${windowIndex}].glassStyle`,
+            "expected supported window glass style",
+          );
+        }
+        const headShape: WindowHeadShape = headShapeRaw;
+        const glassStyle: WindowGlassStyle = glassStyleRaw;
+
+        return {
+          centerS: asNumber(window.centerS, `${source}.window_layout_overrides[${index}].windows[${windowIndex}].centerS`),
+          sillY: asNumber(window.sillY, `${source}.window_layout_overrides[${index}].windows[${windowIndex}].sillY`),
+          width: asPositiveNumber(window.width, `${source}.window_layout_overrides[${index}].windows[${windowIndex}].width`),
+          height: asPositiveNumber(window.height, `${source}.window_layout_overrides[${index}].windows[${windowIndex}].height`),
+          headShape,
+          glassStyle,
+        };
+      });
+
+      return {
+        zoneId,
+        face,
+        segmentOrdinal,
+        windows,
       };
     });
   }

@@ -1047,6 +1047,10 @@ function resolveWindowTreatment(spec, columnIndex, story) {
   }
 }
 
+function authoredWindowLayoutKey(zoneId, face, segmentOrdinal) {
+  return `${zoneId}:${face}:${segmentOrdinal}`;
+}
+
 function countContiguousWindowColumns(spec, startColumn, direction, maxCount) {
   let count = 0;
   for (let step = 1; step <= maxCount; step += 1) {
@@ -1159,7 +1163,7 @@ function buildColumnPattern(columnRoles) {
     .join(" ");
 }
 
-function summarizeSegmentFacade(segment, zone, segmentIndex, faceContext, baseSeed, maxProtrusionM, density, cornerKeys) {
+function summarizeSegmentFacade(segment, zone, segmentIndex, segmentOrdinal, faceContext, authoredWindowLayout, baseSeed, maxProtrusionM, density, cornerKeys) {
   const style = resolveFacadeStyleForSegment(zone, toSegmentFrame(segment));
   const wallRole = resolveWallRole(zone, faceContext.face, faceContext.isInsideWall, faceContext.isSpawnEntryWall);
   const segmentDensityRaw = density
@@ -1387,6 +1391,47 @@ function summarizeSegmentFacade(segment, zone, segmentIndex, faceContext, baseSe
   const balconyPlan = computeBalconyPlacements(spec);
   const windowCounts = { glass: 0, dark: 0, shuttered: 0 };
   let upperDoorCount = 0;
+
+  if (authoredWindowLayout) {
+    for (const window of authoredWindowLayout.windows) {
+      windowCounts.glass += 1;
+    }
+
+    const upperCount = authoredWindowLayout.windows.filter((window) => window.glassStyle === "stained_glass_bright").length;
+    const lowerCount = authoredWindowLayout.windows.length - upperCount;
+
+    return {
+      wallRole,
+      compositionPreset: faceContext.compositionPreset,
+      style,
+      lengthM,
+      usableLength,
+      wallHeightM: faceContext.wallHeightM,
+      stories,
+      bayCount,
+      bayWidth,
+      doorCount,
+      groundDoorCount: doorColumns.length,
+      upperDoorCount,
+      balconyCount: 0,
+      balconyEntries: [],
+      windowCounts,
+      windowColumns: [],
+      accentWindowColumns: [],
+      doorColumns,
+      columnPattern: "authored",
+      specNotes: `Authored window layout override on segment #${segmentOrdinal} places ${authoredWindowLayout.windows.length} exact windows while retaining the procedural door grid.`,
+      balconyNotes: spec.balconyStyle === "none"
+        ? `No balconies because ${style.family} frontage resolves balcony style "none".`
+        : `No balconies because authored window layout does not introduce balcony openings.`,
+      doorNotes: doorColumns.length > 0
+        ? `${doorColumns.length} ground door column(s) derived from wall role ${wallRole}.`
+        : isFrontageWallRole(wallRole)
+          ? `No ground doors because ${usableLength.toFixed(2)}m usable length does not reach the frontage threshold.`
+          : `No ground doors because wall role ${wallRole} suppresses frontage openings.`,
+      windowNotes: `Authored window layout places ${authoredWindowLayout.windows.length} pointed-arch windows (${upperCount} bright stained-glass upper / ${lowerCount} dim stained-glass lower).`,
+    };
+  }
 
   for (let column = 0; column < spec.bayCount; column += 1) {
     const role = spec.columnRoles[column];
@@ -2202,6 +2247,25 @@ async function main() {
       asString(object.preset, "wall_details.facade_overrides[].preset"),
     );
   }
+  const authoredWindowLayoutMap = new Map();
+  for (const override of asArray(specRaw.wall_details.window_layout_overrides ?? [], "wall_details.window_layout_overrides")) {
+    const object = asObject(override, "wall_details.window_layout_overrides[]");
+    authoredWindowLayoutMap.set(
+      authoredWindowLayoutKey(
+        asString(object.zoneId, "wall_details.window_layout_overrides[].zoneId"),
+        asString(object.face, "wall_details.window_layout_overrides[].face"),
+        asNumber(object.segmentOrdinal, "wall_details.window_layout_overrides[].segmentOrdinal"),
+      ),
+      {
+        windows: asArray(object.windows, "wall_details.window_layout_overrides[].windows").map((window) => {
+          const rawWindow = asObject(window, "wall_details.window_layout_overrides[].windows[]");
+          return {
+            glassStyle: asString(rawWindow.glassStyle, "wall_details.window_layout_overrides[].windows[].glassStyle"),
+          };
+        }),
+      },
+    );
+  }
 
   const mainLaneZones = spec.zones.filter((zone) => zone.type === "main_lane_segment");
   const mapCenterX = mainLaneZones.reduce((sum, zone) => sum + zone.rect.x + zone.rect.w * 0.5, 0) / Math.max(1, mainLaneZones.length);
@@ -2330,7 +2394,9 @@ async function main() {
           segment,
           expected.zone,
           segment.index,
+          index + 1,
           faceContext,
+          authoredWindowLayoutMap.get(authoredWindowLayoutKey(expected.zone.id, expected.face, index + 1)) ?? null,
           runtimeSeed,
           maxProtrusionM,
           density,

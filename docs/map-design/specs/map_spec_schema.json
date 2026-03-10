@@ -72,8 +72,84 @@
                   "residential_quiet",
                   "residential_balcony_stack",
                   "spawn_courtyard_landmark",
+                  "spawn_gate_brick_backdrop",
                   "service_blank"
                 ]
+              }
+            }
+          }
+        },
+        "window_layout_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "zoneId",
+              "face",
+              "segmentOrdinal",
+              "windows"
+            ],
+            "properties": {
+              "zoneId": {
+                "type": "string"
+              },
+              "face": {
+                "type": "string",
+                "enum": [
+                  "north",
+                  "south",
+                  "east",
+                  "west"
+                ]
+              },
+              "segmentOrdinal": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "windows": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "centerS",
+                    "sillY",
+                    "width",
+                    "height",
+                    "headShape",
+                    "glassStyle"
+                  ],
+                  "properties": {
+                    "centerS": {
+                      "type": "number"
+                    },
+                    "sillY": {
+                      "type": "number"
+                    },
+                    "width": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "height": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "headShape": {
+                      "type": "string",
+                      "enum": [
+                        "rect",
+                        "pointed_arch"
+                      ]
+                    },
+                    "glassStyle": {
+                      "type": "string",
+                      "enum": [
+                        "stained_glass_bright",
+                        "stained_glass_dim"
+                      ]
+                    }
+                  }
+                }
               }
             }
           }

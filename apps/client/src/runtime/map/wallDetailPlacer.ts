@@ -1,9 +1,12 @@
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type {
+  RuntimeAuthoredWindow,
   RuntimeAnchorsSpec,
   RuntimeBlockoutZone,
   RuntimeFacadeOverride,
   RuntimeFacadeOverridePreset,
+  RuntimeWindowLayoutOverride,
+  WindowGlassStyle,
 } from "./types";
 import type { BoundarySegment } from "./buildBlockout";
 import type { WallDetailInstance } from "./wallDetailKit";
@@ -41,6 +44,8 @@ const SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_M = 0.58;
 const SPAWN_B_SHELL_SHARED_PLINTH_DEPTH_M = 0.17;
 const SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_SCALE = 0.85;
 const SPAWN_B_SHELL_TRIM_DEPTH_SCALE = 0.67;
+const STAINED_GLASS_BRIGHT_MATERIAL_ID = "tm_stained_glass_bright";
+const STAINED_GLASS_DIM_MATERIAL_ID = "tm_stained_glass_dim";
 const RECESSED_PANEL_BACK_THICKNESS_M = 0.02;
 const MIN_RECESSED_PANEL_FRONT_INSET_M = 0.08;
 
@@ -209,6 +214,7 @@ type SegmentDecorContext = {
   frame: SegmentFrame;
   zone: RuntimeBlockoutZone | null;
   facadeFace: FacadeFace;
+  segmentOrdinal: number | null;
   wallRole: WallRole;
   compositionPreset: RuntimeFacadeOverridePreset;
   isMainLane: boolean;
@@ -245,6 +251,7 @@ type SegmentDecorContext = {
   /** Plinth dimensions computed early (for deferred emit with door gaps). */
   plinthHeight: number;
   plinthDepth: number;
+  authoredWindowLayout: RuntimeWindowLayoutOverride | null;
 };
 
 export type BuildWallDetailProfile = "blockout" | "pbr";
@@ -254,6 +261,7 @@ export type BuildWallDetailPlacementsOptions = {
   zones: readonly RuntimeBlockoutZone[];
   anchors: RuntimeAnchorsSpec | null;
   facadeOverrides: readonly RuntimeFacadeOverride[];
+  windowLayoutOverrides: readonly RuntimeWindowLayoutOverride[];
   seed: number;
   wallHeightM: number;
   wallThicknessM: number;
@@ -281,6 +289,10 @@ export type WallDetailPlacementResult = {
 };
 
 type WindowTreatment = "glass" | "dark" | "shuttered";
+
+function authoredWindowLayoutKey(zoneId: string, face: FacadeFace, segmentOrdinal: number): string {
+  return `${zoneId}:${face}:${segmentOrdinal}`;
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -1353,6 +1365,73 @@ function resolveWindowTreatment(
   }
 }
 
+function resolveStainedGlassMaterialId(glassStyle: WindowGlassStyle): string {
+  return glassStyle === "stained_glass_bright"
+    ? STAINED_GLASS_BRIGHT_MATERIAL_ID
+    : STAINED_GLASS_DIM_MATERIAL_ID;
+}
+
+function placeAuthoredPointedArchWindow(
+  ctx: SegmentDecorContext,
+  window: RuntimeAuthoredWindow,
+  spec: FacadeSpec,
+): void {
+  const trimDepthScale = isSpawnBShellCleanupSurface(ctx) ? SPAWN_B_SHELL_TRIM_DEPTH_SCALE : 1;
+  const frameThickness = spec.frameThickness * 0.74;
+  const outerWidth = window.width + frameThickness * 2.2;
+  const outerHeight = window.height + frameThickness * 1.8;
+  const frameCenterY = window.sillY + outerHeight * 0.5;
+  const panelCenterY = window.sillY + window.height * 0.5;
+  const voidInset = Math.max(0.006, spec.frameDepth * 0.08 * trimDepthScale);
+  const glassInset = Math.max(voidInset + 0.012, spec.frameDepth * 0.18 * trimDepthScale);
+  const frameProjection = spec.frameDepth * 1.28 * trimDepthScale;
+  const sillDepth = spec.frameDepth * 1.64 * trimDepthScale;
+  const sillHeight = frameThickness * 0.82;
+
+  pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_void", null,
+    ctx.frame, window.centerS, panelCenterY, voidInset,
+    0.02, window.height * 0.98, window.width * 0.96);
+
+  pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_glass", null,
+    ctx.frame, window.centerS, panelCenterY, glassInset,
+    WINDOW_GLASS_THICKNESS_M, window.height * 0.94, window.width * 0.9);
+  tagTrim(ctx.instances, null, resolveStainedGlassMaterialId(window.glassStyle));
+
+  pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_frame", ctx.wallMaterialId,
+    ctx.frame, window.centerS, frameCenterY, frameProjection * 0.5,
+    frameProjection, outerHeight, outerWidth);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
+
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, window.centerS, window.sillY - sillHeight * 0.42,
+    sillDepth * 0.5,
+    sillDepth, sillHeight, window.width + frameThickness * 1.7);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
+
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, window.centerS, window.sillY - frameThickness * 0.9,
+    spec.frameDepth * 0.84 * trimDepthScale,
+    spec.frameDepth * 1.08 * trimDepthScale, frameThickness * 0.34, window.width + frameThickness * 1.15);
+  tagTrim(ctx.instances, ctx.trimLightMaterialId ?? ctx.trimHeavyMaterialId);
+}
+
+function placeAuthoredWindow(
+  ctx: SegmentDecorContext,
+  window: RuntimeAuthoredWindow,
+  spec: FacadeSpec,
+): void {
+  if (window.headShape === "pointed_arch") {
+    placeAuthoredPointedArchWindow(ctx, window, spec);
+    return;
+  }
+
+  placeWindowOpening(ctx, window.centerS, window.sillY, {
+    ...spec,
+    windowW: window.width,
+    windowH: window.height,
+  }, "glass");
+}
+
 function placeWindowOpening(
   ctx: SegmentDecorContext,
   centerS: number,
@@ -2045,6 +2124,26 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   // Pilasters aligned to the bay grid
   placePilasters(ctx, spec);
 
+  if (ctx.authoredWindowLayout) {
+    for (const doorCol of spec.doorColumns) {
+      placeArchedDoor(ctx, columnCenterS(spec, doorCol), spec);
+    }
+
+    for (const window of ctx.authoredWindowLayout.windows) {
+      placeAuthoredWindow(ctx, window, spec);
+    }
+
+    const doorGaps = spec.doorColumns
+      .filter(() => spec.doorH >= 2.0 && spec.doorW >= 0.8)
+      .map((doorCol) => ({
+        centerS: columnCenterS(spec, doorCol),
+        halfW: spec.doorW * 0.5,
+      }));
+    emitPlinthStrip(ctx, doorGaps);
+    placeCableSegments(ctx);
+    return;
+  }
+
   const balconyPlan = computeBalconyPlacements(spec);
 
   // Walk columns × stories with vertical coherence
@@ -2193,14 +2292,51 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   for (const override of options.facadeOverrides) {
     facadeOverrideMap.set(`${override.zoneId}:${override.face}`, override.preset);
   }
+  const authoredWindowLayoutMap = new Map<string, RuntimeWindowLayoutOverride>();
+  for (const override of options.windowLayoutOverrides) {
+    authoredWindowLayoutMap.set(authoredWindowLayoutKey(override.zoneId, override.face, override.segmentOrdinal), override);
+  }
+
+  const segmentMetaByIndex = new Map<number, {
+    zone: RuntimeBlockoutZone | null;
+    facadeFace: FacadeFace;
+    segmentOrdinal: number | null;
+  }>();
+  const segmentGroupsByFace = new Map<string, Array<{ index: number; start: number }>>();
+  for (let index = 0; index < options.segments.length; index += 1) {
+    const segment = options.segments[index]!;
+    const frame = toSegmentFrame(segment);
+    const zone = resolveSegmentZone(frame, options.zones);
+    const facadeFace = resolveFacadeFaceForSegment(zone, frame);
+    segmentMetaByIndex.set(index, {
+      zone,
+      facadeFace,
+      segmentOrdinal: null,
+    });
+    if (!zone) continue;
+    const key = `${zone.id}:${facadeFace}`;
+    const entries = segmentGroupsByFace.get(key) ?? [];
+    entries.push({ index, start: segment.start });
+    segmentGroupsByFace.set(key, entries);
+  }
+  for (const entries of segmentGroupsByFace.values()) {
+    entries.sort((left, right) => left.start - right.start);
+    for (let ordinal = 0; ordinal < entries.length; ordinal += 1) {
+      const meta = segmentMetaByIndex.get(entries[ordinal]!.index);
+      if (meta) {
+        meta.segmentOrdinal = ordinal + 1;
+      }
+    }
+  }
   let segmentsDecorated = 0;
 
   for (let index = 0; index < options.segments.length; index += 1) {
     const segment = options.segments[index]!;
     const frame = toSegmentFrame(segment);
-    const zone = resolveSegmentZone(frame, options.zones);
+    const segmentMeta = segmentMetaByIndex.get(index);
+    const zone = segmentMeta?.zone ?? resolveSegmentZone(frame, options.zones);
     const facadeStyle = resolveFacadeStyleForSegment(zone, frame);
-    const facadeFace = resolveFacadeFaceForSegment(zone, frame);
+    const facadeFace = segmentMeta?.facadeFace ?? resolveFacadeFaceForSegment(zone, frame);
     const compositionPreset = resolveCompositionPreset(
       zone,
       facadeFace,
@@ -2288,6 +2424,9 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     const isSpawnOuterWall = zone?.type === "spawn_plaza" && !isSpawnEntryWall;
     // Connector spawn-facing wall: the opposite of main-lane-facing.
     const isConnectorSpawnFacing = zone?.type === "connector" && !isConnectorMainLaneFacing;
+    const authoredWindowLayout = zone && segmentMeta?.segmentOrdinal
+      ? authoredWindowLayoutMap.get(authoredWindowLayoutKey(zone.id, facadeFace, segmentMeta.segmentOrdinal)) ?? null
+      : null;
     const wallRole = resolveWallRole(
       zone,
       facadeFace,
@@ -2301,6 +2440,7 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       zone,
       wallRole,
       facadeFace,
+      segmentOrdinal: segmentMeta?.segmentOrdinal ?? null,
       compositionPreset,
       isMainLane,
       isShopfrontZone: isShopfront,
@@ -2330,6 +2470,7 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       doorModelPlacements,
       plinthHeight: 0,
       plinthDepth: 0,
+      authoredWindowLayout,
     });
     if (instances.length > countBefore) {
       segmentsDecorated += 1;

@@ -63,6 +63,173 @@
         "face": "south",
         "preset": "spawn_courtyard_landmark"
       }
+    ],
+    "window_layout_overrides": [
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "north",
+        "segmentOrdinal": 1,
+        "windows": [
+          {
+            "centerS": -4.05,
+            "sillY": 3.78,
+            "width": 1.08,
+            "height": 1.52,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": -1.35,
+            "sillY": 3.78,
+            "width": 1.08,
+            "height": 1.52,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": 1.35,
+            "sillY": 3.78,
+            "width": 1.08,
+            "height": 1.52,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": 4.05,
+            "sillY": 3.78,
+            "width": 1.08,
+            "height": 1.52,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": -4,
+            "sillY": 0.98,
+            "width": 1.02,
+            "height": 1.32,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          },
+          {
+            "centerS": 4,
+            "sillY": 0.98,
+            "width": 1.02,
+            "height": 1.32,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          }
+        ]
+      },
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "east",
+        "segmentOrdinal": 2,
+        "windows": [
+          {
+            "centerS": -2.1,
+            "sillY": 3.92,
+            "width": 1,
+            "height": 1.42,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": 0,
+            "sillY": 3.92,
+            "width": 1,
+            "height": 1.42,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": 2.1,
+            "sillY": 3.92,
+            "width": 1,
+            "height": 1.42,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": -2.1,
+            "sillY": 1.02,
+            "width": 0.96,
+            "height": 1.28,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          },
+          {
+            "centerS": 0,
+            "sillY": 1.02,
+            "width": 0.96,
+            "height": 1.28,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          },
+          {
+            "centerS": 2.1,
+            "sillY": 1.02,
+            "width": 0.96,
+            "height": 1.28,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          }
+        ]
+      },
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "west",
+        "segmentOrdinal": 2,
+        "windows": [
+          {
+            "centerS": -2.1,
+            "sillY": 3.92,
+            "width": 1,
+            "height": 1.42,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": 0,
+            "sillY": 3.92,
+            "width": 1,
+            "height": 1.42,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": 2.1,
+            "sillY": 3.92,
+            "width": 1,
+            "height": 1.42,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_bright"
+          },
+          {
+            "centerS": -2.1,
+            "sillY": 1.02,
+            "width": 0.96,
+            "height": 1.28,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          },
+          {
+            "centerS": 0,
+            "sillY": 1.02,
+            "width": 0.96,
+            "height": 1.28,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          },
+          {
+            "centerS": 2.1,
+            "sillY": 1.02,
+            "width": 0.96,
+            "height": 1.28,
+            "headShape": "pointed_arch",
+            "glassStyle": "stained_glass_dim"
+          }
+        ]
+      }
     ]
   },
   "zones": [
