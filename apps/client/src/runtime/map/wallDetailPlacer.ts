@@ -473,6 +473,10 @@ function scaleSpawnBShellTrimDepth(depthM: number, isSpawnBCleanup: boolean): nu
   return isSpawnBCleanup ? depthM * SPAWN_B_SHELL_TRIM_DEPTH_SCALE : depthM;
 }
 
+function resolveCorniceStripHeight(ctx: SegmentDecorContext, dims: TrimDims): number {
+  return dims.corniceH * (ctx.trimTier === "hero" ? 1.06 : ctx.trimTier === "accented" ? 0.98 : 0.84);
+}
+
 function isSpawnHeroFacade(ctx: SegmentDecorContext): boolean {
   return ctx.compositionPreset === "spawn_courtyard_landmark"
     || isSpawnGateBrickBackdropPreset(ctx.compositionPreset);
@@ -769,7 +773,7 @@ function placeCorniceStrip(ctx: SegmentDecorContext): void {
   ctx.rng.range(0.18, 0.30); // consume
   ctx.rng.range(0.10, 0.19); // consume
   // Spawn hero facades now keep their cornice for silhouette definition.
-  const corniceHeight = dims.corniceH * (ctx.trimTier === "hero" ? 1.06 : ctx.trimTier === "accented" ? 0.98 : 0.84);
+  const corniceHeight = resolveCorniceStripHeight(ctx, dims);
   const corniceDepth = scaleSpawnBShellTrimDepth(
     clamp(
       dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8),
@@ -2006,10 +2010,10 @@ function decorateSegment(ctx: SegmentDecorContext): void {
           }
           // Center window vertically between the horizontal trim below and above.
           const belowTop = story === 0
-            ? (ctx.isSideHall ? 0 : (isSpawnBCleanup ? ctx.plinthHeight : trimDims.plinthH))
+            ? (ctx.isSideHall ? 0 : ctx.plinthHeight)
             : storyBaseY + (isSpawnBCleanup ? 0 : trimDims.courseH * 0.5);
           const aboveBot = story === spec.stories - 1
-            ? ctx.wallHeightM - trimDims.corniceH
+            ? ctx.wallHeightM - resolveCorniceStripHeight(ctx, trimDims)
             : (story + 1) * STORY_HEIGHT_M - (isSpawnBCleanup ? 0 : trimDims.courseH * 0.5);
           const sillY = (belowTop + aboveBot) * 0.5 - spec.windowH * 0.5;
           const isBrickBackdrop = isSpawnGateBrickBackdropPreset(spec.compositionPreset);

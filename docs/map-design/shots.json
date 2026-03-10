@@ -13,7 +13,7 @@
       },
       "yaw_degrees": "0=+Y(north), 90=+X(east), 180=-Y(south), 270=-X(west)"
     },
-    "shotCount": 10,
+    "shotCount": 11,
     "notes": [
       "MVP shot list for previews/validation. Shots are optional at runtime but useful for automated capture and QA.",
       "All shot positions are approximate and may be adjusted once blockout exists in-engine."
