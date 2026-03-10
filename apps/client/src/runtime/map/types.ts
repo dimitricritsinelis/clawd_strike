@@ -51,6 +51,7 @@ export type RuntimeFacadeOverridePreset =
   | "residential_quiet"
   | "residential_balcony_stack"
   | "spawn_courtyard_landmark"
+  | "spawn_gate_brick_backdrop"
   | "service_blank";
 
 export type RuntimeFacadeOverride = {
@@ -257,6 +258,7 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
         && preset !== "residential_quiet"
         && preset !== "residential_balcony_stack"
         && preset !== "spawn_courtyard_landmark"
+        && preset !== "spawn_gate_brick_backdrop"
         && preset !== "service_blank"
       ) {
         failParse(

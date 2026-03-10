@@ -119,7 +119,7 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Anchors: spawn-cover x2
 - Anchor IDs: `PP_SPAWN_A_01`, `PP_SPAWN_A_02`
 - Floor surface: PBR floor material `large_sandstone_blocks_01`
-- Wall material summary: Walls `ph_whitewashed_brick_warm` with heavy trims `ph_trim_sanded_01` and light trims `ph_band_beige_001`.
+- Wall material summary: Walls `ph_whitewashed_brick_warm`, `ph_aged_plaster_ochre` with heavy trims `ph_trim_sanded_01` and light trims `ph_band_beige_001`.
 - Constraints: Spawn safety cover + quick access to all lanes via bazaar center and side connectors.
 - Notes: South spawn courtyard and staging area.
 
@@ -138,7 +138,7 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Anchors: spawn-cover x2
 - Anchor IDs: `PP_SPAWN_B_01`, `PP_SPAWN_B_02`
 - Floor surface: PBR floor material `cobblestone_pavement`
-- Wall material summary: Walls `ph_whitewashed_brick_warm` with heavy trims `ph_trim_sanded_01` and light trims `ph_band_beige_001`.
+- Wall material summary: Walls `ph_brick_4_desert`, `ph_whitewashed_brick_warm` with heavy trims `ph_stone_trim_white`, `ph_trim_sanded_01` and light trims `ph_band_plastered`, `ph_band_beige_001`.
 - Constraints: Spawn safety cover + landmark arch threshold into bazaar.
 - Notes: North spawn gate plaza and arch threshold.
 
@@ -855,7 +855,7 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Composition preset: `residential_quiet`
 - Facade family: `spawn`
 - Balcony style: `residential_parapet`
-- Wall material: `ph_whitewashed_brick_warm`
+- Wall material: `ph_aged_plaster_ochre`
 - Trim textures: heavy `ph_trim_sanded_01`, light `ph_band_beige_001`
 - Balcony texture: `ph_trim_sanded_01`
 - Floor context: PBR floor material `large_sandstone_blocks_01`
@@ -863,8 +863,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Door logic: #1 No ground doors because wall role spawn_side_window_rich suppresses frontage openings. #2 No procedural doors; segment is below the minimum frontage length.
 - Window logic: #1 3 window column(s) with accent columns [0, 1]. #2 No procedural windows; segment is below the minimum facade length.
 - Balcony logic: #1 No balconies because preset residential_quiet does not enable balcony stacks. #2 No balcony evaluation; segment is below the minimum facade length.
-- Texture logic: spawn facade family on SPAWN_A_COURTYARD:east resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
-- Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
+- Texture logic: spawn facade family on SPAWN_A_COURTYARD:east resolves wall `ph_aged_plaster_ochre` with balcony material `ph_trim_sanded_01`.
+- Trim logic: Accented trim tier keeps base trim and string-course reads with `ph_trim_sanded_01` / `ph_band_beige_001`.
 - Anchor summary: none
 - Segment breakdown:
   - #1: usable=7.30m, bays=3, pattern=W W W, doors=0/0, balconies=0, windows=3 glass / 1 dark / 2 shuttered
@@ -886,7 +886,7 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Composition preset: `residential_quiet`
 - Facade family: `spawn`
 - Balcony style: `residential_parapet`
-- Wall material: `ph_whitewashed_brick_warm`
+- Wall material: `ph_aged_plaster_ochre`
 - Trim textures: heavy `ph_trim_sanded_01`, light `ph_band_beige_001`
 - Balcony texture: `ph_trim_sanded_01`
 - Floor context: PBR floor material `large_sandstone_blocks_01`
@@ -894,8 +894,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Door logic: #1 No ground doors because wall role spawn_side_window_rich suppresses frontage openings. #2 No procedural doors; segment is below the minimum frontage length.
 - Window logic: #1 3 window column(s) with accent columns [0, 1]. #2 No procedural windows; segment is below the minimum facade length.
 - Balcony logic: #1 No balconies because preset residential_quiet does not enable balcony stacks. #2 No balcony evaluation; segment is below the minimum facade length.
-- Texture logic: spawn facade family on SPAWN_A_COURTYARD:west resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
-- Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
+- Texture logic: spawn facade family on SPAWN_A_COURTYARD:west resolves wall `ph_aged_plaster_ochre` with balcony material `ph_trim_sanded_01`.
+- Trim logic: Accented trim tier keeps base trim and string-course reads with `ph_trim_sanded_01` / `ph_band_beige_001`.
 - Anchor summary: none
 - Segment breakdown:
   - #1: usable=7.30m, bays=3, pattern=W W W, doors=0/0, balconies=0, windows=3 glass / 1 dark / 2 shuttered
@@ -914,23 +914,23 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Adjacent gaps: none
 - Height: 6.00m (2 stories)
 - Wall role: `spawn_frontage`
-- Composition preset: `residential_quiet`
+- Composition preset: `spawn_gate_brick_backdrop`
 - Facade family: `spawn`
-- Balcony style: `residential_parapet`
-- Wall material: `ph_whitewashed_brick_warm`
-- Trim textures: heavy `ph_trim_sanded_01`, light `ph_band_beige_001`
-- Balcony texture: `ph_trim_sanded_01`
+- Balcony style: `none`
+- Wall material: `ph_brick_4_desert`
+- Trim textures: heavy `ph_stone_trim_white`, light `ph_band_plastered`
+- Balcony texture: none
 - Floor context: PBR floor material `cobblestone_pavement`
-- Opening totals: 2 ground doors, 0 upper door openings, 0 balconies, 3 glass windows, 5 dark windows, 0 shuttered windows
+- Opening totals: 2 ground doors, 0 upper door openings, 0 balconies, 3 glass windows, 0 dark windows, 2 shuttered windows
 - Door logic: #1 2 ground door column(s) derived from wall role spawn_frontage.
-- Window logic: #1 4 window column(s) with accent columns [2, 5].
-- Balcony logic: #1 No balconies because preset residential_quiet does not enable balcony stacks.
-- Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:north resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
-- Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
+- Window logic: #1 3 window column(s) with accent columns [2, 4].
+- Balcony logic: #1 No balconies because spawn frontage resolves balcony style "none".
+- Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:north resolves wall `ph_brick_4_desert` with balcony material none.
+- Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
 - Anchor summary: none
 - Segment breakdown:
-  - #1: usable=21.30m, bays=8, pattern=_ D W W W W D _, doors=2/0, balconies=0, windows=3 glass / 5 dark / 0 shuttered
-    logic: Facade grid uses 8 bays across 21.30m usable length with 2.66m bay width. 2 ground door column(s) derived from wall role spawn_frontage. 4 window column(s) with accent columns [2, 5]. No balconies because preset residential_quiet does not enable balcony stacks.
+  - #1: usable=21.30m, bays=7, pattern=_ D W W W D _, doors=2/0, balconies=0, windows=3 glass / 0 dark / 2 shuttered
+    logic: Facade grid uses 7 bays across 21.30m usable length with 3.04m bay width. 2 ground door column(s) derived from wall role spawn_frontage. 3 window column(s) with accent columns [2, 4]. No balconies because spawn frontage resolves balcony style "none".
 - Notes: Spawn B exposed north face.
 
 ### WALL_BLDG_H_FRONT — Building H Front Wall
@@ -977,23 +977,23 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Wall role: `spawn_frontage`
 - Composition preset: `residential_quiet`
 - Facade family: `spawn`
-- Balcony style: `residential_parapet`
-- Wall material: `ph_whitewashed_brick_warm`
-- Trim textures: heavy `ph_trim_sanded_01`, light `ph_band_beige_001`
-- Balcony texture: `ph_trim_sanded_01`
+- Balcony style: `none`
+- Wall material: `ph_brick_4_desert`
+- Trim textures: heavy `ph_stone_trim_white`, light `ph_band_plastered`
+- Balcony texture: none
 - Floor context: PBR floor material `cobblestone_pavement`
 - Opening totals: 0 ground doors, 0 upper door openings, 0 balconies, 3 glass windows, 6 dark windows, 0 shuttered windows
 - Door logic: #1 No procedural doors; segment is below the minimum frontage length. #2 No ground doors because 7.30m usable length does not reach the frontage threshold.
 - Window logic: #1 No procedural windows; segment is below the minimum facade length. #2 3 window column(s) with accent columns [0, 1].
-- Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because preset residential_quiet does not enable balcony stacks.
-- Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:east resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
-- Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
+- Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because spawn frontage resolves balcony style "none".
+- Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:east resolves wall `ph_brick_4_desert` with balcony material none.
+- Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
 - Anchor summary: none
 - Segment breakdown:
   - #1: usable=1.30m, bays=0, pattern=n/a, doors=0/0, balconies=0, windows=0 glass / 0 dark / 0 shuttered
     logic: Segment is too short for a procedural facade grid after edge margins. No procedural doors; segment is below the minimum frontage length. No procedural windows; segment is below the minimum facade length. No balcony evaluation; segment is below the minimum facade length.
   - #2: usable=7.30m, bays=3, pattern=W W W, doors=0/0, balconies=0, windows=3 glass / 6 dark / 0 shuttered
-    logic: Facade grid uses 3 bays across 7.30m usable length with 2.43m bay width. No ground doors because 7.30m usable length does not reach the frontage threshold. 3 window column(s) with accent columns [0, 1]. No balconies because preset residential_quiet does not enable balcony stacks.
+    logic: Facade grid uses 3 bays across 7.30m usable length with 2.43m bay width. No ground doors because 7.30m usable length does not reach the frontage threshold. 3 window column(s) with accent columns [0, 1]. No balconies because spawn frontage resolves balcony style "none".
 - Notes: Spawn B exposed east face.
 
 ### WALL_AREA_SPAWN_B_WEST — Spawn B West Wall
@@ -1008,23 +1008,23 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Wall role: `spawn_frontage`
 - Composition preset: `residential_quiet`
 - Facade family: `spawn`
-- Balcony style: `residential_parapet`
-- Wall material: `ph_whitewashed_brick_warm`
-- Trim textures: heavy `ph_trim_sanded_01`, light `ph_band_beige_001`
-- Balcony texture: `ph_trim_sanded_01`
+- Balcony style: `none`
+- Wall material: `ph_brick_4_desert`
+- Trim textures: heavy `ph_stone_trim_white`, light `ph_band_plastered`
+- Balcony texture: none
 - Floor context: PBR floor material `cobblestone_pavement`
 - Opening totals: 0 ground doors, 0 upper door openings, 0 balconies, 3 glass windows, 6 dark windows, 0 shuttered windows
 - Door logic: #1 No procedural doors; segment is below the minimum frontage length. #2 No ground doors because 7.30m usable length does not reach the frontage threshold.
 - Window logic: #1 No procedural windows; segment is below the minimum facade length. #2 3 window column(s) with accent columns [0, 1].
-- Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because preset residential_quiet does not enable balcony stacks.
-- Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:west resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
-- Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
+- Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because spawn frontage resolves balcony style "none".
+- Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:west resolves wall `ph_brick_4_desert` with balcony material none.
+- Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
 - Anchor summary: none
 - Segment breakdown:
   - #1: usable=1.30m, bays=0, pattern=n/a, doors=0/0, balconies=0, windows=0 glass / 0 dark / 0 shuttered
     logic: Segment is too short for a procedural facade grid after edge margins. No procedural doors; segment is below the minimum frontage length. No procedural windows; segment is below the minimum facade length. No balcony evaluation; segment is below the minimum facade length.
   - #2: usable=7.30m, bays=3, pattern=W W W, doors=0/0, balconies=0, windows=3 glass / 6 dark / 0 shuttered
-    logic: Facade grid uses 3 bays across 7.30m usable length with 2.43m bay width. No ground doors because 7.30m usable length does not reach the frontage threshold. 3 window column(s) with accent columns [0, 1]. No balconies because preset residential_quiet does not enable balcony stacks.
+    logic: Facade grid uses 3 bays across 7.30m usable length with 2.43m bay width. No ground doors because 7.30m usable length does not reach the frontage threshold. 3 window column(s) with accent columns [0, 1]. No balconies because spawn frontage resolves balcony style "none".
 - Notes: Spawn B exposed west face.
 
 ### WALL_AREA_MAIN_HALL_SOUTH_NORTH — Main Hall South North Wall

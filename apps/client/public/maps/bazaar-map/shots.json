@@ -278,19 +278,19 @@
     {
       "id": "SHOT_11_SPAWN_B_BACK_WALL",
       "label": "Spawn B back wall",
-      "description": "Spawn B cleanup-shell signoff shot; validates lighter north-wall trim depth, shorter plinth read, and coherent side-wall massing from player height.",
+      "description": "Spawn B courtyard shell review; validates the brick hero wall hierarchy, restrained side returns, and readable door/window composition.",
       "camera": {
         "pos": {
-          "x": 18.2,
-          "y": 73.8,
+          "x": 25,
+          "y": 71.5,
           "z": 1.7
         },
         "lookAt": {
-          "x": 25.1,
-          "y": 81.4,
-          "z": 3.1
+          "x": 25,
+          "y": 80.2,
+          "z": 3
         },
-        "fovDeg": 76
+        "fovDeg": 84
       },
       "durationSec": 4,
       "tags": [
@@ -300,14 +300,14 @@
       ],
       "reviewPriority": "high",
       "reviewFocus": [
-        "cleanup-shell trim depth on north/east/west Spawn B faces",
-        "shorter plinth to opening spacing on the north wall",
-        "lighter parapet, cornice, and corner-pier mass without weakening the shell"
+        "brick mass and plaster infill balance",
+        "door surround hierarchy without balcony clutter",
+        "calm return-wall support treatment"
       ],
       "mustShow": [
-        "north cleanup wall as the dominant read",
-        "subordinate side-wall trim that stays visually coordinated",
-        "no overdeep surround or plinth projection"
+        "two preserved ground-floor doors",
+        "brick wrapping around openings and corners",
+        "no repeated square-frame wallpaper"
       ]
     },
     {

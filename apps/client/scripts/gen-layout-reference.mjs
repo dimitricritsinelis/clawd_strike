@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 const MAP_ID = "bazaar-map";
 const STORY_HEIGHT_M = 3.0;
 const SEGMENT_EDGE_MARGIN_M = 0.35;
+const SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_M = 0.58;
+const SPAWN_B_SHELL_SHARED_PLINTH_DEPTH_M = 0.17;
 const FACE_VALUES = ["north", "south", "east", "west"];
 const TARGET_WALL_ZONE_TYPES = new Set([
   "spawn_plaza",
@@ -491,6 +493,20 @@ const SLOT_SPAWN = {
   balcony: "ph_trim_sanded_01",
 };
 
+const SLOT_SPAWN_SIDE = {
+  wall: "ph_aged_plaster_ochre",
+  trimHeavy: "ph_trim_sanded_01",
+  trimLight: "ph_band_beige_001",
+  balcony: "ph_trim_sanded_01",
+};
+
+const SLOT_SPAWN_B_BRICK = {
+  wall: "ph_brick_4_desert",
+  trimHeavy: "ph_stone_trim_white",
+  trimLight: "ph_band_plastered",
+  balcony: null,
+};
+
 const SLOT_SIDE_HALL = {
   wall: "ph_whitewashed_brick",
   trimHeavy: "ph_sandstone_blocks_05",
@@ -589,11 +605,14 @@ function resolveFacadeStyleForSegment(zone, frame) {
   }
 
   if (zone.type === "spawn_plaza") {
+    const face = resolveFacadeFaceForSegment(zone, frame);
+    const isHorizontalFace = face === "north" || face === "south";
+    const isSpawnBOuterShell = zone.id === "SPAWN_B_GATE_PLAZA" && face !== "south";
     return {
       family: "spawn",
-      trimTier: "hero",
-      balconyStyle: "residential_parapet",
-      materials: SLOT_SPAWN,
+      trimTier: isSpawnBOuterShell ? (face === "north" ? "hero" : "accented") : isHorizontalFace ? "hero" : "accented",
+      balconyStyle: isSpawnBOuterShell ? "none" : "residential_parapet",
+      materials: isSpawnBOuterShell ? SLOT_SPAWN_B_BRICK : isHorizontalFace ? SLOT_SPAWN : SLOT_SPAWN_SIDE,
     };
   }
 
@@ -753,12 +772,20 @@ function getTrimDims(wallHeightM) {
   return TRIM_DIMS[stories] ?? TRIM_DIMS[3];
 }
 
+function isSpawnGateBrickBackdropPreset(preset) {
+  return preset === "spawn_gate_brick_backdrop";
+}
+
+function isSpawnBShellCleanupSurface(zone, face) {
+  return zone?.id === "SPAWN_B_GATE_PLAZA" && (face === "north" || face === "east" || face === "west");
+}
+
 function isHeroBalconyPreset(preset) {
   return preset === "merchant_hero_stack" || preset === "spawn_courtyard_landmark" || preset === "residential_balcony_stack";
 }
 
 function isSpawnHeroFacade(compositionPreset) {
-  return compositionPreset === "spawn_courtyard_landmark";
+  return compositionPreset === "spawn_courtyard_landmark" || isSpawnGateBrickBackdropPreset(compositionPreset);
 }
 
 function pickFacadeLean(zoneType, rng) {
@@ -924,7 +951,17 @@ function resolveWindowColumnTarget(wallRole, candidateColumns, stories, doorCoun
 
   switch (wallRole) {
     case "main_frontage":
+      return Math.min(
+        candidateColumns.length,
+        Math.max(
+          isHeroFrontage ? 3 : 2,
+          Math.ceil((Math.max(1, doorCount) * 4) / Math.max(1, stories)) + (isHeroFrontage ? 1 : 0),
+        ),
+      );
     case "spawn_frontage":
+      if (isSpawnGateBrickBackdropPreset(compositionPreset)) {
+        return Math.min(candidateColumns.length, Math.max(3, Math.min(4, stories + doorCount)));
+      }
       return Math.min(
         candidateColumns.length,
         Math.max(
@@ -998,6 +1035,11 @@ function resolveWindowTreatment(spec, columnIndex, story) {
     case "residential_quiet":
       return (story + columnIndex + leanBias) % 3 === 0 ? "glass" : "dark";
     case "residential_balcony_stack":
+      return story === spec.stories - 1 ? "glass" : "dark";
+    case "spawn_gate_brick_backdrop":
+      if (story === spec.stories - 1) return "glass";
+      if (isAccent) return "shuttered";
+      return columnIndex === Math.floor(spec.bayCount * 0.5) ? "dark" : "glass";
     case "spawn_courtyard_landmark":
       return story === spec.stories - 1 ? "glass" : "dark";
     default:
@@ -1207,12 +1249,19 @@ function summarizeSegmentFacade(segment, zone, segmentIndex, faceContext, baseSe
 
   const stories = Math.max(1, Math.floor(faceContext.wallHeightM / STORY_HEIGHT_M));
   const facadeLean = pickFacadeLean(zone.type, rng);
-  const targetBayW = isFrontageWallRole(wallRole)
-    ? rng.range(2.2, 3.0)
-    : wallRole === "sidehall_outer_quiet"
-      ? rng.range(2.6, 3.4)
-      : rng.range(1.9, 2.5);
+  const isBrickBackdrop = isSpawnGateBrickBackdropPreset(faceContext.compositionPreset);
+  const isSpawnFacade = zone.type === "spawn_plaza";
+  const targetBayW = isBrickBackdrop
+    ? usableLength >= 18 ? usableLength / 7 : usableLength / 5
+    : isFrontageWallRole(wallRole)
+      ? rng.range(2.2, 3.0)
+      : wallRole === "sidehall_outer_quiet"
+        ? rng.range(2.6, 3.4)
+        : rng.range(1.9, 2.5);
   let bayCount = Math.max(1, Math.round(usableLength / targetBayW));
+  if (isBrickBackdrop) {
+    bayCount = usableLength >= 18 ? 7 : 5;
+  }
   const doorCount = resolveDoorCountForWallRole(wallRole, usableLength, faceContext.compositionPreset);
 
   if (doorCount === 1 && bayCount >= 2 && bayCount % 2 === 0) {
@@ -1225,41 +1274,69 @@ function summarizeSegmentFacade(segment, zone, segmentIndex, faceContext, baseSe
   const bayWidth = usableLength / bayCount;
   const windowW = clamp(
     bayWidth * (
-      isFrontageWallRole(wallRole)
-        ? rng.range(0.34, 0.46)
-        : wallRole === "sidehall_outer_quiet"
-          ? rng.range(0.26, 0.34)
-          : rng.range(0.32, 0.44)
+      isBrickBackdrop
+        ? rng.range(0.36, 0.48)
+        : isSpawnFacade
+          ? rng.range(0.46, 0.58)
+          : isFrontageWallRole(wallRole)
+            ? rng.range(0.34, 0.46)
+            : wallRole === "sidehall_outer_quiet"
+              ? rng.range(0.26, 0.34)
+              : rng.range(0.32, 0.44)
     ),
     0.52,
-    bayWidth * 0.64,
+    bayWidth * (isBrickBackdrop ? 0.56 : isSpawnFacade ? 0.72 : 0.64),
   );
-  const windowH = isFrontageWallRole(wallRole)
-    ? rng.range(1.0, 1.26)
-    : wallRole === "sidehall_outer_quiet"
-      ? rng.range(0.92, 1.16)
-      : rng.range(1.08, 1.38);
+  const windowH = isBrickBackdrop
+    ? rng.range(1.18, 1.38)
+    : isSpawnFacade
+      ? rng.range(1.28, 1.55)
+      : isFrontageWallRole(wallRole)
+        ? rng.range(1.0, 1.26)
+        : wallRole === "sidehall_outer_quiet"
+          ? rng.range(0.92, 1.16)
+          : rng.range(1.08, 1.38);
   rng.range(0.85, 1.05);
   const doorW = clamp(
     bayWidth * (
-      isFrontageWallRole(wallRole)
-        ? rng.range(0.50, 0.64)
-        : wallRole === "sidehall_outer_quiet"
-          ? rng.range(0.40, 0.50)
-          : rng.range(0.44, 0.58)
+      isBrickBackdrop
+        ? rng.range(0.56, 0.68)
+        : isFrontageWallRole(wallRole)
+          ? rng.range(0.50, 0.64)
+          : wallRole === "sidehall_outer_quiet"
+            ? rng.range(0.40, 0.50)
+            : rng.range(0.44, 0.58)
     ),
     0.75,
     bayWidth * 0.74,
   );
-  const doorH = style.family === "merchant"
-    ? rng.range(2.45, 2.72)
-    : style.family === "service"
-      ? rng.range(2.18, 2.38)
-      : rng.range(2.32, 2.58);
-  const recessDepth = rng.range(0.10, 0.16);
-  const frameThickness = rng.range(0.11, 0.17);
-  const frameDepth = clamp(rng.range(0.09, 0.13), 0.06, segmentMaxProtrusion + 0.08);
-  const jambDepth = clamp(rng.range(0.10, 0.16), 0.06, segmentMaxProtrusion + 0.10);
+  const doorH = isBrickBackdrop
+    ? rng.range(2.52, 2.78)
+    : style.family === "merchant"
+      ? rng.range(2.45, 2.72)
+      : style.family === "service"
+        ? rng.range(2.18, 2.38)
+        : rng.range(2.32, 2.58);
+  const recessDepth = isBrickBackdrop
+    ? rng.range(0.22, 0.32)
+    : isSpawnFacade ? rng.range(0.18, 0.28) : rng.range(0.10, 0.16);
+  const frameThickness = isBrickBackdrop
+    ? rng.range(0.18, 0.26)
+    : isSpawnFacade ? rng.range(0.14, 0.22) : rng.range(0.11, 0.17);
+  const frameDepth = clamp(
+    isBrickBackdrop
+      ? rng.range(0.22, 0.32)
+      : isSpawnFacade ? rng.range(0.16, 0.26) : rng.range(0.09, 0.13),
+    0.06,
+    segmentMaxProtrusion + (isBrickBackdrop ? 0.16 : isSpawnFacade ? 0.10 : 0.08),
+  );
+  const jambDepth = clamp(
+    isBrickBackdrop
+      ? rng.range(0.24, 0.34)
+      : isSpawnFacade ? rng.range(0.18, 0.28) : rng.range(0.10, 0.16),
+    0.06,
+    segmentMaxProtrusion + (isBrickBackdrop ? 0.18 : isSpawnFacade ? 0.12 : 0.10),
+  );
 
   const columnRoles = Array.from({ length: bayCount }, () => "blank");
   let doorColumns = [];
@@ -1324,6 +1401,9 @@ function summarizeSegmentFacade(segment, zone, segmentIndex, faceContext, baseSe
         continue;
       }
       if (role === "window" && !balconyPlan.coveredWindows.has(`${column}:${story}`)) {
+        if (isSpawnGateBrickBackdropPreset(spec.compositionPreset) && story === 0 && column === Math.floor(spec.bayCount * 0.5)) {
+          continue;
+        }
         const treatment = resolveWindowTreatment(spec, column, story);
         windowCounts[treatment] += 1;
       }
@@ -2239,6 +2319,7 @@ async function main() {
       isSideHall,
       isConnector,
     };
+    const isSpawnBCleanup = isSpawnBShellCleanupSurface(expected.zone, expected.face);
 
     const segmentSummaries = segments
       .sort((left, right) => left.start - right.start)
@@ -2304,11 +2385,13 @@ async function main() {
       windowLogic: segmentSummaries.map((segment) => `#${segment.segmentNumber} ${segment.summary.windowNotes}`).join(" "),
       balconyLogic: segmentSummaries.map((segment) => `#${segment.segmentNumber} ${segment.summary.balconyNotes}`).join(" "),
       textureLogic: `${style.family} facade family on ${expected.zone.id}:${expected.face} resolves wall \`${style.materials.wall}\` with balcony material ${style.materials.balcony ? `\`${style.materials.balcony}\`` : "none"}.`,
-      trimLogic: style.trimTier === "hero"
-        ? `Hero trim tier uses the heaviest parapet and trim emphasis with \`${style.materials.trimHeavy}\` and \`${style.materials.trimLight}\`.`
-        : style.trimTier === "accented"
-          ? `Accented trim tier keeps base trim and string-course reads with \`${style.materials.trimHeavy}\` / \`${style.materials.trimLight}\`.`
-          : `Restrained trim tier minimizes banding and keeps trims on \`${style.materials.trimHeavy}\` / \`${style.materials.trimLight}\`.`,
+      trimLogic: isSpawnBCleanup
+        ? `Spawn B shell cleanup keeps only edge trims: shared plinth ${SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_M.toFixed(2)}m / ${SPAWN_B_SHELL_SHARED_PLINTH_DEPTH_M.toFixed(2)}m, heavy top-edge trims on \`${style.materials.trimHeavy}\`, no string-course bands, and no full-height pilaster grid.`
+        : style.trimTier === "hero"
+          ? `Hero trim tier uses the heaviest parapet and trim emphasis with \`${style.materials.trimHeavy}\` and \`${style.materials.trimLight}\`.`
+          : style.trimTier === "accented"
+            ? `Accented trim tier keeps base trim and string-course reads with \`${style.materials.trimHeavy}\` / \`${style.materials.trimLight}\`.`
+            : `Restrained trim tier minimizes banding and keeps trims on \`${style.materials.trimHeavy}\` / \`${style.materials.trimLight}\`.`,
       notes: building ? building.notes : `${area.label} exposed ${expected.face} face.`,
     };
 

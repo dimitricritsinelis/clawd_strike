@@ -94,6 +94,13 @@ const SLOT_SPAWN_SIDE: FacadeMaterialSlots = {
   balcony: "ph_trim_sanded_01",
 };
 
+const SLOT_SPAWN_B_BRICK: FacadeMaterialSlots = {
+  wall: "ph_brick_4_desert",
+  trimHeavy: "ph_stone_trim_white",
+  trimLight: "ph_band_plastered",
+  balcony: null,
+};
+
 const SLOT_SIDE_HALL: FacadeMaterialSlots = {
   wall: "ph_whitewashed_brick",
   trimHeavy: "ph_sandstone_blocks_05",
@@ -231,11 +238,12 @@ export function resolveFacadeStyleForSegment(zone: ZoneLike, frame: FacadeSegmen
   if (zone.type === "spawn_plaza") {
     const face = resolveFacadeFaceForSegment(zone, frame);
     const isHorizontalFace = face === "north" || face === "south";
+    const isSpawnBOuterShell = zone.id === "SPAWN_B_GATE_PLAZA" && face !== "south";
     return {
       family: "spawn",
-      trimTier: isHorizontalFace ? "hero" : "accented",
-      balconyStyle: "residential_parapet",
-      materials: isHorizontalFace ? SLOT_SPAWN : SLOT_SPAWN_SIDE,
+      trimTier: isSpawnBOuterShell ? (face === "north" ? "hero" : "accented") : isHorizontalFace ? "hero" : "accented",
+      balconyStyle: isSpawnBOuterShell ? "none" : "residential_parapet",
+      materials: isSpawnBOuterShell ? SLOT_SPAWN_B_BRICK : isHorizontalFace ? SLOT_SPAWN : SLOT_SPAWN_SIDE,
     };
   }
 

@@ -333,6 +333,7 @@ function deriveBlockoutSpec(spec, zones) {
                 "residential_quiet",
                 "residential_balcony_stack",
                 "spawn_courtyard_landmark",
+                "spawn_gate_brick_backdrop",
                 "service_blank",
               ].includes(preset)
             ) {

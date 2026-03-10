@@ -85,6 +85,27 @@
       }
     },
     {
+      "id": "ph_brick_4_desert",
+      "tileSizeM": 0.5,
+      "tintHex": "#e0c39b",
+      "albedoBoost": 1.04,
+      "roughness": 0.97,
+      "normalScale": 0.72,
+      "aoIntensity": 0.62,
+      "textures": {
+        "1k": {
+          "albedo": "./brick_4_desert/brick_4_desert_diff_1k.jpg",
+          "normal": "./brick_4_desert/brick_4_desert_nor_gl_1k.jpg",
+          "arm": "./brick_4_desert/brick_4_desert_arm_1k.jpg"
+        },
+        "2k": {
+          "albedo": "./brick_4_desert/brick_4_desert_diff_2k.jpg",
+          "normal": "./brick_4_desert/brick_4_desert_nor_gl_2k.jpg",
+          "arm": "./brick_4_desert/brick_4_desert_arm_2k.jpg"
+        }
+      }
+    },
+    {
       "id": "ph_whitewashed_brick",
       "tileSizeM": 2.0,
       "tintHex": "#f5f0e8",

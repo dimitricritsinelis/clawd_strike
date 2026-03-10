@@ -34,6 +34,14 @@ const SEGMENT_EDGE_MARGIN_M = 0.35;
 const INSTANCE_BUDGET = 9800;
 const STORY_HEIGHT_M = 3.0;
 const WINDOW_GLASS_THICKNESS_M = 0.02;
+const STANDARD_MAIN_GROUND_FACADE_DOOR_W_M = 1.4;
+const STANDARD_MAIN_GROUND_FACADE_DOOR_H_M = 2.55;
+const SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_M = 0.58;
+const SPAWN_B_SHELL_SHARED_PLINTH_DEPTH_M = 0.17;
+const SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_SCALE = 0.85;
+const SPAWN_B_SHELL_TRIM_DEPTH_SCALE = 0.67;
+const RECESSED_PANEL_BACK_THICKNESS_M = 0.02;
+const MIN_RECESSED_PANEL_FRONT_INSET_M = 0.08;
 
 // ── Standardized trim dimensions by story class ────────────────────────────
 // All trim pieces use fixed canonical sizes per story count rather than per-segment
@@ -103,16 +111,6 @@ const SPAWN_TRIM_DIMS: Record<number, TrimDims> = {
     pilasterD: 0.12, pilasterW: 0.24,
   },
 };
-
-// Spawn B cleanup-shell retune applies only to the outer north/east/west faces.
-const SPAWN_B_CLEANUP_ZONE_ID = "SPAWN_B_GATE_PLAZA";
-const SPAWN_B_CLEANUP_FACES = new Set<FacadeFace>(["north", "east", "west"]);
-const SPAWN_B_CLEANUP_DEPTH_SCALE = 0.67;
-const SPAWN_B_CLEANUP_PLINTH_HEIGHT_SCALE = 0.85;
-const SPAWN_B_CLEANUP_TRIM_HEIGHT_SCALE = 0.92;
-const SPAWN_B_CLEANUP_PIER_WIDTH_SCALE = 0.94;
-const SPAWN_B_CLEANUP_SURROUND_THICKNESS_SCALE = 0.92;
-const SPAWN_B_CLEANUP_ARCH_HEIGHT_SCALE = 0.92;
 
 function getTrimDims(wallHeightM: number, isSpawn = false): TrimDims {
   const stories = Math.max(1, Math.round(wallHeightM / STORY_HEIGHT_M));
@@ -248,49 +246,6 @@ type SegmentDecorContext = {
   plinthDepth: number;
 };
 
-type CleanupTrimScales = {
-  depth: number;
-  plinthHeight: number;
-  trimHeight: number;
-  pierWidth: number;
-  surroundThickness: number;
-  archHeight: number;
-};
-
-function resolveCleanupTrimScales(
-  ctx: Pick<SegmentDecorContext, "zone" | "facadeFace">,
-): CleanupTrimScales {
-  const isSpawnBCleanupSurface = ctx.zone?.id === SPAWN_B_CLEANUP_ZONE_ID
-    && SPAWN_B_CLEANUP_FACES.has(ctx.facadeFace);
-
-  if (!isSpawnBCleanupSurface) {
-    return {
-      depth: 1,
-      plinthHeight: 1,
-      trimHeight: 1,
-      pierWidth: 1,
-      surroundThickness: 1,
-      archHeight: 1,
-    };
-  }
-
-  return {
-    depth: SPAWN_B_CLEANUP_DEPTH_SCALE,
-    plinthHeight: SPAWN_B_CLEANUP_PLINTH_HEIGHT_SCALE,
-    trimHeight: SPAWN_B_CLEANUP_TRIM_HEIGHT_SCALE,
-    pierWidth: SPAWN_B_CLEANUP_PIER_WIDTH_SCALE,
-    surroundThickness: SPAWN_B_CLEANUP_SURROUND_THICKNESS_SCALE,
-    archHeight: SPAWN_B_CLEANUP_ARCH_HEIGHT_SCALE,
-  };
-}
-
-function resolveCorniceStripHeight(ctx: SegmentDecorContext, dims: TrimDims): number {
-  const cleanupScales = resolveCleanupTrimScales(ctx);
-  return dims.corniceH
-    * (ctx.trimTier === "hero" ? 1.06 : ctx.trimTier === "accented" ? 0.98 : 0.84)
-    * cleanupScales.trimHeight;
-}
-
 export type BuildWallDetailProfile = "blockout" | "pbr";
 
 export type BuildWallDetailPlacementsOptions = {
@@ -371,6 +326,10 @@ function isBlankWallRole(wallRole: WallRole): boolean {
 }
 
 function isFrontageWallRole(wallRole: WallRole): boolean {
+  return wallRole === "main_frontage" || wallRole === "spawn_frontage";
+}
+
+function usesStandardMainGroundFacadeDoorSize(wallRole: WallRole): boolean {
   return wallRole === "main_frontage" || wallRole === "spawn_frontage";
 }
 
@@ -496,8 +455,27 @@ function tagTrim(
   }
 }
 
+function resolveInsetSurfaceCenterOffset(requestedInsetM: number, depthM: number): number {
+  const minimumInset = MIN_RECESSED_PANEL_FRONT_INSET_M + depthM * 0.5;
+  return -Math.max(requestedInsetM, minimumInset);
+}
+
+function isSpawnGateBrickBackdropPreset(preset: RuntimeFacadeOverridePreset): boolean {
+  return preset === "spawn_gate_brick_backdrop";
+}
+
+function isSpawnBShellCleanupSurface(ctx: SegmentDecorContext): boolean {
+  return ctx.zone?.id === "SPAWN_B_GATE_PLAZA"
+    && (ctx.facadeFace === "north" || ctx.facadeFace === "east" || ctx.facadeFace === "west");
+}
+
+function scaleSpawnBShellTrimDepth(depthM: number, isSpawnBCleanup: boolean): number {
+  return isSpawnBCleanup ? depthM * SPAWN_B_SHELL_TRIM_DEPTH_SCALE : depthM;
+}
+
 function isSpawnHeroFacade(ctx: SegmentDecorContext): boolean {
-  return ctx.compositionPreset === "spawn_courtyard_landmark";
+  return ctx.compositionPreset === "spawn_courtyard_landmark"
+    || isSpawnGateBrickBackdropPreset(ctx.compositionPreset);
 }
 
 function pickHeroFacadeLean(ctx: SegmentDecorContext): -1 | 1 {
@@ -573,23 +551,26 @@ function placeParapetCap(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
   const isHero = isSpawnHeroFacade(ctx);
-  const cleanupScales = resolveCleanupTrimScales(ctx);
+  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
   ctx.rng.range(0.18, 0.35); // consume
   ctx.rng.range(0.06, 0.14); // consume
   const tierHeightScale = ctx.trimTier === "hero" ? 1.08 : ctx.trimTier === "accented" ? 0.98 : 0.86;
   const tierDepthScale = ctx.trimTier === "hero" ? 1.18 : ctx.trimTier === "accented" ? 1.0 : 0.82;
-  const capHeight = dims.parapetH * (isHero ? 1.18 : tierHeightScale) * cleanupScales.trimHeight;
-  const capDepth = clamp(
-    dims.parapetD * (isHero ? 1.35 : tierDepthScale) * cleanupScales.depth,
-    0.04,
-    ctx.maxProtrusionM + 0.06,
+  const capHeight = dims.parapetH * (isHero ? 1.18 : tierHeightScale);
+  const capDepth = scaleSpawnBShellTrimDepth(
+    clamp(
+      dims.parapetD * (isHero ? 1.35 : tierDepthScale),
+      0.04,
+      ctx.maxProtrusionM + 0.06,
+    ),
+    isSpawnBCleanup,
   );
   const y = ctx.wallHeightM + capHeight * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
     ctx.frame, 0, y, capDepth * 0.5, capDepth, capHeight, ctx.frame.lengthM);
   tagTrim(
     ctx.instances,
-    isHero || ctx.trimTier === "hero" ? ctx.trimHeavyMaterialId : ctx.trimLightMaterialId,
+    isSpawnBCleanup || isHero || ctx.trimTier === "hero" ? ctx.trimHeavyMaterialId : ctx.trimLightMaterialId,
   );
 }
 
@@ -629,8 +610,10 @@ function placeRoofCap(ctx: SegmentDecorContext): void {
  *   3. Return wall at segment end   — same
  */
 function placeBuildingEnclosure(ctx: SegmentDecorContext): void {
-  // Only enclose walls that need a building shell
-  if (!ctx.isSpawnOuterWall && !ctx.isConnectorSpawnFacing) return;
+  // Only spawn outer walls get enclosure shells. Connector spawn-facing walls are
+  // transitional portals, not true front facades; enclosing them leaks slabs into
+  // the spawn sightline and shows up as plaster patches over nearby brick walls.
+  if (!ctx.isSpawnOuterWall) return;
   if (ctx.frame.lengthM < 1.0) return;
 
   const wallH = ctx.wallHeightM;
@@ -683,15 +666,28 @@ function placeBuildingEnclosure(ctx: SegmentDecorContext): void {
 function computePlinthDims(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
+  if (isSpawnBShellCleanupSurface(ctx)) {
+    ctx.rng.range(0.28, 0.48); // consume (preserve determinism)
+    ctx.rng.range(0.06, 0.13); // consume
+    ctx.plinthHeight = SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_M * SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_SCALE;
+    ctx.plinthDepth = scaleSpawnBShellTrimDepth(
+      clamp(
+        SPAWN_B_SHELL_SHARED_PLINTH_DEPTH_M,
+        0.04,
+        ctx.maxProtrusionM + 0.06,
+      ),
+      true,
+    );
+    return;
+  }
   const isHero = isSpawnHeroFacade(ctx);
-  const cleanupScales = resolveCleanupTrimScales(ctx);
   ctx.rng.range(0.28, 0.48); // consume (preserve determinism)
   ctx.rng.range(0.06, 0.13); // consume
   const tierHeightScale = ctx.trimTier === "hero" ? 1.08 : ctx.trimTier === "accented" ? 0.96 : 0.84;
   const tierDepthScale = ctx.trimTier === "hero" ? 1.12 : ctx.trimTier === "accented" ? 0.95 : 0.8;
-  ctx.plinthHeight = dims.plinthH * (isHero ? 1.45 : tierHeightScale) * cleanupScales.plinthHeight;
+  ctx.plinthHeight = dims.plinthH * (isHero ? 1.45 : tierHeightScale);
   ctx.plinthDepth = clamp(
-    dims.plinthD * (isHero ? 1.65 : tierDepthScale) * cleanupScales.depth,
+    dims.plinthD * (isHero ? 1.65 : tierDepthScale),
     0.04,
     ctx.maxProtrusionM + 0.06,
   );
@@ -743,8 +739,8 @@ function emitPlinthStrip(
 
 function placeStringCourses(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.5) return;
+  if (isSpawnBShellCleanupSurface(ctx)) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
-  const cleanupScales = resolveCleanupTrimScales(ctx);
   ctx.rng.range(0.10, 0.18); // consume
   ctx.rng.range(0.06, 0.11); // consume
   // Spawn: 2-story walls get string courses. Non-spawn: original 3-story guard.
@@ -753,7 +749,7 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
     return;
   }
   const courseHeight = dims.courseH;
-  const courseDepth = clamp(dims.courseD * cleanupScales.depth, 0.04, ctx.maxProtrusionM + 0.04);
+  const courseDepth = clamp(dims.courseD, 0.04, ctx.maxProtrusionM + 0.04);
 
   // Place a string course at EVERY story break for rhythmic horizontal banding.
   for (let storyY = STORY_HEIGHT_M; storyY < ctx.wallHeightM - 0.5; storyY += STORY_HEIGHT_M) {
@@ -769,21 +765,24 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
 function placeCorniceStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
-  const cleanupScales = resolveCleanupTrimScales(ctx);
+  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
   ctx.rng.range(0.18, 0.30); // consume
   ctx.rng.range(0.10, 0.19); // consume
   // Spawn hero facades now keep their cornice for silhouette definition.
-  const corniceHeight = resolveCorniceStripHeight(ctx, dims);
-  const corniceDepth = clamp(
-    dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8) * cleanupScales.depth,
-    0.06,
-    ctx.maxProtrusionM + 0.08,
+  const corniceHeight = dims.corniceH * (ctx.trimTier === "hero" ? 1.06 : ctx.trimTier === "accented" ? 0.98 : 0.84);
+  const corniceDepth = scaleSpawnBShellTrimDepth(
+    clamp(
+      dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8),
+      0.06,
+      ctx.maxProtrusionM + 0.08,
+    ),
+    isSpawnBCleanup,
   );
   const y = ctx.wallHeightM - corniceHeight * 0.5;
   pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
     ctx.frame, 0, y, corniceDepth * 0.5,
     corniceDepth, corniceHeight, ctx.frame.lengthM);
-  tagTrim(ctx.instances, ctx.trimLightMaterialId);
+  tagTrim(ctx.instances, isSpawnBCleanup ? (ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId) : ctx.trimLightMaterialId);
 }
 
 // ── Corner piers ───────────────────────────────────────────────────────────
@@ -793,7 +792,7 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
 
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
   const isHero = isSpawnHeroFacade(ctx);
-  const cleanupScales = resolveCleanupTrimScales(ctx);
+  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
   const marginM = ctx.profile === "pbr" ? 0.04 : 0.02;
   const maxWidth = Math.max(0.28, Math.min(1.05, ctx.frame.lengthM * 0.4));
   // Consume RNG calls that were previously used for random dims (preserves sequence).
@@ -809,30 +808,40 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
     : ctx.trimTier === "hero" ? (isSpawn ? 1.3 : 1.0)
     : ctx.trimTier === "accented" ? (isSpawn ? 1.1 : 0.78)
     : (isSpawn ? 0.85 : 0.62);
-  const pierWidth = clamp(dims.pierW * tierWidthScale * cleanupScales.pierWidth, 0.22, maxWidth);
-  const pierDepth = clamp(dims.pierD * tierDepthScale * cleanupScales.depth, 0.05, ctx.maxProtrusionM);
+  const pierWidth = clamp(dims.pierW * tierWidthScale, 0.22, maxWidth);
+  const pierDepth = scaleSpawnBShellTrimDepth(
+    clamp(dims.pierD * tierDepthScale, 0.05, ctx.maxProtrusionM),
+    isSpawnBCleanup,
+  );
   const pierHeight = ctx.wallHeightM; // full height — contiguous with roofline
   const halfLen = ctx.frame.lengthM * 0.5;
-  const plinthDepth = clamp(
-    dims.plinthD * (isHero ? 1.65 : ctx.trimTier === "hero" ? 1.12 : ctx.trimTier === "accented" ? 0.95 : 0.8) * cleanupScales.depth,
-    0.04,
-    ctx.maxProtrusionM + 0.06,
-  );
-  const courseDepth = clamp(dims.courseD * cleanupScales.depth, 0.04, ctx.maxProtrusionM + 0.04);
-  const corniceDepth = clamp(
-    dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8) * cleanupScales.depth,
-    0.06,
-    ctx.maxProtrusionM + 0.08,
-  );
-  const parapetDepth = clamp(
-    dims.parapetD * (isHero ? 1.35 : ctx.trimTier === "hero" ? 1.18 : ctx.trimTier === "accented" ? 1.0 : 0.82) * cleanupScales.depth,
-    0.04,
-    ctx.maxProtrusionM + 0.06,
-  );
 
   // At corners the pier depth must cover all strip protrusions so it
   // visually bridges the perpendicular wall faces.
-  const cornerDepth = Math.max(pierDepth, plinthDepth, courseDepth, corniceDepth, parapetDepth);
+  const cleanupCorniceDepth = scaleSpawnBShellTrimDepth(
+    clamp(
+      dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8),
+      0.06,
+      ctx.maxProtrusionM + 0.08,
+    ),
+    isSpawnBCleanup,
+  );
+  const cleanupParapetDepth = scaleSpawnBShellTrimDepth(
+    clamp(
+      dims.parapetD * (isHero ? 1.35 : ctx.trimTier === "hero" ? 1.18 : ctx.trimTier === "accented" ? 1.0 : 0.82),
+      0.04,
+      ctx.maxProtrusionM + 0.06,
+    ),
+    isSpawnBCleanup,
+  );
+  const cornerDepth = isSpawnBCleanup
+    ? Math.max(
+      pierDepth,
+      scaleSpawnBShellTrimDepth(SPAWN_B_SHELL_SHARED_PLINTH_DEPTH_M, true),
+      cleanupCorniceDepth,
+      cleanupParapetDepth,
+    )
+    : Math.max(pierDepth, dims.plinthD, dims.courseD, dims.corniceD, dims.parapetD);
 
   for (const side of [-1, 1] as const) {
     const isCorner = (side === -1 && ctx.cornerAtStart) || (side === 1 && ctx.cornerAtEnd);
@@ -998,6 +1007,9 @@ function resolveWindowColumnTarget(
         ),
       );
     case "spawn_frontage":
+      if (isSpawnGateBrickBackdropPreset(compositionPreset)) {
+        return Math.min(candidateColumns.length, Math.max(3, Math.min(4, stories + doorCount)));
+      }
       return Math.min(
         candidateColumns.length,
         Math.max(
@@ -1096,14 +1108,20 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
 
   const stories = Math.max(1, Math.floor(ctx.wallHeightM / STORY_HEIGHT_M));
   const facadeLean = pickFacadeLean(ctx);
+  const isBrickBackdrop = isSpawnGateBrickBackdropPreset(ctx.compositionPreset);
 
   const targetBayW =
-    isFrontageWallRole(ctx.wallRole)
+    isBrickBackdrop
+      ? usableLength >= 18 ? usableLength / 7 : usableLength / 5
+      : isFrontageWallRole(ctx.wallRole)
       ? ctx.rng.range(2.2, 3.0)
       : ctx.wallRole === "sidehall_outer_quiet"
         ? ctx.rng.range(2.6, 3.4)
         : ctx.rng.range(1.9, 2.5);
   let bayCount = Math.max(1, Math.round(usableLength / targetBayW));
+  if (isBrickBackdrop) {
+    bayCount = usableLength >= 18 ? 7 : 5;
+  }
   const doorCount = resolveDoorCountForWallRole(ctx.wallRole, usableLength, ctx.compositionPreset);
 
   if (doorCount === 1 && bayCount >= 2 && bayCount % 2 === 0) {
@@ -1116,7 +1134,9 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
   const windowW = clamp(
     bayWidth
       * (
-        isSpawnFacade
+        isBrickBackdrop
+          ? ctx.rng.range(0.36, 0.48)
+          : isSpawnFacade
           ? ctx.rng.range(0.46, 0.58)
           : isFrontageWallRole(ctx.wallRole)
             ? ctx.rng.range(0.34, 0.46)
@@ -1125,21 +1145,26 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
               : ctx.rng.range(0.32, 0.44)
       ),
     0.52,
-    bayWidth * (isSpawnFacade ? 0.72 : 0.64),
+    bayWidth * (isBrickBackdrop ? 0.56 : isSpawnFacade ? 0.72 : 0.64),
   );
   const windowH =
-    isSpawnFacade
+    isBrickBackdrop
+      ? ctx.rng.range(1.18, 1.38)
+      : isSpawnFacade
       ? ctx.rng.range(1.28, 1.55)
       : isFrontageWallRole(ctx.wallRole)
         ? ctx.rng.range(1.0, 1.26)
         : ctx.wallRole === "sidehall_outer_quiet"
           ? ctx.rng.range(0.92, 1.16)
           : ctx.rng.range(1.08, 1.38);
+  const standardizeGroundFloorDoorSize = usesStandardMainGroundFacadeDoorSize(ctx.wallRole);
   ctx.rng.range(0.85, 1.05); // consume — sill now computed from trim centering
-  const doorW = clamp(
+  const authoredDoorW = clamp(
     bayWidth
       * (
-        isFrontageWallRole(ctx.wallRole)
+        isBrickBackdrop
+          ? ctx.rng.range(0.56, 0.68)
+          : isFrontageWallRole(ctx.wallRole)
           ? ctx.rng.range(0.50, 0.64)
           : ctx.wallRole === "sidehall_outer_quiet"
             ? ctx.rng.range(0.40, 0.50)
@@ -1148,24 +1173,36 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
     0.75,
     bayWidth * 0.74,
   );
-  const doorH =
-    ctx.facadeFamily === "merchant"
+  const authoredDoorH =
+    isBrickBackdrop
+      ? ctx.rng.range(2.52, 2.78)
+      : ctx.facadeFamily === "merchant"
       ? ctx.rng.range(2.45, 2.72)
       : ctx.facadeFamily === "service"
         ? ctx.rng.range(2.18, 2.38)
         : ctx.rng.range(2.32, 2.58);
-  const recessDepth = isSpawnFacade ? ctx.rng.range(0.18, 0.28) : ctx.rng.range(0.10, 0.16);
-  const cleanupScales = resolveCleanupTrimScales(ctx);
-  let frameThickness = isSpawnFacade ? ctx.rng.range(0.14, 0.22) : ctx.rng.range(0.11, 0.17);
-  let frameDepth = clamp(
-    isSpawnFacade ? ctx.rng.range(0.16, 0.26) : ctx.rng.range(0.09, 0.13),
-    0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.10 : 0.08));
-  let jambDepth = clamp(
-    isSpawnFacade ? ctx.rng.range(0.18, 0.28) : ctx.rng.range(0.10, 0.16),
-    0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.12 : 0.10));
-  frameThickness *= cleanupScales.surroundThickness;
-  frameDepth = clamp(frameDepth * cleanupScales.depth, 0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.10 : 0.08));
-  jambDepth = clamp(jambDepth * cleanupScales.depth, 0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.12 : 0.10));
+  const doorW = standardizeGroundFloorDoorSize ? STANDARD_MAIN_GROUND_FACADE_DOOR_W_M : authoredDoorW;
+  const doorH = standardizeGroundFloorDoorSize ? STANDARD_MAIN_GROUND_FACADE_DOOR_H_M : authoredDoorH;
+  const recessDepth = isBrickBackdrop
+    ? ctx.rng.range(0.22, 0.32)
+    : isSpawnFacade ? ctx.rng.range(0.18, 0.28) : ctx.rng.range(0.10, 0.16);
+  const frameThickness = isBrickBackdrop
+    ? ctx.rng.range(0.18, 0.26)
+    : isSpawnFacade ? ctx.rng.range(0.14, 0.22) : ctx.rng.range(0.11, 0.17);
+  const frameDepth = clamp(
+    isBrickBackdrop
+      ? ctx.rng.range(0.22, 0.32)
+      : isSpawnFacade ? ctx.rng.range(0.16, 0.26) : ctx.rng.range(0.09, 0.13),
+    0.06,
+    ctx.maxProtrusionM + (isBrickBackdrop ? 0.16 : isSpawnFacade ? 0.10 : 0.08),
+  );
+  const jambDepth = clamp(
+    isBrickBackdrop
+      ? ctx.rng.range(0.24, 0.34)
+      : isSpawnFacade ? ctx.rng.range(0.18, 0.28) : ctx.rng.range(0.10, 0.16),
+    0.06,
+    ctx.maxProtrusionM + (isBrickBackdrop ? 0.18 : isSpawnFacade ? 0.12 : 0.10),
+  );
 
   const columnRoles: ColumnRole[] = Array.from(
     { length: bayCount }, () => "blank" as ColumnRole,
@@ -1269,6 +1306,10 @@ function resolveWindowTreatment(
       return ((story + columnIndex + leanBias) % 3 === 0) ? "glass" : "dark";
     case "residential_balcony_stack":
       return story === spec.stories - 1 ? "glass" : "dark";
+    case "spawn_gate_brick_backdrop":
+      if (story === spec.stories - 1) return "glass";
+      if (isAccent) return "shuttered";
+      return columnIndex === Math.floor(spec.bayCount * 0.5) ? "dark" : "glass";
     case "spawn_courtyard_landmark": {
       // Top floor: always glass
       if (story === spec.stories - 1) return "glass";
@@ -1292,10 +1333,13 @@ function placeWindowOpening(
   treatment: WindowTreatment,
 ): void {
   const centerY = sillY + spec.windowH * 0.5;
-  const revealW = spec.windowW * 0.84;
-  const revealH = spec.windowH * 0.82;
+  const isBrickBackdrop = isSpawnGateBrickBackdropPreset(spec.compositionPreset);
+  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
+  const revealW = spec.windowW * (isBrickBackdrop ? 0.8 : 0.84);
+  const revealH = spec.windowH * (isBrickBackdrop ? 0.8 : 0.82);
   const shutterLeafW = revealW * 0.46;
   const isSpawn = ctx.zone?.type === "spawn_plaza";
+  const trimDepthScale = isSpawnBCleanup ? SPAWN_B_SHELL_TRIM_DEPTH_SCALE : 1;
 
   // 1. Dark backing panel — spawn: recessed INTO wall; non-spawn: flush.
   pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
@@ -1308,11 +1352,11 @@ function placeWindowOpening(
       WINDOW_GLASS_THICKNESS_M, revealH, revealW);
 
     pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", null,
-      ctx.frame, centerS, centerY, isSpawn ? -spec.recessDepth * 0.25 : 0.018,
+      ctx.frame, centerS, centerY, isSpawn ? -spec.recessDepth * (isBrickBackdrop ? 0.35 : 0.25) : 0.018,
       0.035, 0.05, revealW * 0.94);
 
     pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", null,
-      ctx.frame, centerS, centerY, isSpawn ? -spec.recessDepth * 0.25 : 0.018,
+      ctx.frame, centerS, centerY, isSpawn ? -spec.recessDepth * (isBrickBackdrop ? 0.35 : 0.25) : 0.018,
       0.035, revealH * 0.94, 0.05);
   } else if (treatment === "shuttered") {
     for (const side of [-1, 1] as const) {
@@ -1326,24 +1370,29 @@ function placeWindowOpening(
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
       ctx.frame, centerS + side * (revealW + spec.frameThickness) * 0.5, centerY,
-      spec.frameDepth * (isSpawn ? 0.9 : 0.6),
-      spec.frameDepth * 1.05, revealH + spec.frameThickness * 1.35, spec.frameThickness);
+      spec.frameDepth * (isBrickBackdrop ? 1.08 : isSpawn ? 0.9 : 0.6) * trimDepthScale,
+      spec.frameDepth * (isBrickBackdrop ? 1.22 : 1.05) * trimDepthScale, revealH + spec.frameThickness * (isBrickBackdrop ? 1.6 : 1.35), spec.frameThickness);
     tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
   }
 
   // 3. Sill shelf — spawn: deeper projection; non-spawn: original depth.
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, sillY - spec.frameThickness * 0.5,
-    spec.frameDepth * (isSpawn ? 1.2 : 0.8),
-    spec.frameDepth * 1.7, spec.frameThickness * 1.15, revealW + spec.frameThickness * 2.3);
+    spec.frameDepth * (isBrickBackdrop ? 1.38 : isSpawn ? 1.2 : 0.8) * trimDepthScale,
+    spec.frameDepth * (isBrickBackdrop ? 1.95 : 1.7) * trimDepthScale, spec.frameThickness * (isBrickBackdrop ? 1.28 : 1.15), revealW + spec.frameThickness * (isBrickBackdrop ? 2.8 : 2.3));
   tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
 
   // 4. Lintel — spawn: deeper; non-spawn: original shallower projection.
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, sillY + revealH + spec.frameThickness * 0.55,
-    spec.frameDepth * (isSpawn ? 0.85 : 0.55),
-    spec.frameDepth * 1.1, spec.frameThickness * 1.3, revealW + spec.frameThickness * 2.1);
-  tagTrim(ctx.instances, ctx.trimLightMaterialId ?? ctx.trimHeavyMaterialId);
+    spec.frameDepth * (isSpawnBCleanup ? 1.38 : isBrickBackdrop ? 1.05 : isSpawn ? 0.85 : 0.55) * trimDepthScale,
+    spec.frameDepth * (isSpawnBCleanup ? 1.95 : isBrickBackdrop ? 1.3 : 1.1) * trimDepthScale,
+    spec.frameThickness * (isSpawnBCleanup ? 1.28 : isBrickBackdrop ? 1.42 : 1.3),
+    revealW + spec.frameThickness * (isSpawnBCleanup ? 2.8 : isBrickBackdrop ? 2.6 : 2.1));
+  tagTrim(
+    ctx.instances,
+    isSpawnBCleanup ? (ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId) : (ctx.trimLightMaterialId ?? ctx.trimHeavyMaterialId),
+  );
 }
 
 // ── Arched door placement (uniform dimensions from spec) ───────────────────
@@ -1355,7 +1404,9 @@ function placeArchedDoor(
 ): void {
   const uses3DModel = spec.doorH >= 2.0 && spec.doorW >= 0.8;
   const isSpawn = ctx.zone?.type === "spawn_plaza";
-  const cleanupScales = resolveCleanupTrimScales(ctx);
+  const isBrickBackdrop = isSpawnGateBrickBackdropPreset(spec.compositionPreset);
+  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
+  const trimDepthScale = isSpawnBCleanup ? SPAWN_B_SHELL_TRIM_DEPTH_SCALE : 1;
 
   if (uses3DModel) {
     // 3D model fully replaces the flat void + lintel
@@ -1372,20 +1423,75 @@ function placeArchedDoor(
 
     // Spawn doors get decorative framing around the 3D model
     if (isSpawn) {
-      const archH = spec.doorW * 0.2 * cleanupScales.archHeight;
+      const archH = spec.doorW * (isBrickBackdrop ? 0.24 : 0.2);
       pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", null,
-        ctx.frame, centerS, spec.doorH, spec.frameDepth * 0.6,
-        spec.frameDepth * 1.5, archH, spec.doorW + spec.frameThickness * 2,
+        ctx.frame, centerS, spec.doorH, spec.frameDepth * (isBrickBackdrop ? 0.78 : 0.6) * trimDepthScale,
+        spec.frameDepth * (isBrickBackdrop ? 1.85 : 1.5) * trimDepthScale, archH, spec.doorW + spec.frameThickness * (isBrickBackdrop ? 2.6 : 2),
         -Math.PI * 0.5);
+      if (isSpawnBCleanup) {
+        tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
+      }
 
       for (const side of [-1, 1] as const) {
         pushBox(ctx.instances, ctx.maxInstances, "door_jamb", ctx.wallMaterialId,
           ctx.frame, centerS + side * (spec.doorW + spec.frameThickness) * 0.5,
-          spec.doorH * 0.5, spec.frameDepth * 0.5,
-          spec.frameDepth * 1.2, spec.doorH, spec.frameThickness);
+          spec.doorH * 0.5, spec.frameDepth * (isBrickBackdrop ? 0.7 : 0.5) * trimDepthScale,
+          spec.frameDepth * (isBrickBackdrop ? 1.45 : 1.2) * trimDepthScale, spec.doorH, spec.frameThickness * (isBrickBackdrop ? 1.18 : 1));
         tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
       }
 
+      if (isBrickBackdrop) {
+        pushBox(ctx.instances, ctx.maxInstances, "door_lintel", ctx.wallMaterialId,
+          ctx.frame, centerS, spec.doorH + spec.frameThickness * 1.45, spec.frameDepth * 0.82 * trimDepthScale,
+          spec.frameDepth * 1.55 * trimDepthScale, spec.frameThickness * 0.82, spec.doorW + spec.frameThickness * 2.9);
+        tagTrim(
+          ctx.instances,
+          isSpawnBCleanup ? (ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId) : (ctx.trimLightMaterialId ?? ctx.trimHeavyMaterialId),
+        );
+      } else {
+        const bracketCount: number = spec.doorW > 1.2 ? 3 : 2;
+        const bracketSpacing = spec.doorW * 0.65 / Math.max(1, bracketCount - 1);
+        for (let i = 0; i < bracketCount; i++) {
+          const offset = bracketCount === 1 ? 0 : -spec.doorW * 0.325 + i * bracketSpacing;
+          pushBox(ctx.instances, ctx.maxInstances, "awning_bracket", null,
+            ctx.frame, centerS + offset, spec.doorH + spec.frameThickness * 2.2,
+            spec.frameDepth * 1.0,
+            0.18, 0.06, 0.14);
+        }
+      }
+    }
+  } else if (isSpawn) {
+    // Small spawn doors: recessed void with decorative framing
+    pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
+      ctx.frame, centerS, spec.doorH * 0.5, -spec.recessDepth * 0.4,
+      0.006, spec.doorH, spec.doorW * 1.05);
+
+    const archH = spec.doorW * (isBrickBackdrop ? 0.24 : 0.2);
+    pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", null,
+      ctx.frame, centerS, spec.doorH, spec.frameDepth * (isBrickBackdrop ? 0.78 : 0.6) * trimDepthScale,
+      spec.frameDepth * (isBrickBackdrop ? 1.85 : 1.5) * trimDepthScale, archH, spec.doorW + spec.frameThickness * (isBrickBackdrop ? 2.6 : 2),
+      -Math.PI * 0.5);
+    if (isSpawnBCleanup) {
+      tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
+    }
+
+    for (const side of [-1, 1] as const) {
+      pushBox(ctx.instances, ctx.maxInstances, "door_jamb", ctx.wallMaterialId,
+        ctx.frame, centerS + side * (spec.doorW + spec.frameThickness) * 0.5,
+        spec.doorH * 0.5, spec.frameDepth * (isBrickBackdrop ? 0.7 : 0.5) * trimDepthScale,
+        spec.frameDepth * (isBrickBackdrop ? 1.45 : 1.2) * trimDepthScale, spec.doorH, spec.frameThickness * (isBrickBackdrop ? 1.18 : 1));
+      tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
+    }
+
+    if (isBrickBackdrop) {
+      pushBox(ctx.instances, ctx.maxInstances, "door_lintel", ctx.wallMaterialId,
+        ctx.frame, centerS, spec.doorH + spec.frameThickness * 1.45, spec.frameDepth * 0.82 * trimDepthScale,
+        spec.frameDepth * 1.55 * trimDepthScale, spec.frameThickness * 0.82, spec.doorW + spec.frameThickness * 2.9);
+      tagTrim(
+        ctx.instances,
+        isSpawnBCleanup ? (ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId) : (ctx.trimLightMaterialId ?? ctx.trimHeavyMaterialId),
+      );
+    } else {
       const bracketCount: number = spec.doorW > 1.2 ? 3 : 2;
       const bracketSpacing = spec.doorW * 0.65 / Math.max(1, bracketCount - 1);
       for (let i = 0; i < bracketCount; i++) {
@@ -1395,35 +1501,6 @@ function placeArchedDoor(
           spec.frameDepth * 1.0,
           0.18, 0.06, 0.14);
       }
-    }
-  } else if (isSpawn) {
-    // Small spawn doors: recessed void with decorative framing
-    pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
-      ctx.frame, centerS, spec.doorH * 0.5, -spec.recessDepth * 0.4,
-      0.006, spec.doorH, spec.doorW * 1.05);
-
-    const archH = spec.doorW * 0.2 * cleanupScales.archHeight;
-    pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", null,
-      ctx.frame, centerS, spec.doorH, spec.frameDepth * 0.6,
-      spec.frameDepth * 1.5, archH, spec.doorW + spec.frameThickness * 2,
-      -Math.PI * 0.5);
-
-    for (const side of [-1, 1] as const) {
-      pushBox(ctx.instances, ctx.maxInstances, "door_jamb", ctx.wallMaterialId,
-        ctx.frame, centerS + side * (spec.doorW + spec.frameThickness) * 0.5,
-        spec.doorH * 0.5, spec.frameDepth * 0.5,
-        spec.frameDepth * 1.2, spec.doorH, spec.frameThickness);
-      tagTrim(ctx.instances, ctx.trimHeavyMaterialId);
-    }
-
-    const bracketCount: number = spec.doorW > 1.2 ? 3 : 2;
-    const bracketSpacing = spec.doorW * 0.65 / Math.max(1, bracketCount - 1);
-    for (let i = 0; i < bracketCount; i++) {
-      const offset = bracketCount === 1 ? 0 : -spec.doorW * 0.325 + i * bracketSpacing;
-      pushBox(ctx.instances, ctx.maxInstances, "awning_bracket", null,
-        ctx.frame, centerS + offset, spec.doorH + spec.frameThickness * 2.2,
-        spec.frameDepth * 1.0,
-        0.18, 0.06, 0.14);
     }
   } else {
     // Small non-spawn doors: flat void + lintel trim
@@ -1445,6 +1522,7 @@ function placeUpperDoorOpening(
   const openingW = clamp(spec.bayWidth * 0.7, spec.windowW * 1.1, spec.bayWidth * 0.84);
   const openingH = clamp(spec.windowH * 1.28, 1.6, 2.25);
   const centerY = storyBaseY + BALCONY_DOOR_SILL_OFFSET + openingH * 0.5;
+  const trimDepthScale = isSpawnBShellCleanupSurface(ctx) ? SPAWN_B_SHELL_TRIM_DEPTH_SCALE : 1;
 
   pushBox(ctx.instances, ctx.maxInstances, "door_void", null,
     ctx.frame, centerS, centerY, 0.008,
@@ -1456,15 +1534,15 @@ function placeUpperDoorOpening(
 
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
-      ctx.frame, centerS + side * (openingW + spec.frameThickness) * 0.5, centerY, spec.frameDepth * 0.6,
-      spec.frameDepth * 1.08, openingH + spec.frameThickness * 1.25, spec.frameThickness);
+      ctx.frame, centerS + side * (openingW + spec.frameThickness) * 0.5, centerY, spec.frameDepth * 0.6 * trimDepthScale,
+      spec.frameDepth * 1.08 * trimDepthScale, openingH + spec.frameThickness * 1.25, spec.frameThickness);
     tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
   }
 
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, storyBaseY + BALCONY_DOOR_SILL_OFFSET + openingH + spec.frameThickness * 0.55,
-    spec.frameDepth * 0.55,
-    spec.frameDepth * 1.1, spec.frameThickness * 1.25, openingW + spec.frameThickness * 2.15);
+    spec.frameDepth * 0.55 * trimDepthScale,
+    spec.frameDepth * 1.1 * trimDepthScale, spec.frameThickness * 1.25, openingW + spec.frameThickness * 2.15);
   tagTrim(ctx.instances, ctx.trimLightMaterialId ?? ctx.trimHeavyMaterialId);
 }
 
@@ -1641,12 +1719,12 @@ function placeBalcony(
 function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
   if (spec.bayCount < 2) return;
   if (ctx.frame.lengthM < 3.0) return;
+  if (isSpawnBShellCleanupSurface(ctx)) return;
 
   ctx.rng.range(0.04, 0.09); // consume — preserved for RNG sequence stability
   ctx.rng.range(0.14, 0.24); // consume
 
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
-  const cleanupScales = resolveCleanupTrimScales(ctx);
   const isBlank = isBlankWallRole(spec.wallRole);
   if (isBlank) return;
 
@@ -1671,7 +1749,7 @@ function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
 
   // Standard facades: pilasters at every other bay edge for rhythm.
   const pilasterW = dims.pilasterW;
-  const pilasterD = clamp(dims.pilasterD * cleanupScales.depth, 0.04, ctx.maxProtrusionM);
+  const pilasterD = clamp(dims.pilasterD, 0.04, ctx.maxProtrusionM);
   const step = ctx.trimTier === "hero" ? 1 : 2;
   for (let edge = 1; edge < spec.bayCount; edge += step) {
     const edgeS = columnCenterS(spec, edge) - spec.bayWidth * 0.5;
@@ -1693,40 +1771,47 @@ function placeBlankBayPanel(
 ): void {
   // Spawn-only feature: recessed panels on blank bays for wall texture
   if (ctx.zone?.type !== "spawn_plaza") return;
+  if (isSpawnBShellCleanupSurface(ctx)) return;
   // Only on non-blank wall roles and non-side-hall facades
   if (isBlankWallRole(spec.wallRole) || ctx.isSideHall) return;
+  const isBrickBackdrop = isSpawnGateBrickBackdropPreset(spec.compositionPreset);
 
   const belowTop = storyBaseY === 0 ? trimDims.plinthH : storyBaseY + trimDims.courseH * 0.5;
   const aboveBot = storyBaseY + STORY_HEIGHT_M - trimDims.courseH * 0.5;
-  const panelH = (aboveBot - belowTop) * 0.65;
-  const panelW = spec.bayWidth * 0.55;
+  const panelH = (aboveBot - belowTop) * (isBrickBackdrop ? 0.72 : 0.65);
+  const panelW = spec.bayWidth * (isBrickBackdrop ? 0.72 : 0.55);
   const panelCenterY = (belowTop + aboveBot) * 0.5;
-  const panelDepth = 0.025; // subtle recess
+  const panelDepth = isBrickBackdrop ? 0.09 : 0.08;
+  const infillMaterialId = isBrickBackdrop ? "ph_band_plastered" : null;
+  const panelCenterInset = resolveInsetSurfaceCenterOffset(panelDepth, RECESSED_PANEL_BACK_THICKNESS_M);
 
   // Recessed back panel (dark, shadowed surface)
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_back", ctx.wallMaterialId,
-    ctx.frame, centerS, panelCenterY, -panelDepth,
-    0.02, panelH, panelW);
+    ctx.frame, centerS, panelCenterY, panelCenterInset,
+    RECESSED_PANEL_BACK_THICKNESS_M, panelH, panelW);
+  if (isBrickBackdrop) {
+    tagTrim(ctx.instances, null, infillMaterialId);
+  }
 
   // Frame around the recess (top, bottom, left, right)
-  const frameT = 0.06;
-  const frameD = panelDepth + 0.04;
+  const frameT = isBrickBackdrop ? 0.075 : 0.06;
+  const frameD = panelDepth + (isBrickBackdrop ? 0.07 : 0.04);
   // Top
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, panelCenterY + (panelH + frameT) * 0.5, frameD * 0.5,
     frameD, frameT, panelW + frameT * 2);
-  tagTrim(ctx.instances, ctx.trimLightMaterialId);
+  tagTrim(ctx.instances, isBrickBackdrop ? (ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId) : ctx.trimLightMaterialId);
   // Bottom
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
     ctx.frame, centerS, panelCenterY - (panelH + frameT) * 0.5, frameD * 0.5,
     frameD, frameT, panelW + frameT * 2);
-  tagTrim(ctx.instances, ctx.trimLightMaterialId);
+  tagTrim(ctx.instances, isBrickBackdrop ? (ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId) : ctx.trimLightMaterialId);
   // Left + Right
   for (const side of [-1, 1] as const) {
     pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_v", ctx.wallMaterialId,
       ctx.frame, centerS + side * (panelW + frameT) * 0.5, panelCenterY, frameD * 0.5,
       frameD, panelH, frameT);
-    tagTrim(ctx.instances, ctx.trimLightMaterialId);
+    tagTrim(ctx.instances, isBrickBackdrop ? (ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId) : ctx.trimLightMaterialId);
   }
 }
 
@@ -1902,6 +1987,7 @@ function decorateSegment(ctx: SegmentDecorContext): void {
 
     for (let story = 0; story < spec.stories; story += 1) {
       const storyBaseY = story * STORY_HEIGHT_M;
+      const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
 
       if (story === 0 && role === "door") {
         // Ground floor door column → arched door
@@ -1915,15 +2001,31 @@ function decorateSegment(ctx: SegmentDecorContext): void {
         }
       } else if (role === "window" && !DISABLE_WINDOWS) {
         if (!balconyPlan.coveredWindows.has(`${col}:${story}`)) {
+          if (isSpawnGateBrickBackdropPreset(spec.compositionPreset) && story === 0 && col === Math.floor(spec.bayCount * 0.5)) {
+            continue;
+          }
           // Center window vertically between the horizontal trim below and above.
           const belowTop = story === 0
-            ? (ctx.isSideHall ? 0 : ctx.plinthHeight)
-            : storyBaseY + trimDims.courseH * 0.5;
+            ? (ctx.isSideHall ? 0 : (isSpawnBCleanup ? ctx.plinthHeight : trimDims.plinthH))
+            : storyBaseY + (isSpawnBCleanup ? 0 : trimDims.courseH * 0.5);
           const aboveBot = story === spec.stories - 1
-            ? ctx.wallHeightM - resolveCorniceStripHeight(ctx, trimDims)
-            : (story + 1) * STORY_HEIGHT_M - trimDims.courseH * 0.5;
+            ? ctx.wallHeightM - trimDims.corniceH
+            : (story + 1) * STORY_HEIGHT_M - (isSpawnBCleanup ? 0 : trimDims.courseH * 0.5);
           const sillY = (belowTop + aboveBot) * 0.5 - spec.windowH * 0.5;
-          placeWindowOpening(ctx, centerS, sillY, spec, resolveWindowTreatment(spec, col, story));
+          const isBrickBackdrop = isSpawnGateBrickBackdropPreset(spec.compositionPreset);
+          const isCenterColumn = col === Math.floor(spec.bayCount * 0.5);
+          const tunedSpec = isBrickBackdrop
+            ? {
+                ...spec,
+                windowW: story === 0
+                  ? spec.windowW * 0.78
+                  : isCenterColumn ? spec.windowW * 1.14 : spec.windowW * 0.94,
+                windowH: story === 0
+                  ? spec.windowH * 0.92
+                  : isCenterColumn ? spec.windowH * 1.06 : spec.windowH,
+              }
+            : spec;
+          placeWindowOpening(ctx, centerS, sillY, tunedSpec, resolveWindowTreatment(spec, col, story));
         }
       } else if (role === "blank" && story > 0) {
         // Upper-floor blank bays get framed recessed panels for wall texture

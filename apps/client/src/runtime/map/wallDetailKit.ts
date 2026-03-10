@@ -82,6 +82,8 @@ type DetailBucket = {
   instances: WallDetailInstance[];
 };
 
+type DetailStabilityClass = "default" | "surface-trim";
+
 const DETAIL_IDS: WallDetailMeshId[] = [
   "plinth_strip",
   "cornice_strip",
@@ -127,8 +129,28 @@ const LIGHT_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
   "vertical_edge_trim",
 ]);
 
+const SURFACE_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
+  "plinth_strip",
+  "cornice_strip",
+  "string_course_strip",
+  "vertical_edge_trim",
+  "corner_pier",
+  "pilaster",
+  "recessed_panel_frame_h",
+  "recessed_panel_frame_v",
+  "door_jamb",
+  "door_lintel",
+  "door_arch_lintel",
+]);
+
+const WALL_DETAIL_RENDER_ORDER = 10;
+
 function inheritsWallSurface(meshId: WallDetailMeshId): boolean {
   return HEAVY_TRIM_MESH_IDS.has(meshId) || LIGHT_TRIM_MESH_IDS.has(meshId);
+}
+
+function resolveDetailStabilityClass(meshId: WallDetailMeshId): DetailStabilityClass {
+  return SURFACE_TRIM_MESH_IDS.has(meshId) ? "surface-trim" : "default";
 }
 
 type RoofMaterialShader = Parameters<NonNullable<MeshStandardMaterial["onBeforeCompile"]>>[0];
@@ -438,6 +460,7 @@ function buildBlockoutDetailMeshes(
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
+    mesh.renderOrder = WALL_DETAIL_RENDER_ORDER;
 
     for (let index = 0; index < bucket.length; index += 1) {
       const instance = bucket[index]!;
@@ -505,8 +528,9 @@ function buildPbrDetailMeshes(
   const getSurfaceMaterial = (
     materialId: string,
     surfaceKind: "detail" | "balcony",
+    stabilityClass: DetailStabilityClass,
   ): MeshStandardMaterial => {
-    const cacheKey = `${materialId}|${surfaceKind}`;
+    const cacheKey = `${materialId}|${surfaceKind}|${stabilityClass}`;
     const cached = surfaceMaterialCache.get(cacheKey);
     if (cached) return cached;
 
@@ -532,6 +556,12 @@ function buildPbrDetailMeshes(
       dirtRoughnessBoost: 0.12,
       ...resolveWallShaderProfile(materialId, surfaceKind),
     });
+    if (stabilityClass === "surface-trim") {
+      material.polygonOffset = true;
+      material.polygonOffsetFactor = -1;
+      material.polygonOffsetUnits = -1;
+      material.needsUpdate = true;
+    }
     surfaceMaterialCache.set(cacheKey, material);
     return material;
   };
@@ -540,9 +570,10 @@ function buildPbrDetailMeshes(
   for (const bucket of grouped.values()) {
     const template = templates[bucket.meshId];
     const isBalconySurface = bucket.meshId.startsWith("balcony_");
+    const stabilityClass = resolveDetailStabilityClass(bucket.meshId);
     const material =
       bucket.materialSource === "manifest" && bucket.materialId
-        ? getSurfaceMaterial(bucket.materialId, isBalconySurface ? "balcony" : "detail")
+        ? getSurfaceMaterial(bucket.materialId, isBalconySurface ? "balcony" : "detail", stabilityClass)
         : bucket.materialSource === "template" && bucket.materialId
           ? templateMaterialOverrides[bucket.materialId as TemplateMaterialOverrideId]
           : template.material;
@@ -553,6 +584,7 @@ function buildPbrDetailMeshes(
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
+    mesh.renderOrder = WALL_DETAIL_RENDER_ORDER;
 
     for (let index = 0; index < bucket.instances.length; index += 1) {
       const instance = bucket.instances[index]!;

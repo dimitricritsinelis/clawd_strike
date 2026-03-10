@@ -55,6 +55,11 @@
       },
       {
         "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "north",
+        "preset": "spawn_gate_brick_backdrop"
+      },
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
         "face": "south",
         "preset": "spawn_courtyard_landmark"
       }

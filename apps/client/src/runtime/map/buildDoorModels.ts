@@ -1,4 +1,4 @@
-import { Box3, Group, Vector3 } from "three";
+import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from "three";
 import type { PropModelLibrary } from "../render/models/PropModelLibrary";
 
 /**
@@ -27,6 +27,43 @@ export const ROLLERSHUTTER_ID = "ph_rollershutter_window_02";
 
 const _bbox = new Box3();
 const _bboxSize = new Vector3();
+const DEFAULT_DOOR_OUTWARD_OFFSET_M = -0.01;
+const CASTLE_DOOR_OUTWARD_OFFSET_M = -0.09;
+const CASTLE_DOOR_BACKING_GEOMETRY = new BoxGeometry(1, 1, 1);
+const CASTLE_DOOR_BACKING_MATERIAL = new MeshStandardMaterial({
+  color: 0x0c1218,
+  roughness: 0.95,
+  metalness: 0.0,
+});
+const CASTLE_DOOR_BACKING_WIDTH_SCALE = 0.752;
+const CASTLE_DOOR_BACKING_HEIGHT_SCALE = 0.784;
+const CASTLE_DOOR_BACKING_DEPTH_M = 0.03;
+const CASTLE_DOOR_BACKING_FRONT_OFFSET_M = 0.05;
+
+function createCastleDoorBacking(
+  placement: DoorModelPlacement,
+  yawRad: number,
+  centerOffsetM: number,
+): Mesh {
+  const backing = new Mesh(CASTLE_DOOR_BACKING_GEOMETRY, CASTLE_DOOR_BACKING_MATERIAL);
+  // Keep the slab centered on the opening and project it forward from the wall
+  // by the configured front-face offset.
+  backing.position.set(
+    placement.wallSurfacePos.x + placement.outwardX * centerOffsetM,
+    placement.wallSurfacePos.y,
+    placement.wallSurfacePos.z + placement.outwardZ * centerOffsetM,
+  );
+  backing.rotation.set(0, yawRad, 0);
+  backing.scale.set(
+    placement.doorW * CASTLE_DOOR_BACKING_WIDTH_SCALE,
+    placement.doorH * CASTLE_DOOR_BACKING_HEIGHT_SCALE,
+    CASTLE_DOOR_BACKING_DEPTH_M,
+  );
+  backing.name = "castle-door-backing";
+  backing.castShadow = false;
+  backing.receiveShadow = true;
+  return backing;
+}
 
 /**
  * Build 3D door model meshes at placement positions.
@@ -75,7 +112,6 @@ export function buildDoorModels(
       const graffitiNode = clone.getObjectByName("rollershutter_window_02_graffiti");
       if (graffitiNode) graffitiNode.removeFromParent();
     }
-
     // Scale model to fit the door opening (uniform scale, fit within bounds)
     const scaleByH = placement.doorH / modelBbox.height;
     const scaleByW = placement.doorW / modelBbox.width;
@@ -92,7 +128,9 @@ export function buildDoorModels(
     // so the street-facing wall surface is at the boundary itself.
     // Place the door slightly INWARD of the boundary (negative outward = toward
     // the street) so it sits in front of the wall's street-facing surface.
-    const outwardOffset = -0.01;
+    const outwardOffset = placement.modelId === CASTLE_DOOR_ID
+      ? CASTLE_DOOR_OUTWARD_OFFSET_M
+      : DEFAULT_DOOR_OUTWARD_OFFSET_M;
 
     const worldX = placement.wallSurfacePos.x + placement.outwardX * outwardOffset;
     const worldZ = placement.wallSurfacePos.z + placement.outwardZ * outwardOffset;
@@ -126,6 +164,10 @@ export function buildDoorModels(
 
     clone.name = `door-model-${placement.modelId}`;
     root.add(clone);
+    if (placement.modelId === CASTLE_DOOR_ID) {
+      const backingCenterOffset = -(CASTLE_DOOR_BACKING_FRONT_OFFSET_M + CASTLE_DOOR_BACKING_DEPTH_M * 0.5);
+      root.add(createCastleDoorBacking(placement, baseRotation + flipPI, backingCenterOffset));
+    }
   }
 
   return root;

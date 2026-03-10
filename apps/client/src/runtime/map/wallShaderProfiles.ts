@@ -2,6 +2,10 @@ import type { WallShaderTweakOptions } from "../render/materials/applyWallShader
 
 export type WallShaderSurfaceKind = "wall" | "detail" | "balcony";
 
+const BRICK_MASONRY_IDS = new Set([
+  "ph_brick_4_desert",
+]);
+
 const SUN_WASHED_PLASTER_IDS = new Set([
   "ph_whitewashed_brick_warm",
   "ph_whitewashed_brick_dusty",
@@ -29,6 +33,31 @@ export function resolveWallShaderProfile(
   materialId: string,
   surfaceKind: WallShaderSurfaceKind,
 ): Partial<WallShaderTweakOptions> {
+  if (BRICK_MASONRY_IDS.has(materialId)) {
+    return {
+      macroColorAmplitude: surfaceKind === "wall" ? 0.05 : 0.035,
+      macroRoughnessAmplitude: surfaceKind === "wall" ? 0.06 : 0.04,
+      macroFrequency: surfaceKind === "wall" ? 0.09 : 0.11,
+      topBleachAmount: surfaceKind === "balcony" ? 0.015 : 0.025,
+      topBleachStartY: surfaceKind === "wall" ? 2.6 : 0.45,
+      topBleachHeightM: surfaceKind === "wall" ? 2.4 : 0.7,
+      topBleachColor: "#efe0c6",
+      dustColor: "#c9ad82",
+      dustColorAmount: surfaceKind === "balcony" ? 0.045 : 0.09,
+      dirtEnabled: true,
+      dirtHeightM: surfaceKind === "balcony" ? 0.5 : 1.65,
+      dirtDarken: surfaceKind === "balcony" ? 0.09 : 0.18,
+      dirtRoughnessBoost: surfaceKind === "balcony" ? 0.1 : 0.17,
+      ...(surfaceKind !== "wall"
+        ? {
+            contactDarkenAmount: surfaceKind === "balcony" ? 0.16 : 0.14,
+            contactDarkenDepth: surfaceKind === "balcony" ? 0.22 : 0.18,
+            useLocalCoords: true,
+          }
+        : {}),
+    };
+  }
+
   if (SUN_WASHED_PLASTER_IDS.has(materialId)) {
     return {
       macroColorAmplitude: surfaceKind === "wall" ? 0.07 : 0.05,
