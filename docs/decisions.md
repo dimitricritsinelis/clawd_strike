@@ -3,7 +3,7 @@ Authority: normative
 Read when: map, visuals, ai, gameplay, ui, public-contract, perf, tooling, docs
 Owns: durable internal decisions that future tasks should not rediscover
 Do not use for: current task status, temporary bug lists, per-task notes, public browser-agent behavior details
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 # Durable Decisions
 
@@ -30,8 +30,11 @@ Last updated: 2026-03-09
 - The public contract must not expose coordinates, hidden enemy state, routes, seeds, landmark IDs, or other repo-only tactical truth.
 
 ## DEC-005: Validation boundary
-- `pnpm qa:completion` is required for player-visible map or visual changes.
+- Default fast local validation is `pnpm typecheck && pnpm test:server && pnpm smoke:game`.
+- `pnpm qa:completion` is required for player-visible map or visual changes and now covers traversal plus deterministic shot review only.
+- `pnpm --filter @clawd-strike/client bot:smoke` is required for enemy tuning and remains part of `pnpm qa:release` alongside `pnpm qa:completion` and `pnpm build`.
 - If a task changes `/skills.md`, stable public selectors, agent-visible browser payload/state, or the documented no-context retry flow, also run `pnpm verify:skills-contract` and `pnpm smoke:no-context` regardless of the primary change tag.
+- `pnpm test:playwright` remains the full browser regression suite for loading-screen, public-selector, public-payload, and shared-champion work rather than the default inner-loop gate.
 - Screenshot and reference inspection are reserved for visual-signoff surfaces rather than logic-only gameplay, bot, perf, tooling, or contract work unless appearance intentionally changed.
 - Current CI is narrower than local completion policy and does not replace these local gates.
 

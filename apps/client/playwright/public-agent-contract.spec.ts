@@ -31,10 +31,17 @@ async function readSelectionState(page: Page) {
   });
 }
 
+function isEffectivelyEmptySelection(selection: Awaited<ReturnType<typeof readSelectionState>>) {
+  return selection.text === ""
+    && selection.rangeCount <= 1
+    && (selection.type === "None" || selection.type === "Caret");
+}
+
 async function expectNoSelection(page: Page) {
+  // Chromium may preserve an empty caret after drag/click without leaving selected text behind.
   await expect
-    .poll(async () => readSelectionState(page))
-    .toEqual({ type: "None", text: "", rangeCount: 0 });
+    .poll(async () => isEffectivelyEmptySelection(await readSelectionState(page)))
+    .toBe(true);
 }
 
 async function readPublicState(page: Page) {

@@ -13,7 +13,7 @@
       },
       "yaw_degrees": "0=+Y(north), 90=+X(east), 180=-Y(south), 270=-X(west)"
     },
-    "shotCount": 10,
+    "shotCount": 11,
     "notes": [
       "MVP shot list for previews/validation. Shots are optional at runtime but useful for automated capture and QA.",
       "All shot positions are approximate and may be adjusted once blockout exists in-engine."
@@ -270,6 +270,41 @@
         "single landmark wall read",
         "calm side windows",
         "no repeated balcony wallpaper"
+      ]
+    },
+    {
+      "id": "SHOT_11_SPAWN_B_BACK_WALL",
+      "label": "Spawn B back wall",
+      "description": "Spawn B cleanup-shell signoff shot; validates lighter north-wall trim depth, shorter plinth read, and coherent side-wall massing from player height.",
+      "camera": {
+        "pos": {
+          "x": 18.2,
+          "y": 73.8,
+          "z": 1.7
+        },
+        "lookAt": {
+          "x": 25.1,
+          "y": 81.4,
+          "z": 3.1
+        },
+        "fovDeg": 76.0
+      },
+      "durationSec": 4.0,
+      "tags": [
+        "visual",
+        "facade",
+        "spawnB"
+      ],
+      "reviewPriority": "high",
+      "reviewFocus": [
+        "cleanup-shell trim depth on north/east/west Spawn B faces",
+        "shorter plinth to opening spacing on the north wall",
+        "lighter parapet, cornice, and corner-pier mass without weakening the shell"
+      ],
+      "mustShow": [
+        "north cleanup wall as the dominant read",
+        "subordinate side-wall trim that stays visually coordinated",
+        "no overdeep surround or plinth projection"
       ]
     }
   ]

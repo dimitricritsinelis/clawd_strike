@@ -104,6 +104,16 @@ const SPAWN_TRIM_DIMS: Record<number, TrimDims> = {
   },
 };
 
+// Spawn B cleanup-shell retune applies only to the outer north/east/west faces.
+const SPAWN_B_CLEANUP_ZONE_ID = "SPAWN_B_GATE_PLAZA";
+const SPAWN_B_CLEANUP_FACES = new Set<FacadeFace>(["north", "east", "west"]);
+const SPAWN_B_CLEANUP_DEPTH_SCALE = 0.67;
+const SPAWN_B_CLEANUP_PLINTH_HEIGHT_SCALE = 0.85;
+const SPAWN_B_CLEANUP_TRIM_HEIGHT_SCALE = 0.92;
+const SPAWN_B_CLEANUP_PIER_WIDTH_SCALE = 0.94;
+const SPAWN_B_CLEANUP_SURROUND_THICKNESS_SCALE = 0.92;
+const SPAWN_B_CLEANUP_ARCH_HEIGHT_SCALE = 0.92;
+
 function getTrimDims(wallHeightM: number, isSpawn = false): TrimDims {
   const stories = Math.max(1, Math.round(wallHeightM / STORY_HEIGHT_M));
   const table = isSpawn ? SPAWN_TRIM_DIMS : TRIM_DIMS;
@@ -237,6 +247,49 @@ type SegmentDecorContext = {
   plinthHeight: number;
   plinthDepth: number;
 };
+
+type CleanupTrimScales = {
+  depth: number;
+  plinthHeight: number;
+  trimHeight: number;
+  pierWidth: number;
+  surroundThickness: number;
+  archHeight: number;
+};
+
+function resolveCleanupTrimScales(
+  ctx: Pick<SegmentDecorContext, "zone" | "facadeFace">,
+): CleanupTrimScales {
+  const isSpawnBCleanupSurface = ctx.zone?.id === SPAWN_B_CLEANUP_ZONE_ID
+    && SPAWN_B_CLEANUP_FACES.has(ctx.facadeFace);
+
+  if (!isSpawnBCleanupSurface) {
+    return {
+      depth: 1,
+      plinthHeight: 1,
+      trimHeight: 1,
+      pierWidth: 1,
+      surroundThickness: 1,
+      archHeight: 1,
+    };
+  }
+
+  return {
+    depth: SPAWN_B_CLEANUP_DEPTH_SCALE,
+    plinthHeight: SPAWN_B_CLEANUP_PLINTH_HEIGHT_SCALE,
+    trimHeight: SPAWN_B_CLEANUP_TRIM_HEIGHT_SCALE,
+    pierWidth: SPAWN_B_CLEANUP_PIER_WIDTH_SCALE,
+    surroundThickness: SPAWN_B_CLEANUP_SURROUND_THICKNESS_SCALE,
+    archHeight: SPAWN_B_CLEANUP_ARCH_HEIGHT_SCALE,
+  };
+}
+
+function resolveCorniceStripHeight(ctx: SegmentDecorContext, dims: TrimDims): number {
+  const cleanupScales = resolveCleanupTrimScales(ctx);
+  return dims.corniceH
+    * (ctx.trimTier === "hero" ? 1.06 : ctx.trimTier === "accented" ? 0.98 : 0.84)
+    * cleanupScales.trimHeight;
+}
 
 export type BuildWallDetailProfile = "blockout" | "pbr";
 
@@ -520,13 +573,14 @@ function placeParapetCap(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
   const isHero = isSpawnHeroFacade(ctx);
+  const cleanupScales = resolveCleanupTrimScales(ctx);
   ctx.rng.range(0.18, 0.35); // consume
   ctx.rng.range(0.06, 0.14); // consume
   const tierHeightScale = ctx.trimTier === "hero" ? 1.08 : ctx.trimTier === "accented" ? 0.98 : 0.86;
   const tierDepthScale = ctx.trimTier === "hero" ? 1.18 : ctx.trimTier === "accented" ? 1.0 : 0.82;
-  const capHeight = dims.parapetH * (isHero ? 1.18 : tierHeightScale);
+  const capHeight = dims.parapetH * (isHero ? 1.18 : tierHeightScale) * cleanupScales.trimHeight;
   const capDepth = clamp(
-    dims.parapetD * (isHero ? 1.35 : tierDepthScale),
+    dims.parapetD * (isHero ? 1.35 : tierDepthScale) * cleanupScales.depth,
     0.04,
     ctx.maxProtrusionM + 0.06,
   );
@@ -630,13 +684,14 @@ function computePlinthDims(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
   const isHero = isSpawnHeroFacade(ctx);
+  const cleanupScales = resolveCleanupTrimScales(ctx);
   ctx.rng.range(0.28, 0.48); // consume (preserve determinism)
   ctx.rng.range(0.06, 0.13); // consume
   const tierHeightScale = ctx.trimTier === "hero" ? 1.08 : ctx.trimTier === "accented" ? 0.96 : 0.84;
   const tierDepthScale = ctx.trimTier === "hero" ? 1.12 : ctx.trimTier === "accented" ? 0.95 : 0.8;
-  ctx.plinthHeight = dims.plinthH * (isHero ? 1.45 : tierHeightScale);
+  ctx.plinthHeight = dims.plinthH * (isHero ? 1.45 : tierHeightScale) * cleanupScales.plinthHeight;
   ctx.plinthDepth = clamp(
-    dims.plinthD * (isHero ? 1.65 : tierDepthScale),
+    dims.plinthD * (isHero ? 1.65 : tierDepthScale) * cleanupScales.depth,
     0.04,
     ctx.maxProtrusionM + 0.06,
   );
@@ -689,6 +744,7 @@ function emitPlinthStrip(
 function placeStringCourses(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.5) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
+  const cleanupScales = resolveCleanupTrimScales(ctx);
   ctx.rng.range(0.10, 0.18); // consume
   ctx.rng.range(0.06, 0.11); // consume
   // Spawn: 2-story walls get string courses. Non-spawn: original 3-story guard.
@@ -697,7 +753,7 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
     return;
   }
   const courseHeight = dims.courseH;
-  const courseDepth = clamp(dims.courseD, 0.04, ctx.maxProtrusionM + 0.04);
+  const courseDepth = clamp(dims.courseD * cleanupScales.depth, 0.04, ctx.maxProtrusionM + 0.04);
 
   // Place a string course at EVERY story break for rhythmic horizontal banding.
   for (let storyY = STORY_HEIGHT_M; storyY < ctx.wallHeightM - 0.5; storyY += STORY_HEIGHT_M) {
@@ -713,12 +769,13 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
 function placeCorniceStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
+  const cleanupScales = resolveCleanupTrimScales(ctx);
   ctx.rng.range(0.18, 0.30); // consume
   ctx.rng.range(0.10, 0.19); // consume
   // Spawn hero facades now keep their cornice for silhouette definition.
-  const corniceHeight = dims.corniceH * (ctx.trimTier === "hero" ? 1.06 : ctx.trimTier === "accented" ? 0.98 : 0.84);
+  const corniceHeight = resolveCorniceStripHeight(ctx, dims);
   const corniceDepth = clamp(
-    dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8),
+    dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8) * cleanupScales.depth,
     0.06,
     ctx.maxProtrusionM + 0.08,
   );
@@ -736,6 +793,7 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
 
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
   const isHero = isSpawnHeroFacade(ctx);
+  const cleanupScales = resolveCleanupTrimScales(ctx);
   const marginM = ctx.profile === "pbr" ? 0.04 : 0.02;
   const maxWidth = Math.max(0.28, Math.min(1.05, ctx.frame.lengthM * 0.4));
   // Consume RNG calls that were previously used for random dims (preserves sequence).
@@ -751,14 +809,30 @@ function placeCornerPiers(ctx: SegmentDecorContext): void {
     : ctx.trimTier === "hero" ? (isSpawn ? 1.3 : 1.0)
     : ctx.trimTier === "accented" ? (isSpawn ? 1.1 : 0.78)
     : (isSpawn ? 0.85 : 0.62);
-  const pierWidth = clamp(dims.pierW * tierWidthScale, 0.22, maxWidth);
-  const pierDepth = clamp(dims.pierD * tierDepthScale, 0.05, ctx.maxProtrusionM);
+  const pierWidth = clamp(dims.pierW * tierWidthScale * cleanupScales.pierWidth, 0.22, maxWidth);
+  const pierDepth = clamp(dims.pierD * tierDepthScale * cleanupScales.depth, 0.05, ctx.maxProtrusionM);
   const pierHeight = ctx.wallHeightM; // full height — contiguous with roofline
   const halfLen = ctx.frame.lengthM * 0.5;
+  const plinthDepth = clamp(
+    dims.plinthD * (isHero ? 1.65 : ctx.trimTier === "hero" ? 1.12 : ctx.trimTier === "accented" ? 0.95 : 0.8) * cleanupScales.depth,
+    0.04,
+    ctx.maxProtrusionM + 0.06,
+  );
+  const courseDepth = clamp(dims.courseD * cleanupScales.depth, 0.04, ctx.maxProtrusionM + 0.04);
+  const corniceDepth = clamp(
+    dims.corniceD * (ctx.trimTier === "hero" ? 1.1 : ctx.trimTier === "accented" ? 0.96 : 0.8) * cleanupScales.depth,
+    0.06,
+    ctx.maxProtrusionM + 0.08,
+  );
+  const parapetDepth = clamp(
+    dims.parapetD * (isHero ? 1.35 : ctx.trimTier === "hero" ? 1.18 : ctx.trimTier === "accented" ? 1.0 : 0.82) * cleanupScales.depth,
+    0.04,
+    ctx.maxProtrusionM + 0.06,
+  );
 
   // At corners the pier depth must cover all strip protrusions so it
   // visually bridges the perpendicular wall faces.
-  const cornerDepth = Math.max(pierDepth, dims.plinthD, dims.courseD, dims.corniceD, dims.parapetD);
+  const cornerDepth = Math.max(pierDepth, plinthDepth, courseDepth, corniceDepth, parapetDepth);
 
   for (const side of [-1, 1] as const) {
     const isCorner = (side === -1 && ctx.cornerAtStart) || (side === 1 && ctx.cornerAtEnd);
@@ -1081,13 +1155,17 @@ function computeFacadeSpec(ctx: SegmentDecorContext): FacadeSpec | null {
         ? ctx.rng.range(2.18, 2.38)
         : ctx.rng.range(2.32, 2.58);
   const recessDepth = isSpawnFacade ? ctx.rng.range(0.18, 0.28) : ctx.rng.range(0.10, 0.16);
-  const frameThickness = isSpawnFacade ? ctx.rng.range(0.14, 0.22) : ctx.rng.range(0.11, 0.17);
-  const frameDepth = clamp(
+  const cleanupScales = resolveCleanupTrimScales(ctx);
+  let frameThickness = isSpawnFacade ? ctx.rng.range(0.14, 0.22) : ctx.rng.range(0.11, 0.17);
+  let frameDepth = clamp(
     isSpawnFacade ? ctx.rng.range(0.16, 0.26) : ctx.rng.range(0.09, 0.13),
     0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.10 : 0.08));
-  const jambDepth = clamp(
+  let jambDepth = clamp(
     isSpawnFacade ? ctx.rng.range(0.18, 0.28) : ctx.rng.range(0.10, 0.16),
     0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.12 : 0.10));
+  frameThickness *= cleanupScales.surroundThickness;
+  frameDepth = clamp(frameDepth * cleanupScales.depth, 0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.10 : 0.08));
+  jambDepth = clamp(jambDepth * cleanupScales.depth, 0.06, ctx.maxProtrusionM + (isSpawnFacade ? 0.12 : 0.10));
 
   const columnRoles: ColumnRole[] = Array.from(
     { length: bayCount }, () => "blank" as ColumnRole,
@@ -1277,6 +1355,7 @@ function placeArchedDoor(
 ): void {
   const uses3DModel = spec.doorH >= 2.0 && spec.doorW >= 0.8;
   const isSpawn = ctx.zone?.type === "spawn_plaza";
+  const cleanupScales = resolveCleanupTrimScales(ctx);
 
   if (uses3DModel) {
     // 3D model fully replaces the flat void + lintel
@@ -1293,7 +1372,7 @@ function placeArchedDoor(
 
     // Spawn doors get decorative framing around the 3D model
     if (isSpawn) {
-      const archH = spec.doorW * 0.2;
+      const archH = spec.doorW * 0.2 * cleanupScales.archHeight;
       pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", null,
         ctx.frame, centerS, spec.doorH, spec.frameDepth * 0.6,
         spec.frameDepth * 1.5, archH, spec.doorW + spec.frameThickness * 2,
@@ -1323,7 +1402,7 @@ function placeArchedDoor(
       ctx.frame, centerS, spec.doorH * 0.5, -spec.recessDepth * 0.4,
       0.006, spec.doorH, spec.doorW * 1.05);
 
-    const archH = spec.doorW * 0.2;
+    const archH = spec.doorW * 0.2 * cleanupScales.archHeight;
     pushBox(ctx.instances, ctx.maxInstances, "door_arch_lintel", null,
       ctx.frame, centerS, spec.doorH, spec.frameDepth * 0.6,
       spec.frameDepth * 1.5, archH, spec.doorW + spec.frameThickness * 2,
@@ -1567,6 +1646,7 @@ function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
   ctx.rng.range(0.14, 0.24); // consume
 
   const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
+  const cleanupScales = resolveCleanupTrimScales(ctx);
   const isBlank = isBlankWallRole(spec.wallRole);
   if (isBlank) return;
 
@@ -1591,7 +1671,7 @@ function placePilasters(ctx: SegmentDecorContext, spec: FacadeSpec): void {
 
   // Standard facades: pilasters at every other bay edge for rhythm.
   const pilasterW = dims.pilasterW;
-  const pilasterD = clamp(dims.pilasterD, 0.04, ctx.maxProtrusionM);
+  const pilasterD = clamp(dims.pilasterD * cleanupScales.depth, 0.04, ctx.maxProtrusionM);
   const step = ctx.trimTier === "hero" ? 1 : 2;
   for (let edge = 1; edge < spec.bayCount; edge += step) {
     const edgeS = columnCenterS(spec, edge) - spec.bayWidth * 0.5;
@@ -1837,10 +1917,10 @@ function decorateSegment(ctx: SegmentDecorContext): void {
         if (!balconyPlan.coveredWindows.has(`${col}:${story}`)) {
           // Center window vertically between the horizontal trim below and above.
           const belowTop = story === 0
-            ? (ctx.isSideHall ? 0 : trimDims.plinthH)
+            ? (ctx.isSideHall ? 0 : ctx.plinthHeight)
             : storyBaseY + trimDims.courseH * 0.5;
           const aboveBot = story === spec.stories - 1
-            ? ctx.wallHeightM - trimDims.corniceH
+            ? ctx.wallHeightM - resolveCorniceStripHeight(ctx, trimDims)
             : (story + 1) * STORY_HEIGHT_M - trimDims.courseH * 0.5;
           const sillY = (belowTop + aboveBot) * 0.5 - spec.windowH * 0.5;
           placeWindowOpening(ctx, centerS, sillY, spec, resolveWindowTreatment(spec, col, story));

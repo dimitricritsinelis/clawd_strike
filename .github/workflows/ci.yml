@@ -41,5 +41,8 @@ jobs:
       - name: Server Tests
         run: pnpm test:server
 
+      - name: Game Smoke
+        run: pnpm smoke:game
+
       - name: Build
         run: pnpm build

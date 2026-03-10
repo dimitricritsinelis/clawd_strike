@@ -3,7 +3,7 @@ Authority: context
 Read when: tooling, docs
 Owns: quick start, basic command entry points, high-level repo map
 Do not use for: workflow policy, current task status, durable decisions, public contract rules
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 # Clawd Strike
 
@@ -25,20 +25,32 @@ pnpm stm -- show active
 pnpm stm -- show card <id>
 pnpm stm -- validate
 pnpm typecheck
-pnpm test:stm
 pnpm test:server
+pnpm smoke:game
+pnpm bot:smoke
+pnpm qa:completion
+pnpm qa:release
+pnpm smoke:no-context
+pnpm verify:skills-contract
+pnpm test:stm
 pnpm test:agent-export
+pnpm test:postgres-audit
 pnpm build
 pnpm export:agent-starter -- --out ../clawd-strike-agent-starter
 pnpm reconcile:shared-champion -- --help
-pnpm test:playwright
-pnpm qa:completion
-pnpm smoke:no-context
-pnpm verify:skills-contract
 pnpm stats:admin -- --help
 ```
 
 Use the canonical playtest URL from the current short-term memory snapshot.
+
+## Validation Ladder
+
+- Normal game work: `pnpm typecheck && pnpm test:server && pnpm smoke:game`
+- Bot work: add `pnpm bot:smoke`
+- Public-contract work: add `pnpm verify:skills-contract && pnpm smoke:no-context`
+- Map/visual checkpoint: `pnpm qa:completion`
+- Release candidate: `pnpm qa:release`
+- Full browser regression sweep: `pnpm test:playwright:full` for loading-screen, public-selector, public-payload, or shared-champion changes
 
 ## Admin Stats
 

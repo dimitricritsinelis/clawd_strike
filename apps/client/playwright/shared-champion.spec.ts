@@ -440,7 +440,7 @@ test("api blocks raw writes and only accepts validated run submissions", async (
   });
 });
 
-test("run-start and direct-write APIs reject missing, invalid, and blocked player names", async ({ request }, testInfo) => {
+test("run-start validates names while direct-write stays internal-only", async ({ request }, testInfo) => {
   const baseUrl = testInfo.project.use.baseURL as string;
   const sessionToken = await getSessionToken(request, baseUrl);
 
@@ -460,9 +460,9 @@ test("run-start and direct-write APIs reject missing, invalid, and blocked playe
       controlMode: "agent",
       sessionToken,
     });
-    expect(directWrite.response.status()).toBe(400);
+    expect(directWrite.response.status()).toBe(403);
     expect(directWrite.body).toEqual({
-      error: "Expected { playerName, score, controlMode, telemetry, sessionToken }.",
+      error: "Direct shared champion writes are internal-only.",
     });
   }
 
@@ -478,9 +478,10 @@ test("run-start and direct-write APIs reject missing, invalid, and blocked playe
     controlMode: "agent",
     sessionToken,
   });
-  expect(validDirectWrite.response.ok()).toBe(true);
-  expect(validDirectWrite.body.updated).toEqual(expect.any(Boolean));
-  expect(validDirectWrite.body).toHaveProperty("champion");
+  expect(validDirectWrite.response.status()).toBe(403);
+  expect(validDirectWrite.body).toEqual({
+    error: "Direct shared champion writes are internal-only.",
+  });
 });
 
 test("validated run submissions keep strict overwrite rules", async ({ request }, testInfo) => {

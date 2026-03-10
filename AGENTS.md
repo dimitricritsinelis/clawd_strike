@@ -3,7 +3,7 @@ Authority: normative
 Read when: implementation work
 Owns: rules, precedence, tags, validation, prompt template
 Do not use for: branch status, durable history outside decisions, public browser details
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 # AGENTS.md — Clawd Strike Operating Contract
 
@@ -19,6 +19,7 @@ Prefer code, scripts, specs, and runtime contracts over prose when they can answ
 4. Read only the code and scripts you will touch.
 
 Active status lives in one STM surface; `docs/decisions.md` owns durable prose memory.
+`progress.md` is deprecated for this repo; do not create, update, read, or write it.
 Specs and contracts outrank prose; generated views and artifacts are evidence only.
 
 ## Domain Authorities
@@ -43,7 +44,7 @@ If omitted, infer the best fit and record it before work starts.
 
 ## Tag Routing
 - `map-geometry`, `map-visual`: read map authority first; add `shots.json` for shot/review changes and approved refs for visual clarification. Validation: `pnpm qa:completion`; geometry also needs map regen/diff (`pnpm --filter @clawd-strike/client gen:maps`, `git diff --exit-code -- apps/client/public/maps`), manual traversal, and deterministic reference review for visible/signoff-sensitive changes.
-- `movement-sim`, `combat-gameplay`, `bot-ai`, `ui-flow`, `perf`: read the STM snapshot and touched runtime code; pull map/public-contract authorities only when needed. Validation: smallest targeted smoke; human pointer-lock/menu/input smoke when feel or UX changed; `pnpm --filter @clawd-strike/client bot:smoke` for enemy tuning, `pnpm test:playwright` for UI flow, before/after perf checks for perf work, and `pnpm qa:completion` when player-visible defaults changed.
+- `movement-sim`, `combat-gameplay`, `bot-ai`, `ui-flow`, `perf`: read the STM snapshot and touched runtime code; pull map/public-contract authorities only when needed. Validation: smallest targeted smoke; default runtime sanity is `pnpm smoke:game`; human pointer-lock/menu/input smoke when feel or UX changed; `pnpm --filter @clawd-strike/client bot:smoke` for enemy tuning, `pnpm test:playwright` for loading-screen/public-selector/public-payload/shared-champion regressions, before/after perf checks for perf work, and `pnpm qa:completion` when player-visible map or visual defaults changed.
 - `public-contract`: read public `skills.md`, touched public API/state code, and contract verification scripts. Validation: `pnpm verify:skills-contract` and `pnpm smoke:no-context`.
 - `tooling`: read root/client `package.json`, touched scripts, and `.github/workflows/ci.yml`. Validation: smallest targeted script/CI check; if runtime output changes, also run the owning subsystem gate; if map generation changes, also run map regen/diff.
 - `docs`: read only the authority file being corrected plus `docs/decisions.md` when the rule is durable. Validation: targeted reference scan only, unless the doc changes a runtime-facing public contract.
@@ -72,7 +73,8 @@ Relevant authority: <owning spec or contract>
 ```
 
 ## Completion
-- Default dev iteration should use `pnpm dev` and fast local checks; use `pnpm typecheck`, `pnpm build`, and full validation on finish/release checkpoints.
+- Default dev iteration should use `pnpm dev` plus `pnpm typecheck`, `pnpm test:server`, and `pnpm smoke:game`; add `pnpm bot:smoke` for bot work, `pnpm verify:skills-contract && pnpm smoke:no-context` for public-contract work, `pnpm qa:completion` for map/visual checkpoints, and `pnpm qa:release` for release candidates.
+- Use `pnpm test:playwright` only for full browser regressions such as loading-screen, public-selector, public-payload, or shared-champion changes, not as the default gameplay inner-loop check.
 - Targeted validation commands should be selected based on the primary change tag and run before task completion.
 - Keep STM updates at claim/progress/status/finish.
 - Keep the STM snapshot compact and current; collapse finished work into one-line rollups.

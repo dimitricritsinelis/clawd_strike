@@ -6,7 +6,7 @@ Do not use for: workflow policy, durable rationale, archive history, product tru
 Schema version: stm-v2
 Canonical playtest URL: http://127.0.0.1:4174/?map=bazaar-map
 Map approval status: NOT APPROVED
-Last compacted: 2026-03-09T22:26:07Z
+Last compacted: 2026-03-10T00:53:53Z
 
 # short_term_memory.md - Clawd Strike Status
 
@@ -14,6 +14,7 @@ Last compacted: 2026-03-09T22:26:07Z
 <!-- GENERATED START: active-snapshot -->
 - STM-20260309-154233-codex | active | codex | ui-flow | Loading-screen champion b... | next: Wait for review or make a...
 - STM-20260309-223704-codex | blocked | codex | docs | Lean AGENTS and mirror docs | next: Resolve the blocked build...
+- STM-20260310-003248-codex | blocked | codex | map-visual | Restore Spawn B cleanup t... | next: Restore SHOT_11 and captu...
 <!-- GENERATED END: active-snapshot -->
 
 ## Shared Ephemera
@@ -62,7 +63,29 @@ Recent Notes:
 - 2026-03-09T22:37:09Z | progress | Trimmed AGENTS to 79 lines and 6141 bytes; cleaned README and CLAUDE; rewrote DEC-001 and DEC-002.
 - 2026-03-09T22:37:04Z | claim | Claimed task.
 
+### STM-20260310-003248-codex | blocked | map-visual | Restore Spawn B cleanup trim pass
+Owner: codex
+Branch: map-dev
+Goal: Recreate the deleted Spawn B cleanup-shell trim retune on SPAWN_B_GATE_PLAZA north/east/west with exact depth and plinth scaling plus required shot review.
+Done when: Spawn B cleanup trim logic and shot contract are restored, deterministic shot review passes, and pnpm typecheck / pnpm build / pnpm qa:completion pass.
+Authority:
+- docs/map-design/specs/map_spec.json
+- docs/map-design/shots.json
+- apps/client/src/runtime/map/wallDetailPlacer.ts
+Files:
+- docs/map-design/shots.json
+- apps/client/src/runtime/map/wallDetailPlacer.ts
+Next:
+- Restore SHOT_11 and capture a before baseline, then reimplement the isolated trim pass.
+Blockers:
+- none
+Recent Notes:
+- 2026-03-10T00:44:50Z | blocker | Blocked only on pnpm build: root build still hangs after Vite reports 97 modules transformed, matching the preexisting STM-20260309-22370...
+- 2026-03-10T00:44:42Z | progress | Restored docs/map-design/shots.json with SHOT_11_SPAWN_B_BACK_WALL, isolated Spawn B cleanup-shell trim scaling in wallDetailPlacer.ts fo...
+- 2026-03-10T00:32:48Z | claim | Claimed task.
+
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->
+- STM-20260310-003355-codex | tooling | Reset test strategy for fast iteration | 2026-03-10 | Added smoke:game/bot:smoke/qa:release/test:playwright:full, narrowed qa:completion to routes+shots, aligned AGENTS/README/decisions/CI, fixed the empty-caret Playwright flake, and validated the new ladder through final qa:release.
 - STM-20260309-222607-codex | tooling | STM single-file memory rollout | 2026-03-09 | Added the STM CLI, safe-write validator/tests, CI gate, and legacy status-file migration.
 <!-- TOOL-MANAGED END: completed-rollup -->

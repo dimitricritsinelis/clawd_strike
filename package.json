@@ -29,10 +29,14 @@
     "test:postgres-audit": "tsx --test scripts/export-postgres-audit.test.ts",
     "typecheck": "pnpm --filter @clawd-strike/client exec tsc -p ../../tsconfig.json --noEmit && pnpm --filter @clawd-strike/client typecheck",
     "test:server": "tsx --test ./server/highScoreStoreImpl.test.ts",
+    "smoke:game": "pnpm --filter @clawd-strike/client smoke:game",
+    "bot:smoke": "pnpm --filter @clawd-strike/client bot:smoke",
     "test:playwright": "pnpm --filter @clawd-strike/client test:playwright",
+    "test:playwright:full": "pnpm --filter @clawd-strike/client test:playwright:full",
     "smoke:no-context": "pnpm --filter @clawd-strike/client smoke:no-context",
     "verify:skills-contract": "pnpm --filter @clawd-strike/client verify:skills-contract",
     "qa:completion": "pnpm --filter @clawd-strike/client qa:completion",
+    "qa:release": "pnpm qa:completion && pnpm bot:smoke && pnpm build",
     "qa:autonomous": "pnpm --filter @clawd-strike/client qa:autonomous"
   }
 }
