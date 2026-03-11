@@ -11,6 +11,7 @@ import type {
 import type { BoundarySegment } from "./buildBlockout";
 import type { WallDetailInstance } from "./wallDetailKit";
 import { CASTLE_DOOR_ID, ROLLERSHUTTER_ID, resolveCastleDoorSilhouette, type DoorModelPlacement } from "./buildDoorModels";
+import { resolvePointedArchFrameFromAperture } from "./pointedArchProfile";
 import {
   resolveFacadeStyleForSegment,
   type BalconyStyle,
@@ -1378,28 +1379,29 @@ function placeAuthoredPointedArchWindow(
 ): void {
   const trimDepthScale = isSpawnBShellCleanupSurface(ctx) ? SPAWN_B_SHELL_TRIM_DEPTH_SCALE : 1;
   const frameThickness = spec.frameThickness * 0.74;
-  const outerWidth = window.width + frameThickness * 2.2;
-  const outerHeight = window.height + frameThickness * 1.8;
-  const frameCenterY = window.sillY + outerHeight * 0.5;
-  const panelCenterY = window.sillY + window.height * 0.5;
+  const frameMetrics = resolvePointedArchFrameFromAperture(window.width, window.height);
+  const frameCenterY = window.sillY + frameMetrics.frameCenterYOffsetFromSill;
+  const panelCenterY = frameCenterY + frameMetrics.apertureCenterYOffsetFromFrameCenter;
   const voidInset = Math.max(0.006, spec.frameDepth * 0.08 * trimDepthScale);
   const glassInset = Math.max(voidInset + 0.012, spec.frameDepth * 0.18 * trimDepthScale);
   const frameProjection = spec.frameDepth * 1.28 * trimDepthScale;
   const sillDepth = spec.frameDepth * 1.64 * trimDepthScale;
   const sillHeight = frameThickness * 0.82;
+  const seamOverlap = Math.min(0.02, frameThickness * 0.18);
+  const voidOverlap = seamOverlap * 0.5;
 
   pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_void", null,
     ctx.frame, window.centerS, panelCenterY, voidInset,
-    0.02, window.height * 0.98, window.width * 0.96);
+    0.02, window.height + voidOverlap * 2, window.width + voidOverlap * 2);
 
   pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_glass", null,
     ctx.frame, window.centerS, panelCenterY, glassInset,
-    WINDOW_GLASS_THICKNESS_M, window.height * 0.94, window.width * 0.9);
+    WINDOW_GLASS_THICKNESS_M, window.height + seamOverlap * 2, window.width + seamOverlap * 2);
   tagTrim(ctx.instances, null, resolveStainedGlassMaterialId(window.glassStyle));
 
   pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_frame", ctx.wallMaterialId,
     ctx.frame, window.centerS, frameCenterY, frameProjection * 0.5,
-    frameProjection, outerHeight, outerWidth);
+    frameProjection, frameMetrics.frameHeight, frameMetrics.frameWidth);
   tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
 
   pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,

@@ -73,48 +73,48 @@
           {
             "centerS": -4.05,
             "sillY": 3.78,
-            "width": 1.08,
-            "height": 1.52,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": -1.35,
             "sillY": 3.78,
-            "width": 1.08,
-            "height": 1.52,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": 1.35,
             "sillY": 3.78,
-            "width": 1.08,
-            "height": 1.52,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": 4.05,
             "sillY": 3.78,
-            "width": 1.08,
-            "height": 1.52,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": -4,
             "sillY": 0.98,
-            "width": 1.02,
-            "height": 1.32,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_dim"
           },
           {
             "centerS": 4,
             "sillY": 0.98,
-            "width": 1.02,
-            "height": 1.32,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_dim"
           }
@@ -128,24 +128,24 @@
           {
             "centerS": -2.1,
             "sillY": 3.92,
-            "width": 1,
-            "height": 1.42,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": 0,
             "sillY": 3.92,
-            "width": 1,
-            "height": 1.42,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": 2.1,
             "sillY": 3.92,
-            "width": 1,
-            "height": 1.42,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
@@ -183,24 +183,24 @@
           {
             "centerS": -2.1,
             "sillY": 3.92,
-            "width": 1,
-            "height": 1.42,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": 0,
             "sillY": 3.92,
-            "width": 1,
-            "height": 1.42,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },
           {
             "centerS": 2.1,
             "sillY": 3.92,
-            "width": 1,
-            "height": 1.42,
+            "width": 0.96,
+            "height": 1.28,
             "headShape": "pointed_arch",
             "glassStyle": "stained_glass_bright"
           },

@@ -23,6 +23,11 @@ import type { WallMaterialLibrary, WallTextureQuality } from "../render/material
 import { resolveBlockoutPalette } from "../render/BlockoutMaterials";
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type { RuntimeWallMode } from "../utils/UrlParams";
+import {
+  POINTED_ARCH_APERTURE_PANEL_BOUNDS,
+  POINTED_ARCH_FRAME_APERTURE_BOUNDS,
+  POINTED_ARCH_FRAME_OUTER_BOUNDS,
+} from "./pointedArchProfile";
 import { resolveWallShaderProfile } from "./wallShaderProfiles";
 
 export type WallDetailMeshId =
@@ -203,7 +208,12 @@ function createPointedArchShape(widthHalf: number, bottomY: number, springY: num
 }
 
 function createPointedArchPanelGeometry(): BufferGeometry {
-  const geometry = new ExtrudeGeometry(createPointedArchShape(0.5, -0.5, 0.02, 0.5), {
+  const geometry = new ExtrudeGeometry(createPointedArchShape(
+    POINTED_ARCH_APERTURE_PANEL_BOUNDS.widthHalf,
+    POINTED_ARCH_APERTURE_PANEL_BOUNDS.bottomY,
+    POINTED_ARCH_APERTURE_PANEL_BOUNDS.springY,
+    POINTED_ARCH_APERTURE_PANEL_BOUNDS.apexY,
+  ), {
     depth: 1,
     bevelEnabled: false,
     curveSegments: 24,
@@ -215,8 +225,18 @@ function createPointedArchPanelGeometry(): BufferGeometry {
 }
 
 function createPointedArchFrameGeometry(): BufferGeometry {
-  const outer = createPointedArchShape(0.5, -0.5, 0.02, 0.5);
-  const inner = createPointedArchShape(0.34, -0.35, 0.01, 0.36);
+  const outer = createPointedArchShape(
+    POINTED_ARCH_FRAME_OUTER_BOUNDS.widthHalf,
+    POINTED_ARCH_FRAME_OUTER_BOUNDS.bottomY,
+    POINTED_ARCH_FRAME_OUTER_BOUNDS.springY,
+    POINTED_ARCH_FRAME_OUTER_BOUNDS.apexY,
+  );
+  const inner = createPointedArchShape(
+    POINTED_ARCH_FRAME_APERTURE_BOUNDS.widthHalf,
+    POINTED_ARCH_FRAME_APERTURE_BOUNDS.bottomY,
+    POINTED_ARCH_FRAME_APERTURE_BOUNDS.springY,
+    POINTED_ARCH_FRAME_APERTURE_BOUNDS.apexY,
+  );
   outer.holes.push(inner);
   const geometry = new ExtrudeGeometry(outer, {
     depth: 1,
