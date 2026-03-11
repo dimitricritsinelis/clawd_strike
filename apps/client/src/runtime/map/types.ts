@@ -72,6 +72,24 @@ export type RuntimeAuthoredWindow = {
   glassStyle: WindowGlassStyle;
 };
 
+export type RuntimeAuthoredDoor = {
+  centerS: number;
+};
+
+export type RuntimeDoorStyleSource = {
+  zoneId: string;
+  face: RuntimeFacadeFace;
+  segmentOrdinal: number;
+};
+
+export type RuntimeDoorLayoutOverride = {
+  zoneId: string;
+  face: RuntimeFacadeFace;
+  segmentOrdinal: number;
+  doors: RuntimeAuthoredDoor[];
+  styleSource?: RuntimeDoorStyleSource;
+};
+
 export type RuntimeWindowLayoutOverride = {
   zoneId: string;
   face: RuntimeFacadeFace;
@@ -86,6 +104,7 @@ export type RuntimeWallDetailOptions = {
   density: number;
   maxProtrusion: number;
   facadeOverrides: RuntimeFacadeOverride[];
+  doorLayoutOverrides: RuntimeDoorLayoutOverride[];
   windowLayoutOverrides: RuntimeWindowLayoutOverride[];
 };
 
@@ -227,6 +246,7 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
       density: DEFAULT_WALL_DETAIL_DENSITY,
       maxProtrusion: DEFAULT_WALL_DETAIL_MAX_PROTRUSION_M,
       facadeOverrides: [],
+      doorLayoutOverrides: [],
       windowLayoutOverrides: [],
     };
   }
@@ -254,6 +274,7 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
     density,
     maxProtrusion,
     facadeOverrides: [],
+    doorLayoutOverrides: [],
     windowLayoutOverrides: [],
   };
 
@@ -360,6 +381,79 @@ function parseWallDetailOptions(value: unknown, source: string): RuntimeWallDeta
         face,
         segmentOrdinal,
         windows,
+      };
+    });
+  }
+
+  if (typeof obj.door_layout_overrides !== "undefined") {
+    if (!Array.isArray(obj.door_layout_overrides)) {
+      failParse(`${source}.door_layout_overrides`, "expected array");
+    }
+
+    resolved.doorLayoutOverrides = obj.door_layout_overrides.map((rawOverride, index) => {
+      const override = asObject(rawOverride, `${source}.door_layout_overrides[${index}]`);
+      const zoneId = asString(override.zoneId, `${source}.door_layout_overrides[${index}].zoneId`);
+      const face = asString(override.face, `${source}.door_layout_overrides[${index}].face`);
+      if (face !== "north" && face !== "south" && face !== "east" && face !== "west") {
+        failParse(`${source}.door_layout_overrides[${index}].face`, "expected 'north', 'south', 'east', or 'west'");
+      }
+      const segmentOrdinal = asPositiveNumber(
+        override.segmentOrdinal,
+        `${source}.door_layout_overrides[${index}].segmentOrdinal`,
+      );
+      if (!Number.isInteger(segmentOrdinal)) {
+        failParse(`${source}.door_layout_overrides[${index}].segmentOrdinal`, "expected integer > 0");
+      }
+      if (!Array.isArray(override.doors) || override.doors.length === 0) {
+        failParse(`${source}.door_layout_overrides[${index}].doors`, "expected non-empty array");
+      }
+
+      const doors = override.doors.map((rawDoor, doorIndex) => {
+        const door = asObject(rawDoor, `${source}.door_layout_overrides[${index}].doors[${doorIndex}]`);
+        return {
+          centerS: asNumber(door.centerS, `${source}.door_layout_overrides[${index}].doors[${doorIndex}].centerS`),
+        };
+      });
+
+      let styleSource: RuntimeDoorStyleSource | undefined;
+      if (typeof override.styleSource !== "undefined") {
+        const sourceRef = asObject(override.styleSource, `${source}.door_layout_overrides[${index}].styleSource`);
+        const sourceFace = asString(
+          sourceRef.face,
+          `${source}.door_layout_overrides[${index}].styleSource.face`,
+        );
+        if (sourceFace !== "north" && sourceFace !== "south" && sourceFace !== "east" && sourceFace !== "west") {
+          failParse(
+            `${source}.door_layout_overrides[${index}].styleSource.face`,
+            "expected 'north', 'south', 'east', or 'west'",
+          );
+        }
+        const sourceSegmentOrdinal = asPositiveNumber(
+          sourceRef.segmentOrdinal,
+          `${source}.door_layout_overrides[${index}].styleSource.segmentOrdinal`,
+        );
+        if (!Number.isInteger(sourceSegmentOrdinal)) {
+          failParse(
+            `${source}.door_layout_overrides[${index}].styleSource.segmentOrdinal`,
+            "expected integer > 0",
+          );
+        }
+        styleSource = {
+          zoneId: asString(
+            sourceRef.zoneId,
+            `${source}.door_layout_overrides[${index}].styleSource.zoneId`,
+          ),
+          face: sourceFace,
+          segmentOrdinal: sourceSegmentOrdinal,
+        };
+      }
+
+      return {
+        zoneId,
+        face,
+        segmentOrdinal,
+        doors,
+        ...(styleSource ? { styleSource } : {}),
       };
     });
   }

@@ -344,6 +344,98 @@ function deriveBlockoutSpec(spec, zones) {
           });
         })()
       : [];
+  const doorLayoutOverrides =
+    wallDetailsRaw && typeof wallDetailsRaw.door_layout_overrides !== "undefined"
+      ? (() => {
+          if (!Array.isArray(wallDetailsRaw.door_layout_overrides)) {
+            fail("wall_details.door_layout_overrides must be an array when provided");
+          }
+
+          return wallDetailsRaw.door_layout_overrides.map((override, index) => {
+            if (!override || typeof override !== "object") {
+              fail(`wall_details.door_layout_overrides[${index}] must be an object`);
+            }
+
+            const zoneId = ensureString(override.zoneId, `wall_details.door_layout_overrides[${index}].zoneId`);
+            if (!zones.some((zone) => zone.id === zoneId)) {
+              fail(`wall_details.door_layout_overrides[${index}].zoneId '${zoneId}' does not match a known zone`);
+            }
+
+            const face = ensureString(override.face, `wall_details.door_layout_overrides[${index}].face`);
+            if (!["north", "south", "east", "west"].includes(face)) {
+              fail(`wall_details.door_layout_overrides[${index}].face must be one of north/south/east/west`);
+            }
+
+            const segmentOrdinal = asNumber(
+              override.segmentOrdinal,
+              `wall_details.door_layout_overrides[${index}].segmentOrdinal`,
+            );
+            if (!Number.isInteger(segmentOrdinal) || segmentOrdinal <= 0) {
+              fail(`wall_details.door_layout_overrides[${index}].segmentOrdinal must be an integer > 0`);
+            }
+
+            if (!Array.isArray(override.doors) || override.doors.length === 0) {
+              fail(`wall_details.door_layout_overrides[${index}].doors must be a non-empty array`);
+            }
+
+            const doors = override.doors.map((door, doorIndex) => {
+              if (!door || typeof door !== "object") {
+                fail(`wall_details.door_layout_overrides[${index}].doors[${doorIndex}] must be an object`);
+              }
+
+              return {
+                centerS: asNumber(
+                  door.centerS,
+                  `wall_details.door_layout_overrides[${index}].doors[${doorIndex}].centerS`,
+                ),
+              };
+            });
+
+            let styleSource;
+            if (typeof override.styleSource !== "undefined") {
+              if (!override.styleSource || typeof override.styleSource !== "object") {
+                fail(`wall_details.door_layout_overrides[${index}].styleSource must be an object when provided`);
+              }
+              const sourceZoneId = ensureString(
+                override.styleSource.zoneId,
+                `wall_details.door_layout_overrides[${index}].styleSource.zoneId`,
+              );
+              if (!zones.some((zone) => zone.id === sourceZoneId)) {
+                fail(
+                  `wall_details.door_layout_overrides[${index}].styleSource.zoneId '${sourceZoneId}' does not match a known zone`,
+                );
+              }
+              const sourceFace = ensureString(
+                override.styleSource.face,
+                `wall_details.door_layout_overrides[${index}].styleSource.face`,
+              );
+              if (!["north", "south", "east", "west"].includes(sourceFace)) {
+                fail(`wall_details.door_layout_overrides[${index}].styleSource.face must be one of north/south/east/west`);
+              }
+              const sourceSegmentOrdinal = asNumber(
+                override.styleSource.segmentOrdinal,
+                `wall_details.door_layout_overrides[${index}].styleSource.segmentOrdinal`,
+              );
+              if (!Number.isInteger(sourceSegmentOrdinal) || sourceSegmentOrdinal <= 0) {
+                fail(`wall_details.door_layout_overrides[${index}].styleSource.segmentOrdinal must be an integer > 0`);
+              }
+              styleSource = {
+                zoneId: sourceZoneId,
+                face: sourceFace,
+                segmentOrdinal: sourceSegmentOrdinal,
+              };
+            }
+
+            return {
+              zoneId,
+              face,
+              segmentOrdinal,
+              doors,
+              ...(styleSource ? { styleSource } : {}),
+            };
+          });
+        })()
+      : [];
   const windowLayoutOverrides =
     wallDetailsRaw && typeof wallDetailsRaw.window_layout_overrides !== "undefined"
       ? (() => {
@@ -452,6 +544,7 @@ function deriveBlockoutSpec(spec, zones) {
       density: Math.max(0, Math.min(1.25, wallDetailDensity)),
       maxProtrusion: Math.max(0.02, Math.min(0.2, wallDetailMaxProtrusion)),
       facade_overrides: facadeOverrides,
+      door_layout_overrides: doorLayoutOverrides,
       window_layout_overrides: windowLayoutOverrides,
       ...(typeof wallDetailSeed === "number" ? { seed: Math.trunc(wallDetailSeed) } : {}),
     },

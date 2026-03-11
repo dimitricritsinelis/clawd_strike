@@ -81,18 +81,57 @@
         "preset": "spawn_courtyard_landmark"
       }
     ],
+    "door_layout_overrides": [
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "north",
+        "segmentOrdinal": 1,
+        "doors": [
+          { "centerS": -6.0857142857 },
+          { "centerS": 6.0857142857 }
+        ]
+      },
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "east",
+        "segmentOrdinal": 2,
+        "styleSource": {
+          "zoneId": "SPAWN_B_GATE_PLAZA",
+          "face": "north",
+          "segmentOrdinal": 1
+        },
+        "doors": [
+          { "centerS": 0.0 }
+        ]
+      },
+      {
+        "zoneId": "SPAWN_B_GATE_PLAZA",
+        "face": "west",
+        "segmentOrdinal": 2,
+        "styleSource": {
+          "zoneId": "SPAWN_B_GATE_PLAZA",
+          "face": "north",
+          "segmentOrdinal": 1
+        },
+        "doors": [
+          { "centerS": 0.0 }
+        ]
+      }
+    ],
     "window_layout_overrides": [
       {
         "zoneId": "SPAWN_B_GATE_PLAZA",
         "face": "north",
         "segmentOrdinal": 1,
         "windows": [
-          { "centerS": -4.05, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": -1.35, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 1.35, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 4.05, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": -4.00, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 4.00, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
+          { "centerS": -9.1285714286, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": -3.0428571429, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": 3.0428571429, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": 9.1285714286, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": -9.1285714286, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
+          { "centerS": -3.0428571429, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
+          { "centerS": 3.0428571429, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
+          { "centerS": 9.1285714286, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
         ]
       },
       {
@@ -100,12 +139,10 @@
         "face": "east",
         "segmentOrdinal": 2,
         "windows": [
-          { "centerS": -2.10, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 0.00, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 2.10, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": -2.10, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 0.00, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 2.10, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
+          { "centerS": -2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": 2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": -2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
+          { "centerS": 2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
         ]
       },
       {
@@ -113,12 +150,10 @@
         "face": "west",
         "segmentOrdinal": 2,
         "windows": [
-          { "centerS": -2.10, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 0.00, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 2.10, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": -2.10, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 0.00, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 2.10, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
+          { "centerS": -2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": 2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
+          { "centerS": -2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
+          { "centerS": 2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
         ]
       }
     ]

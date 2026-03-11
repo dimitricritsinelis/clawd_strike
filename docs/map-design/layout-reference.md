@@ -921,16 +921,16 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Trim textures: heavy `ph_stone_trim_white`, light `ph_band_plastered`
 - Balcony texture: none
 - Floor context: PBR floor material `cobblestone_pavement`
-- Opening totals: 2 ground doors, 0 upper door openings, 0 balconies, 6 glass windows, 0 dark windows, 0 shuttered windows
-- Door logic: #1 2 ground door column(s) derived from wall role spawn_frontage.
-- Window logic: #1 Authored window layout places 6 pointed-arch windows (4 bright stained-glass upper / 2 dim stained-glass lower).
+- Opening totals: 2 ground doors, 0 upper door openings, 0 balconies, 8 glass windows, 0 dark windows, 0 shuttered windows
+- Door logic: #1 2 authored ground door opening(s) placed on segment #1.
+- Window logic: #1 Authored window layout places 8 pointed-arch windows (4 bright stained-glass upper / 4 dim stained-glass lower).
 - Balcony logic: #1 No balconies because spawn frontage resolves balcony style "none".
 - Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:north resolves wall `ph_brick_4_desert` with balcony material none.
 - Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
 - Anchor summary: none
 - Segment breakdown:
-  - #1: usable=21.30m, bays=7, pattern=authored, doors=2/0, balconies=0, windows=6 glass / 0 dark / 0 shuttered
-    logic: Authored window layout override on segment #1 places 6 exact windows while retaining the procedural door grid. 2 ground door column(s) derived from wall role spawn_frontage. Authored window layout places 6 pointed-arch windows (4 bright stained-glass upper / 2 dim stained-glass lower). No balconies because spawn frontage resolves balcony style "none".
+  - #1: usable=21.30m, bays=7, pattern=authored, doors=2/0, balconies=0, windows=8 glass / 0 dark / 0 shuttered
+    logic: Authored door/window layout overrides on segment #1 place exact openings while preserving the existing facade construction. 2 authored ground door opening(s) placed on segment #1. Authored window layout places 8 pointed-arch windows (4 bright stained-glass upper / 4 dim stained-glass lower). No balconies because spawn frontage resolves balcony style "none".
 - Notes: Spawn B exposed north face.
 
 ### WALL_BLDG_H_FRONT — Building H Front Wall
@@ -982,9 +982,9 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Trim textures: heavy `ph_stone_trim_white`, light `ph_band_plastered`
 - Balcony texture: none
 - Floor context: PBR floor material `cobblestone_pavement`
-- Opening totals: 0 ground doors, 0 upper door openings, 0 balconies, 6 glass windows, 0 dark windows, 0 shuttered windows
-- Door logic: #1 No procedural doors; segment is below the minimum frontage length. #2 No ground doors because 7.30m usable length does not reach the frontage threshold.
-- Window logic: #1 No procedural windows; segment is below the minimum facade length. #2 Authored window layout places 6 pointed-arch windows (3 bright stained-glass upper / 3 dim stained-glass lower).
+- Opening totals: 1 ground doors, 0 upper door openings, 0 balconies, 4 glass windows, 0 dark windows, 0 shuttered windows
+- Door logic: #1 No procedural doors; segment is below the minimum frontage length. #2 1 authored ground door opening(s) placed on segment #2 using door style from SPAWN_B_GATE_PLAZA:north#1.
+- Window logic: #1 No procedural windows; segment is below the minimum facade length. #2 Authored window layout places 4 pointed-arch windows (2 bright stained-glass upper / 2 dim stained-glass lower).
 - Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because spawn frontage resolves balcony style "none".
 - Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:east resolves wall `ph_brick_4_desert` with balcony material none.
 - Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
@@ -992,8 +992,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Segment breakdown:
   - #1: usable=1.30m, bays=0, pattern=n/a, doors=0/0, balconies=0, windows=0 glass / 0 dark / 0 shuttered
     logic: Segment is too short for a procedural facade grid after edge margins. No procedural doors; segment is below the minimum frontage length. No procedural windows; segment is below the minimum facade length. No balcony evaluation; segment is below the minimum facade length.
-  - #2: usable=7.30m, bays=3, pattern=authored, doors=0/0, balconies=0, windows=6 glass / 0 dark / 0 shuttered
-    logic: Authored window layout override on segment #2 places 6 exact windows while retaining the procedural door grid. No ground doors because 7.30m usable length does not reach the frontage threshold. Authored window layout places 6 pointed-arch windows (3 bright stained-glass upper / 3 dim stained-glass lower). No balconies because spawn frontage resolves balcony style "none".
+  - #2: usable=7.30m, bays=3, pattern=authored, doors=1/0, balconies=0, windows=4 glass / 0 dark / 0 shuttered
+    logic: Authored door/window layout overrides on segment #2 place exact openings while preserving the existing facade construction, using door style from SPAWN_B_GATE_PLAZA:north#1. 1 authored ground door opening(s) placed on segment #2 using door style from SPAWN_B_GATE_PLAZA:north#1. Authored window layout places 4 pointed-arch windows (2 bright stained-glass upper / 2 dim stained-glass lower). No balconies because spawn frontage resolves balcony style "none".
 - Notes: Spawn B exposed east face.
 
 ### WALL_AREA_SPAWN_B_WEST — Spawn B West Wall
@@ -1013,9 +1013,9 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Trim textures: heavy `ph_stone_trim_white`, light `ph_band_plastered`
 - Balcony texture: none
 - Floor context: PBR floor material `cobblestone_pavement`
-- Opening totals: 0 ground doors, 0 upper door openings, 0 balconies, 6 glass windows, 0 dark windows, 0 shuttered windows
-- Door logic: #1 No procedural doors; segment is below the minimum frontage length. #2 No ground doors because 7.30m usable length does not reach the frontage threshold.
-- Window logic: #1 No procedural windows; segment is below the minimum facade length. #2 Authored window layout places 6 pointed-arch windows (3 bright stained-glass upper / 3 dim stained-glass lower).
+- Opening totals: 1 ground doors, 0 upper door openings, 0 balconies, 4 glass windows, 0 dark windows, 0 shuttered windows
+- Door logic: #1 No procedural doors; segment is below the minimum frontage length. #2 1 authored ground door opening(s) placed on segment #2 using door style from SPAWN_B_GATE_PLAZA:north#1.
+- Window logic: #1 No procedural windows; segment is below the minimum facade length. #2 Authored window layout places 4 pointed-arch windows (2 bright stained-glass upper / 2 dim stained-glass lower).
 - Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because spawn frontage resolves balcony style "none".
 - Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:west resolves wall `ph_brick_4_desert` with balcony material none.
 - Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
@@ -1023,8 +1023,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Segment breakdown:
   - #1: usable=1.30m, bays=0, pattern=n/a, doors=0/0, balconies=0, windows=0 glass / 0 dark / 0 shuttered
     logic: Segment is too short for a procedural facade grid after edge margins. No procedural doors; segment is below the minimum frontage length. No procedural windows; segment is below the minimum facade length. No balcony evaluation; segment is below the minimum facade length.
-  - #2: usable=7.30m, bays=3, pattern=authored, doors=0/0, balconies=0, windows=6 glass / 0 dark / 0 shuttered
-    logic: Authored window layout override on segment #2 places 6 exact windows while retaining the procedural door grid. No ground doors because 7.30m usable length does not reach the frontage threshold. Authored window layout places 6 pointed-arch windows (3 bright stained-glass upper / 3 dim stained-glass lower). No balconies because spawn frontage resolves balcony style "none".
+  - #2: usable=7.30m, bays=3, pattern=authored, doors=1/0, balconies=0, windows=4 glass / 0 dark / 0 shuttered
+    logic: Authored door/window layout overrides on segment #2 place exact openings while preserving the existing facade construction, using door style from SPAWN_B_GATE_PLAZA:north#1. 1 authored ground door opening(s) placed on segment #2 using door style from SPAWN_B_GATE_PLAZA:north#1. Authored window layout places 4 pointed-arch windows (2 bright stained-glass upper / 2 dim stained-glass lower). No balconies because spawn frontage resolves balcony style "none".
 - Notes: Spawn B exposed west face.
 
 ### WALL_AREA_MAIN_HALL_SOUTH_NORTH — Main Hall South North Wall

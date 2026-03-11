@@ -1,8 +1,11 @@
 import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 import type {
+  RuntimeAuthoredDoor,
   RuntimeAuthoredWindow,
   RuntimeAnchorsSpec,
   RuntimeBlockoutZone,
+  RuntimeDoorLayoutOverride,
+  RuntimeDoorStyleSource,
   RuntimeFacadeOverride,
   RuntimeFacadeOverridePreset,
   RuntimeWindowLayoutOverride,
@@ -252,6 +255,9 @@ type SegmentDecorContext = {
   /** Plinth dimensions computed early (for deferred emit with door gaps). */
   plinthHeight: number;
   plinthDepth: number;
+  authoredDoorLayout: RuntimeDoorLayoutOverride | null;
+  authoredDoorStyleSpec: FacadeSpec | null;
+  authoredDoorStyleSource: RuntimeDoorStyleSource | null;
   authoredWindowLayout: RuntimeWindowLayoutOverride | null;
 };
 
@@ -262,6 +268,7 @@ export type BuildWallDetailPlacementsOptions = {
   zones: readonly RuntimeBlockoutZone[];
   anchors: RuntimeAnchorsSpec | null;
   facadeOverrides: readonly RuntimeFacadeOverride[];
+  doorLayoutOverrides: readonly RuntimeDoorLayoutOverride[];
   windowLayoutOverrides: readonly RuntimeWindowLayoutOverride[];
   seed: number;
   wallHeightM: number;
@@ -292,6 +299,10 @@ export type WallDetailPlacementResult = {
 type WindowTreatment = "glass" | "dark" | "shuttered";
 
 function authoredWindowLayoutKey(zoneId: string, face: FacadeFace, segmentOrdinal: number): string {
+  return `${zoneId}:${face}:${segmentOrdinal}`;
+}
+
+function authoredDoorLayoutKey(zoneId: string, face: FacadeFace, segmentOrdinal: number): string {
   return `${zoneId}:${face}:${segmentOrdinal}`;
 }
 
@@ -1298,6 +1309,16 @@ function columnCenterS(spec: FacadeSpec, columnIndex: number): number {
   return -spec.usableLength * 0.5 + spec.bayWidth * (columnIndex + 0.5);
 }
 
+function resolveDoorCentersS(
+  spec: FacadeSpec,
+  authoredDoorLayout: RuntimeDoorLayoutOverride | null,
+): number[] {
+  if (authoredDoorLayout) {
+    return authoredDoorLayout.doors.map((door: RuntimeAuthoredDoor) => door.centerS);
+  }
+  return spec.doorColumns.map((doorCol) => columnCenterS(spec, doorCol));
+}
+
 // ── Window placement (uniform dimensions from spec) ────────────────────────
 
 function resolveWindowTreatment(
@@ -1510,12 +1531,15 @@ function placeArchedDoor(
   ctx: SegmentDecorContext,
   centerS: number,
   spec: FacadeSpec,
+  doorStyleSource: RuntimeDoorStyleSource | null = null,
 ): void {
   const uses3DModel = spec.doorH >= 2.0 && spec.doorW >= 0.8;
   const isSpawn = ctx.zone?.type === "spawn_plaza";
   const isBrickBackdrop = isSpawnGateBrickBackdropPreset(spec.compositionPreset);
   const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
   const trimDepthScale = isSpawnBCleanup ? SPAWN_B_SHELL_TRIM_DEPTH_SCALE : 1;
+  const styleZoneId = doorStyleSource?.zoneId ?? ctx.zone?.id ?? null;
+  const styleFacadeFace = doorStyleSource?.face ?? ctx.facadeFace;
 
   if (uses3DModel) {
     const modelId = spec.doorW >= 1.2 ? CASTLE_DOOR_ID : ROLLERSHUTTER_ID;
@@ -1536,8 +1560,8 @@ function placeArchedDoor(
     };
     if (isCastleDoor) {
       const isSpawnBMainHeroDoor =
-        ctx.zone?.id === "SPAWN_B_GATE_PLAZA"
-        && ctx.facadeFace === "north"
+        styleZoneId === "SPAWN_B_GATE_PLAZA"
+        && styleFacadeFace === "north"
         && isBrickBackdrop;
       const surroundDepthM = isSpawnBMainHeroDoor
         ? SPAWN_B_HERO_DOOR_SURROUND_DEPTH_M
@@ -2126,20 +2150,25 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   // Pilasters aligned to the bay grid
   placePilasters(ctx, spec);
 
-  if (ctx.authoredWindowLayout) {
-    for (const doorCol of spec.doorColumns) {
-      placeArchedDoor(ctx, columnCenterS(spec, doorCol), spec);
+  if (ctx.authoredWindowLayout || ctx.authoredDoorLayout) {
+    const doorPlacementSpec = ctx.authoredDoorStyleSpec ?? spec;
+    const doorCentersS = resolveDoorCentersS(spec, ctx.authoredDoorLayout);
+
+    for (const doorCenterS of doorCentersS) {
+      placeArchedDoor(ctx, doorCenterS, doorPlacementSpec, ctx.authoredDoorStyleSource);
     }
 
-    for (const window of ctx.authoredWindowLayout.windows) {
-      placeAuthoredWindow(ctx, window, spec);
+    if (ctx.authoredWindowLayout) {
+      for (const window of ctx.authoredWindowLayout.windows) {
+        placeAuthoredWindow(ctx, window, spec);
+      }
     }
 
-    const doorGaps = spec.doorColumns
-      .filter(() => spec.doorH >= 2.0 && spec.doorW >= 0.8)
-      .map((doorCol) => ({
-        centerS: columnCenterS(spec, doorCol),
-        halfW: spec.doorW * 0.5,
+    const doorGaps = doorCentersS
+      .filter(() => doorPlacementSpec.doorH >= 2.0 && doorPlacementSpec.doorW >= 0.8)
+      .map((doorCenterS) => ({
+        centerS: doorCenterS,
+        halfW: doorPlacementSpec.doorW * 0.5,
       }));
     emitPlinthStrip(ctx, doorGaps);
     placeCableSegments(ctx);
@@ -2294,6 +2323,10 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   for (const override of options.facadeOverrides) {
     facadeOverrideMap.set(`${override.zoneId}:${override.face}`, override.preset);
   }
+  const authoredDoorLayoutMap = new Map<string, RuntimeDoorLayoutOverride>();
+  for (const override of options.doorLayoutOverrides) {
+    authoredDoorLayoutMap.set(authoredDoorLayoutKey(override.zoneId, override.face, override.segmentOrdinal), override);
+  }
   const authoredWindowLayoutMap = new Map<string, RuntimeWindowLayoutOverride>();
   for (const override of options.windowLayoutOverrides) {
     authoredWindowLayoutMap.set(authoredWindowLayoutKey(override.zoneId, override.face, override.segmentOrdinal), override);
@@ -2330,9 +2363,51 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       }
     }
   }
-  let segmentsDecorated = 0;
+  const segmentKeyToIndex = new Map<string, number>();
+  for (const [index, meta] of segmentMetaByIndex) {
+    if (!meta.zone || meta.segmentOrdinal === null) continue;
+    segmentKeyToIndex.set(authoredDoorLayoutKey(meta.zone.id, meta.facadeFace, meta.segmentOrdinal), index);
+  }
 
-  for (let index = 0; index < options.segments.length; index += 1) {
+  type SegmentDescriptor = {
+    frame: SegmentFrame;
+    zone: RuntimeBlockoutZone | null;
+    facadeStyle: ReturnType<typeof resolveFacadeStyleForSegment>;
+    facadeFace: FacadeFace;
+    segmentOrdinal: number | null;
+    compositionPreset: RuntimeFacadeOverridePreset;
+    isMainLane: boolean;
+    isShopfront: boolean;
+    isSideHall: boolean;
+    isConnector: boolean;
+    isCut: boolean;
+    wallMaterialId: string;
+    trimHeavyMaterialId: string | null;
+    trimLightMaterialId: string | null;
+    isInsideWall: boolean;
+    isSpawnEntryWall: boolean;
+    segHeight: number;
+    segmentDensity: number;
+    segmentMaxProtrusion: number;
+    segSeed: number;
+    cornerAtStart: boolean;
+    cornerAtEnd: boolean;
+    isSpawnOuterWall: boolean;
+    isConnectorSpawnFacing: boolean;
+    authoredDoorLayout: RuntimeDoorLayoutOverride | null;
+    authoredWindowLayout: RuntimeWindowLayoutOverride | null;
+    wallRole: WallRole;
+  };
+
+  const segmentDescriptorCache = new Map<number, SegmentDescriptor>();
+  const authoredDoorStyleSpecCache = new Map<string, FacadeSpec>();
+
+  function describeSegment(index: number): SegmentDescriptor {
+    const cached = segmentDescriptorCache.get(index);
+    if (cached) {
+      return cached;
+    }
+
     const segment = options.segments[index]!;
     const frame = toSegmentFrame(segment);
     const segmentMeta = segmentMetaByIndex.get(index);
@@ -2354,30 +2429,17 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     const wallMaterialId = facadeStyle.materials.wall;
     const trimHeavyMaterialId = facadeStyle.materials.trimHeavy;
     const trimLightMaterialId = facadeStyle.materials.trimLight;
-
-    // Compute per-segment height.
-    // Seed is zone-scoped (no segment index) so every wall segment belonging to
-    // the same zone resolves to the same story count — eliminating the corner
-    // holes and floating slabs caused by per-segment independent height picks.
-    //
-    // Side-hall inner walls use the same spatial test as shouldSkipDoors():
-    // if sign(centerX − mapCenterX) === sign(inwardX), the inward vector points
-    // away from map centre → this wall faces the building block → inner wall.
     const isInsideWall = isSideHall
       && Math.abs(frame.inwardX) > 0.5
       && Math.sign(frame.centerX - mapCenterX) !== 0
       && Math.sign(frame.centerX - mapCenterX) === Math.sign(frame.inwardX);
-    // Spawn entry wall: the one face of the spawn plaza that looks toward the bazaar.
-    // Detection: wall centerZ is between the spawn's own Z-center and mapCenterZ.
+
     let isSpawnEntryWall = false;
     if (zone?.type === "spawn_plaza") {
       const spawnCenterZ = zone.rect.y + zone.rect.h / 2;
       isSpawnEntryWall = (frame.centerZ - spawnCenterZ) * (mapCenterZ - spawnCenterZ) > 0;
     }
-    // Connector main-lane-facing wall: the wall's inward normal points away from
-    // the map centre (toward the spawn), meaning the wall's visible face looks
-    // toward the map centre (toward the main-lane buildings).  These walls are the
-    // backs of 3-story main-lane buildings and must stay at 9 m.
+
     let isConnectorMainLaneFacing = false;
     if (zone?.type === "connector") {
       const zoneCenterZ = zone.rect.y + zone.rect.h / 2;
@@ -2387,14 +2449,17 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
         frame.inwardX * (mapCenterX - zoneCenterX);
       isConnectorMainLaneFacing = toMainLane < -0.01;
     }
+
     const heightSeed = deriveSubSeed(seed, `height:${zone?.id ?? "none"}`);
     const heightRng = new DeterministicRng(heightSeed);
-    const segHeight = resolveSegmentWallHeight(options.wallHeightM, zone, heightRng, isInsideWall, isSpawnEntryWall, isConnectorMainLaneFacing);
-    segmentHeights.push(segHeight);
-
-    if (instances.length >= maxInstances) {
-      continue;
-    }
+    const segHeight = resolveSegmentWallHeight(
+      options.wallHeightM,
+      zone,
+      heightRng,
+      isInsideWall,
+      isSpawnEntryWall,
+      isConnectorMainLaneFacing,
+    );
 
     const segmentDensityRaw = density
       * (isMainLane ? 1.04 : 1)
@@ -2403,76 +2468,183 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       * (isConnector ? 0.78 : 1);
     const segmentDensity = clamp(segmentDensityRaw, 0.06, 1.2);
     const segmentMaxProtrusion = clamp(
-      isMainLane ? Math.min(maxProtrusionM, 0.14)
-        : maxProtrusionM,
+      isMainLane ? Math.min(maxProtrusionM, 0.14) : maxProtrusionM,
       0.03,
       maxProtrusionM,
     );
     const segSeed = deriveSubSeed(seed, `segment:${index}:${zone?.id ?? "none"}`);
-    const segRng = rootRng.fork(String(segSeed));
 
-    // Determine which endpoints are 90° corners (perpendicular segment meets).
     let cornerAtStart: boolean;
     let cornerAtEnd: boolean;
     if (segment.orientation === "vertical") {
       cornerAtStart = cornerKeys.has(toCornerKey(segment.coord, segment.start));
-      cornerAtEnd   = cornerKeys.has(toCornerKey(segment.coord, segment.end));
+      cornerAtEnd = cornerKeys.has(toCornerKey(segment.coord, segment.end));
     } else {
       cornerAtStart = cornerKeys.has(toCornerKey(segment.start, segment.coord));
-      cornerAtEnd   = cornerKeys.has(toCornerKey(segment.end, segment.coord));
+      cornerAtEnd = cornerKeys.has(toCornerKey(segment.end, segment.coord));
     }
 
-    // Spawn outer wall: any spawn_plaza wall that is NOT the entry wall facing bazaar.
     const isSpawnOuterWall = zone?.type === "spawn_plaza" && !isSpawnEntryWall;
-    // Connector spawn-facing wall: the opposite of main-lane-facing.
     const isConnectorSpawnFacing = zone?.type === "connector" && !isConnectorMainLaneFacing;
+    const authoredDoorLayout = zone && segmentMeta?.segmentOrdinal
+      ? authoredDoorLayoutMap.get(authoredDoorLayoutKey(zone.id, facadeFace, segmentMeta.segmentOrdinal)) ?? null
+      : null;
     const authoredWindowLayout = zone && segmentMeta?.segmentOrdinal
       ? authoredWindowLayoutMap.get(authoredWindowLayoutKey(zone.id, facadeFace, segmentMeta.segmentOrdinal)) ?? null
       : null;
-    const wallRole = resolveWallRole(
-      zone,
-      facadeFace,
-      isInsideWall,
-      isSpawnEntryWall,
-    );
+    const wallRole = resolveWallRole(zone, facadeFace, isInsideWall, isSpawnEntryWall);
 
-    const countBefore = instances.length;
-    decorateSegment({
+    const descriptor: SegmentDescriptor = {
       frame,
       zone,
-      wallRole,
+      facadeStyle,
       facadeFace,
       segmentOrdinal: segmentMeta?.segmentOrdinal ?? null,
       compositionPreset,
       isMainLane,
-      isShopfrontZone: isShopfront,
+      isShopfront,
       isSideHall,
       isConnector,
       isCut,
-      mapCenterX,
-      mapCenterZ,
-      profile: options.profile,
-      facadeFamily: facadeStyle.family,
-      trimTier: facadeStyle.trimTier,
-      balconyStyle: facadeStyle.balconyStyle,
-      materialSlots: facadeStyle.materials,
       wallMaterialId,
       trimHeavyMaterialId,
       trimLightMaterialId,
-      wallHeightM: segHeight,
-      maxProtrusionM: segmentMaxProtrusion,
-      density: segmentDensity,
-      rng: segRng,
-      instances,
-      maxInstances,
+      isInsideWall,
+      isSpawnEntryWall,
+      segHeight,
+      segmentDensity,
+      segmentMaxProtrusion,
+      segSeed,
       cornerAtStart,
       cornerAtEnd,
       isSpawnOuterWall,
       isConnectorSpawnFacing,
+      authoredDoorLayout,
+      authoredWindowLayout,
+      wallRole,
+    };
+    segmentDescriptorCache.set(index, descriptor);
+    return descriptor;
+  }
+
+  function resolveAuthoredDoorStyleSpec(doorLayout: RuntimeDoorLayoutOverride | null): {
+    spec: FacadeSpec | null;
+    source: RuntimeDoorStyleSource | null;
+  } {
+    if (!doorLayout?.styleSource) {
+      return { spec: null, source: null };
+    }
+
+    const source = doorLayout.styleSource;
+    const sourceKey = authoredDoorLayoutKey(source.zoneId, source.face, source.segmentOrdinal);
+    const cached = authoredDoorStyleSpecCache.get(sourceKey);
+    if (cached) {
+      return { spec: cached, source };
+    }
+
+    const sourceIndex = segmentKeyToIndex.get(sourceKey);
+    if (typeof sourceIndex !== "number") {
+      throw new Error(`[wall-detail] authored door style source '${sourceKey}' not found`);
+    }
+
+    const sourceDescriptor = describeSegment(sourceIndex);
+    const sourceSpec = computeFacadeSpec({
+      frame: sourceDescriptor.frame,
+      zone: sourceDescriptor.zone,
+      facadeFace: sourceDescriptor.facadeFace,
+      segmentOrdinal: sourceDescriptor.segmentOrdinal,
+      wallRole: sourceDescriptor.wallRole,
+      compositionPreset: sourceDescriptor.compositionPreset,
+      isMainLane: sourceDescriptor.isMainLane,
+      isShopfrontZone: sourceDescriptor.isShopfront,
+      isSideHall: sourceDescriptor.isSideHall,
+      isConnector: sourceDescriptor.isConnector,
+      isCut: sourceDescriptor.isCut,
+      mapCenterX,
+      mapCenterZ,
+      profile: options.profile,
+      facadeFamily: sourceDescriptor.facadeStyle.family,
+      trimTier: sourceDescriptor.facadeStyle.trimTier,
+      balconyStyle: sourceDescriptor.facadeStyle.balconyStyle,
+      materialSlots: sourceDescriptor.facadeStyle.materials,
+      wallMaterialId: sourceDescriptor.wallMaterialId,
+      trimHeavyMaterialId: sourceDescriptor.trimHeavyMaterialId,
+      trimLightMaterialId: sourceDescriptor.trimLightMaterialId,
+      wallHeightM: sourceDescriptor.segHeight,
+      maxProtrusionM: sourceDescriptor.segmentMaxProtrusion,
+      density: sourceDescriptor.segmentDensity,
+      rng: rootRng.fork(String(sourceDescriptor.segSeed)),
+      instances: [],
+      maxInstances: 1,
+      cornerAtStart: sourceDescriptor.cornerAtStart,
+      cornerAtEnd: sourceDescriptor.cornerAtEnd,
+      isSpawnOuterWall: sourceDescriptor.isSpawnOuterWall,
+      isConnectorSpawnFacing: sourceDescriptor.isConnectorSpawnFacing,
+      doorModelPlacements: [],
+      plinthHeight: 0,
+      plinthDepth: 0,
+      authoredDoorLayout: sourceDescriptor.authoredDoorLayout,
+      authoredDoorStyleSpec: null,
+      authoredDoorStyleSource: null,
+      authoredWindowLayout: sourceDescriptor.authoredWindowLayout,
+    });
+    if (!sourceSpec) {
+      throw new Error(`[wall-detail] unable to resolve authored door style for source '${sourceKey}'`);
+    }
+    authoredDoorStyleSpecCache.set(sourceKey, sourceSpec);
+    return { spec: sourceSpec, source };
+  }
+  let segmentsDecorated = 0;
+
+  for (let index = 0; index < options.segments.length; index += 1) {
+    const descriptor = describeSegment(index);
+    segmentHeights.push(descriptor.segHeight);
+
+    if (instances.length >= maxInstances) {
+      continue;
+    }
+    const authoredDoorStyle = resolveAuthoredDoorStyleSpec(descriptor.authoredDoorLayout);
+
+    const countBefore = instances.length;
+    decorateSegment({
+      frame: descriptor.frame,
+      zone: descriptor.zone,
+      wallRole: descriptor.wallRole,
+      facadeFace: descriptor.facadeFace,
+      segmentOrdinal: descriptor.segmentOrdinal,
+      compositionPreset: descriptor.compositionPreset,
+      isMainLane: descriptor.isMainLane,
+      isShopfrontZone: descriptor.isShopfront,
+      isSideHall: descriptor.isSideHall,
+      isConnector: descriptor.isConnector,
+      isCut: descriptor.isCut,
+      mapCenterX,
+      mapCenterZ,
+      profile: options.profile,
+      facadeFamily: descriptor.facadeStyle.family,
+      trimTier: descriptor.facadeStyle.trimTier,
+      balconyStyle: descriptor.facadeStyle.balconyStyle,
+      materialSlots: descriptor.facadeStyle.materials,
+      wallMaterialId: descriptor.wallMaterialId,
+      trimHeavyMaterialId: descriptor.trimHeavyMaterialId,
+      trimLightMaterialId: descriptor.trimLightMaterialId,
+      wallHeightM: descriptor.segHeight,
+      maxProtrusionM: descriptor.segmentMaxProtrusion,
+      density: descriptor.segmentDensity,
+      rng: rootRng.fork(String(descriptor.segSeed)),
+      instances,
+      maxInstances,
+      cornerAtStart: descriptor.cornerAtStart,
+      cornerAtEnd: descriptor.cornerAtEnd,
+      isSpawnOuterWall: descriptor.isSpawnOuterWall,
+      isConnectorSpawnFacing: descriptor.isConnectorSpawnFacing,
       doorModelPlacements,
       plinthHeight: 0,
       plinthDepth: 0,
-      authoredWindowLayout,
+      authoredDoorLayout: descriptor.authoredDoorLayout,
+      authoredDoorStyleSpec: authoredDoorStyle.spec,
+      authoredDoorStyleSource: authoredDoorStyle.source,
+      authoredWindowLayout: descriptor.authoredWindowLayout,
     });
     if (instances.length > countBefore) {
       segmentsDecorated += 1;

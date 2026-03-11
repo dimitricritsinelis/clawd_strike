@@ -175,12 +175,15 @@ function createCastleDoorSurround(
   trimThicknessM: number,
   depthM: number,
   centerOffsetM: number,
+  tangentOffsetM = 0,
 ): Group {
   const surround = new Group();
   surround.name = "castle-door-surround";
-  const centerX = placement.wallSurfacePos.x + placement.outwardX * centerOffsetM;
+  const tangentX = Math.cos(yawRad);
+  const tangentZ = -Math.sin(yawRad);
+  const centerX = placement.wallSurfacePos.x + placement.outwardX * centerOffsetM + tangentX * tangentOffsetM;
   const centerY = placement.wallSurfacePos.y;
-  const centerZ = placement.wallSurfacePos.z + placement.outwardZ * centerOffsetM;
+  const centerZ = placement.wallSurfacePos.z + placement.outwardZ * centerOffsetM + tangentZ * tangentOffsetM;
   const jambWidthM = trimThicknessM;
   const revealWidthM = placement.revealWidthM ?? Math.max(0.035, Math.min(0.06, trimThicknessM * 0.24));
   const openingWidthM = widthM + revealWidthM * 2;
@@ -402,6 +405,7 @@ export function buildDoorModels(
           placement.trimThicknessM,
           placement.surroundDepthM,
           placement.surroundCenterOffsetM,
+          tangentOffsetM,
         ));
       }
     }
