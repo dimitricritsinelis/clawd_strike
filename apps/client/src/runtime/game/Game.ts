@@ -891,10 +891,10 @@ export class Game {
     // Tuning constants kept here for easy adjustment.
     const FOG_COLOR = 0xEADBC8;       // warm dust
     const AMBIENT_COLOR = 0xFFEFD4;
-    const AMBIENT_INTENSITY = 0.48;   // lifted from 0.38 — brighter hallway floor
+    const AMBIENT_INTENSITY = 0.55;   // retuned to absorb the old fill light contribution
     const HEMI_SKY = 0xD8EBFF;        // slightly brighter sky bounce (was 0xCFE3FF)
     const HEMI_GROUND = 0xE0C08A;     // warmer/brighter ground bounce (was 0xD7B07A)
-    const HEMI_INTENSITY = 0.75;      // lifted from 0.62 — stronger bounce into corridors
+    const HEMI_INTENSITY = 0.82;      // stronger ambient bounce without a second direct light
     const SUN_COLOR = 0xFFD2A1;
     const SUN_INTENSITY = 2.1;
     const SUN_POS: [number, number, number] = [-110, 75, -40];
@@ -904,9 +904,6 @@ export class Game {
     const SHADOW_NORMAL_BIAS = 0.015;
     const SHADOW_BOUNDS = 50;         // ±50 ortho frustum (covers 50×82m playable area)
     const SHADOW_RADIUS = 1;
-    const FILL_COLOR = 0xBFD9FF;      // cool blue counter-fill
-    const FILL_INTENSITY = 0.30;      // lifted from 0.16 — stronger fill on shadow side
-    const FILL_POS: [number, number, number] = [90, 35, 70];
     const FOG_DENSITY = 0.0030;       // reduced from 0.0045 — less haze, clearer distance
 
     this.scene.fog = new FogExp2(FOG_COLOR, FOG_DENSITY);
@@ -930,11 +927,7 @@ export class Game {
     sun.shadow.radius = SHADOW_RADIUS;
     sun.target.position.set(...SUN_TARGET);
 
-    const fill = new DirectionalLight(FILL_COLOR, FILL_INTENSITY);
-    fill.position.set(...FILL_POS);
-    fill.castShadow = false;
-
-    this.scene.add(ambient, hemi, sun, sun.target, fill);
+    this.scene.add(ambient, hemi, sun, sun.target);
 
     // Live procedural desert skydome (scaled within camera.far, follows camera each frame)
     this.scene.background = null; // skydome IS the background; clearColor serves as fallback

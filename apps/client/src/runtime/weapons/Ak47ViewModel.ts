@@ -238,21 +238,13 @@ export class Ak47ViewModel {
 
     this.viewModelScene.add(this.viewModelCamera);
 
-    const ambient = new AmbientLight(0xffffff, 1.15);
-    const hemi = new HemisphereLight(0xf9fbff, 0x6e7a88, 1.0);
+    const ambient = new AmbientLight(0xffffff, 1.22);
+    const hemi = new HemisphereLight(0xf9fbff, 0x6e7a88, 1.08);
     hemi.position.set(0, 1, 0);
     // Camera-anchored lights keep the gun consistently readable regardless of world lighting.
-    const key = new DirectionalLight(0xfff4e6, 1.35);
+    const key = new DirectionalLight(0xfff4e6, 1.45);
     key.position.set(0.7, 0.25, -0.35);
     this.viewModelCamera.add(key);
-
-    const fill = new DirectionalLight(0xe9f4ff, 0.7);
-    fill.position.set(-0.55, -0.15, -0.25);
-    this.viewModelCamera.add(fill);
-
-    const rim = new DirectionalLight(0xc2dbff, 0.55);
-    rim.position.set(-0.4, 0.35, 0.7);
-    this.viewModelCamera.add(rim);
 
     this.viewModelScene.add(ambient, hemi);
   }

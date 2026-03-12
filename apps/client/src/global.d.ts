@@ -15,6 +15,9 @@ declare global {
       enemyName?: string;
     }) => void;
     __debug_eliminate_all_bots?: () => number;
+    __debug_set_buff_orbs?: (payload: {
+      count?: number;
+    }) => number;
     __debug_set_player_pose?: (payload: {
       x: number;
       y: number;

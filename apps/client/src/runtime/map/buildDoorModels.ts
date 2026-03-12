@@ -112,7 +112,7 @@ function createCastleDoorBacking(
   backing.rotation.set(0, yawRad, 0);
   backing.name = "castle-door-backing";
   backing.castShadow = false;
-  backing.receiveShadow = true;
+  backing.receiveShadow = false;
   return backing;
 }
 
@@ -192,7 +192,7 @@ function createCastleDoorSurround(
     const jamb = new Mesh(new BoxGeometry(jambWidthM, heightM, depthM), trimMaterial);
     jamb.position.set(side * (openingWidthM + jambWidthM) * 0.5, 0, 0);
     jamb.castShadow = true;
-    jamb.receiveShadow = true;
+    jamb.receiveShadow = false;
     jamb.name = `castle-door-jamb-${side < 0 ? "l" : "r"}`;
     return jamb;
   };
@@ -201,7 +201,7 @@ function createCastleDoorSurround(
     const reveal = new Mesh(new BoxGeometry(revealWidthM, heightM, depthM), trimMaterial);
     reveal.position.set(side * (widthM + revealWidthM) * 0.5, 0, 0);
     reveal.castShadow = true;
-    reveal.receiveShadow = true;
+    reveal.receiveShadow = false;
     reveal.name = `castle-door-reveal-${side < 0 ? "l" : "r"}`;
     return reveal;
   };
@@ -216,7 +216,7 @@ function createCastleDoorSurround(
     trimMaterial,
   );
   revealArch.castShadow = true;
-  revealArch.receiveShadow = true;
+  revealArch.receiveShadow = false;
   revealArch.name = "castle-door-reveal-arch";
   surround.add(revealArch);
 
@@ -225,7 +225,7 @@ function createCastleDoorSurround(
     trimMaterial,
   );
   outerArch.castShadow = true;
-  outerArch.receiveShadow = true;
+  outerArch.receiveShadow = false;
   outerArch.name = "castle-door-outer-arch";
   surround.add(outerArch);
   surround.position.set(centerX, centerY, centerZ);
@@ -375,7 +375,7 @@ export function buildDoorModels(
       const mesh = node as { isMesh?: boolean; castShadow?: boolean; receiveShadow?: boolean };
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.receiveShadow = false;
     });
 
     clone.name = `door-model-${placement.modelId}`;

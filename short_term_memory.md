@@ -14,6 +14,7 @@ Last compacted: 2026-03-12T01:15:53Z
 <!-- GENERATED START: active-snapshot -->
 - STM-20260309-154233-codex | active | codex | ui-flow | Loading-screen champion b... | next: Wait for review or make a...
 - STM-20260309-223704-codex | blocked | codex | docs | Lean AGENTS and mirror docs | next: Resolve the blocked build...
+- STM-20260312-020306-codex | handoff | codex | perf | Scalable runtime perf pass | next: Claim the card and implem...
 <!-- GENERATED END: active-snapshot -->
 
 ## Shared Ephemera
@@ -61,6 +62,26 @@ Recent Notes:
 - 2026-03-09T22:37:09Z | blocker | Blocked on pnpm build hanging after Vite reports 96 modules transformed.
 - 2026-03-09T22:37:09Z | progress | Trimmed AGENTS to 79 lines and 6141 bytes; cleaned README and CLAUDE; rewrote DEC-001 and DEC-002.
 - 2026-03-09T22:37:04Z | claim | Claimed task.
+
+### STM-20260312-020306-codex | handoff | perf | Scalable runtime perf pass
+Owner: codex
+Branch: main
+Goal: Replace per-orb scene graphs with scalable pooled orb rendering and cut baseline render cost.
+Done when: Orb perf scales with count, runtime exposes orb perf counters, and perf smoke covers 0/1/5/10/20 orb cases.
+Authority:
+- AGENTS.md
+- apps/client/src/runtime/buffs/BuffManager.ts
+- apps/client/src/runtime/game/Game.ts
+Files:
+- AGENTS.md
+Next:
+- Claim the card and implement the orb renderer plus perf smoke.
+Blockers:
+- none
+Recent Notes:
+- 2026-03-12T02:55:59Z | progress | Recovered orb color and motion using per-buff pooled layers with bob, breathe, and pulse animation while keeping orb-side perf budgets wi...
+- 2026-03-12T02:20:52Z | handoff | Orb scaling now stays within budget locally, but the zero-orb baseline remains above target and needs a follow-up non-orb perf pass.
+- 2026-03-12T02:20:52Z | progress | Implemented the pooled orb renderer, added orb perf telemetry/debug hooks, and added an orb-scaling perf smoke with paired controls.
 
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->

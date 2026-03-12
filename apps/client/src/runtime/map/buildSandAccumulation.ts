@@ -335,7 +335,7 @@ export function buildSandAccumulation(options: BuildSandAccumulationOptions): Me
 
   const mesh = new Mesh(geometry, material);
   mesh.name = "map-sand-accumulation";
-  mesh.receiveShadow = true;
+  mesh.receiveShadow = false;
   mesh.castShadow = false;
   return mesh;
 }

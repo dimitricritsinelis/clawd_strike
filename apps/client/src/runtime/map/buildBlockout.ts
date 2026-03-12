@@ -358,8 +358,8 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       floorTopY + 0.03,
     );
     if (walkableFloor) walkableFloor.receiveShadow = true;
-    if (stallOverlay) stallOverlay.receiveShadow = true;
-    if (clearOverlay) clearOverlay.receiveShadow = true;
+    if (stallOverlay) stallOverlay.receiveShadow = false;
+    if (clearOverlay) clearOverlay.receiveShadow = false;
 
     if (walkableFloor) root.add(walkableFloor);
     if (stallOverlay) root.add(stallOverlay);
@@ -418,7 +418,7 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     );
     if (wallInstances) {
       wallInstances.castShadow = true;
-      wallInstances.receiveShadow = true;
+      wallInstances.receiveShadow = false;
       root.add(wallInstances);
     }
   }

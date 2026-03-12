@@ -289,7 +289,7 @@ export function buildPbrWalls(options: BuildPbrWallsOptions): Group {
     const mesh = new Mesh(geometry, material);
     mesh.name = `wall-${materialId}`;
     mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
     root.add(mesh);
   }
 

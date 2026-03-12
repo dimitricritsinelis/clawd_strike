@@ -724,7 +724,7 @@ function buildBlockoutDetailMeshes(
     const mesh = new InstancedMesh(template.geometry, template.material, bucket.length);
     mesh.name = `wall-detail-${meshId}`;
     mesh.castShadow = meshId !== "window_pointed_arch_glass" && meshId !== "hero_window_pointed_arch_glass";
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
     mesh.frustumCulled = false;
     mesh.renderOrder = meshId === "window_pointed_arch_glass" || meshId === "hero_window_pointed_arch_glass"
       ? WINDOW_GLASS_RENDER_ORDER
@@ -850,7 +850,7 @@ function buildPbrDetailMeshes(
       ? `wall-detail-${bucket.meshId}-${bucket.materialSource}-${bucket.materialId}`
       : `wall-detail-${bucket.meshId}-template`;
     mesh.castShadow = !isStainedGlassMaterialId(bucket.materialId);
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
     mesh.frustumCulled = false;
     mesh.renderOrder = bucket.meshId === "window_pointed_arch_glass" || isStainedGlassMaterialId(bucket.materialId)
       ? WINDOW_GLASS_RENDER_ORDER

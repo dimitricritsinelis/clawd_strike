@@ -13,7 +13,7 @@ import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
 import { resolveBlockoutPalette } from "./BlockoutMaterials";
 import type { RuntimeLightingPreset } from "../utils/UrlParams";
 
-const MAX_PIXEL_RATIO = 1.25;
+const MAX_PIXEL_RATIO = 1.10;
 
 // ── SSAO tuning constants ───────────────────────────────────────────
 const SSAO_KERNEL_RADIUS = 2;

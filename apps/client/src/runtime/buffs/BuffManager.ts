@@ -1,5 +1,5 @@
-import type { Scene } from "three";
-import { BuffOrb } from "./BuffOrb";
+import type { PerspectiveCamera, Scene } from "three";
+import { BuffOrb, BuffOrbRenderer } from "./BuffOrb";
 import {
   type BuffType,
   type BuffDefinition,
@@ -25,13 +25,23 @@ export type ActiveBuffSnapshot = {
   durationS: number;
 };
 
+export type BuffPerfSnapshot = {
+  orbCount: number;
+  orbCapacity: number;
+  orbSpawnMs: number;
+  orbUpdateMs: number;
+};
+
 export class BuffManager {
   private readonly scene: Scene;
+  private orbRenderer: BuffOrbRenderer | null = null;
   private activeBuffs = new Map<BuffType, ActiveBuff>();
   private droppedOrbs: BuffOrb[] = [];
 
   // Deferred spawn queue to avoid frame-spike on enemy death
   private pendingSpawns: PendingOrbSpawn[] = [];
+  private orbSpawnMs = 0;
+  private orbUpdateMs = 0;
 
   // Headshot tracking for Rallying Cry
   private waveKills = 0;
@@ -122,12 +132,19 @@ export class BuffManager {
   update(
     deltaSeconds: number,
     playerPosition: { x: number; y: number; z: number },
+    camera: PerspectiveCamera,
   ): void {
-    // Process deferred orb spawns (one per frame to spread cost)
+    const updateStartedAt = performance.now();
+    this.orbSpawnMs = 0;
+
     if (this.pendingSpawns.length > 0) {
-      const spawn = this.pendingSpawns.shift()!;
-      const orb = new BuffOrb(this.scene, spawn.position, spawn.definition);
-      this.droppedOrbs.push(orb);
+      const spawnStartedAt = performance.now();
+      const spawns = this.pendingSpawns.splice(0, this.pendingSpawns.length);
+      this.ensureOrbRenderer();
+      for (const spawn of spawns) {
+        this.droppedOrbs.push(new BuffOrb(spawn.position, spawn.definition));
+      }
+      this.orbSpawnMs = performance.now() - spawnStartedAt;
     }
 
     // Update orbs and check walk-over pickup
@@ -137,7 +154,6 @@ export class BuffManager {
 
       if (!alive) {
         // Orb expired
-        orb.dispose(this.scene);
         this.droppedOrbs.splice(i, 1);
         continue;
       }
@@ -156,6 +172,8 @@ export class BuffManager {
       }
     }
 
+    this.orbRenderer?.update(this.droppedOrbs, camera, deltaSeconds);
+
     // Tick active buff timers
     for (const [type, buff] of this.activeBuffs) {
       buff.remainingS -= deltaSeconds;
@@ -169,6 +187,9 @@ export class BuffManager {
     if (this._rallyingCryActive && this.activeBuffs.size === 0) {
       this._rallyingCryActive = false;
     }
+
+    this.orbUpdateMs = performance.now() - updateStartedAt;
+    this.disposeOrbRendererIfIdle();
   }
 
   /**
@@ -204,7 +225,6 @@ export class BuffManager {
     if (index < 0 || index >= this.droppedOrbs.length) return null;
     const orb = this.droppedOrbs[index]!;
     const buffType = orb.getBuffType();
-    orb.dispose(this.scene);
     this.droppedOrbs.splice(index, 1);
     this.activateBuff(buffType);
     this.onBuffPickedUp?.(buffType);
@@ -229,11 +249,12 @@ export class BuffManager {
   }
 
   clearOrbs(): void {
-    for (const orb of this.droppedOrbs) {
-      orb.dispose(this.scene);
-    }
     this.droppedOrbs.length = 0;
     this.pendingSpawns.length = 0;
+    this.orbRenderer?.clear();
+    this.orbSpawnMs = 0;
+    this.orbUpdateMs = 0;
+    this.disposeOrbRendererIfIdle();
   }
 
   clearAllBuffs(): void {
@@ -247,6 +268,67 @@ export class BuffManager {
 
   dispose(): void {
     this.clearAllBuffs();
+    this.orbRenderer?.dispose();
+    this.orbRenderer = null;
+  }
+
+  getPerfSnapshot(): BuffPerfSnapshot {
+    return {
+      orbCount: this.droppedOrbs.length,
+      orbCapacity: this.orbRenderer?.getCapacity() ?? 0,
+      orbSpawnMs: this.orbSpawnMs,
+      orbUpdateMs: this.orbUpdateMs,
+    };
+  }
+
+  debugSetOrbCount(
+    count: number,
+    origin: { x: number; y: number; z: number },
+    forward: { x: number; y: number; z: number },
+  ): number {
+    const nextCount = Math.max(0, Math.floor(count));
+    this.clearOrbs();
+    if (nextCount === 0) return 0;
+
+    const forwardLength = Math.hypot(forward.x, forward.z);
+    const normalizedX = forwardLength > 0.001 ? forward.x / forwardLength : 0;
+    const normalizedZ = forwardLength > 0.001 ? forward.z / forwardLength : 1;
+    const baseAngle = Math.atan2(normalizedZ, normalizedX);
+    const orbsPerRing = 8;
+    this.ensureOrbRenderer();
+
+    for (let index = 0; index < nextCount; index += 1) {
+      const ring = Math.floor(index / orbsPerRing);
+      const ringIndex = index % orbsPerRing;
+      const ringCount = Math.min(orbsPerRing, nextCount - ring * orbsPerRing);
+      const span = ringCount <= 1 ? 0 : Math.min(Math.PI * 0.9, Math.PI * (0.35 + ringCount * 0.06));
+      const angle = ringCount <= 1
+        ? baseAngle
+        : baseAngle - span * 0.5 + (span * ringIndex) / Math.max(1, ringCount - 1);
+      const distance = 3.4 + ring * 1.2;
+      const type = BUFF_TYPES[index % BUFF_TYPES.length]!;
+      this.droppedOrbs.push(new BuffOrb({
+        x: origin.x + Math.cos(angle) * distance,
+        y: origin.y,
+        z: origin.z + Math.sin(angle) * distance,
+      }, BUFF_DEFINITIONS[type]));
+    }
+
+    return this.droppedOrbs.length;
+  }
+
+  private ensureOrbRenderer(): BuffOrbRenderer {
+    if (!this.orbRenderer) {
+      this.orbRenderer = new BuffOrbRenderer(this.scene);
+    }
+    return this.orbRenderer;
+  }
+
+  private disposeOrbRendererIfIdle(): void {
+    if (this.orbRenderer && this.droppedOrbs.length === 0 && this.pendingSpawns.length === 0) {
+      this.orbRenderer.dispose();
+      this.orbRenderer = null;
+    }
   }
 
   private activateBuff(type: BuffType): void {

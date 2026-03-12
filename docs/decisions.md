@@ -96,3 +96,8 @@ Last updated: 2026-03-10
 - Shared champion Postgres URLs may arrive from provider env vars with legacy `sslmode=prefer`, `sslmode=require`, or `sslmode=verify-ca`.
 - Repo runtime behavior should normalize those modes to `sslmode=verify-full` before handing the URL to `pg`, preserving the repo’s current strict certificate-validation intent while avoiding the current driver warning.
 - Production operators should validate shared-champion DB constraints through a dedicated command after reconcile reports a clean database, instead of relying on reconcile side effects.
+
+## DEC-017: Buff-orb visuals must scale without dynamic per-orb lights
+- Runtime buff orbs should preserve their glowing pickup readability, but they must render through pooled shared resources rather than per-orb scene graphs with dynamic lights and per-instance material allocation.
+- Idle runtime performance and orb-scaling performance are both first-class perf surfaces; orb perf validation must include zero-orb baseline plus multi-count orb scenarios rather than a single fixed orb count.
+- Future orb-look changes should preserve that scalability boundary unless a new owning perf decision explicitly replaces it.

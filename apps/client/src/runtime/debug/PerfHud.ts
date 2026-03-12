@@ -11,6 +11,10 @@ export type PerfHudSnapshot = {
   dpr: number;
   dprCap: number;
   debugEnabled: boolean;
+  orbCount: number;
+  orbCapacity: number;
+  orbSpawnMs: number;
+  orbUpdateMs: number;
 };
 
 const DRAW_CALL_WARNING_THRESHOLD = 140;
@@ -67,6 +71,7 @@ export class PerfHud {
       `draws: ${snapshot.drawCalls}  tris: ${formatLarge(snapshot.triangles)}`,
       `geo/tex/mat: ${snapshot.geometries}/${snapshot.textures}/${snapshot.materials}`,
       `instanced meshes: ${snapshot.instancedMeshes}  instances: ${snapshot.instancedInstances}`,
+      `orbs: ${snapshot.orbCount}/${snapshot.orbCapacity}  spawn: ${snapshot.orbSpawnMs.toFixed(2)} ms  update: ${snapshot.orbUpdateMs.toFixed(2)} ms`,
       `dpr: ${snapshot.dpr.toFixed(2)} (cap ${snapshot.dprCap.toFixed(2)})`,
     ];
 

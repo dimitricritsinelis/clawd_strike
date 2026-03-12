@@ -1,91 +1,99 @@
 import {
   AdditiveBlending,
   CanvasTexture,
-  MeshStandardMaterial,
-  PointLight,
-  SphereGeometry,
+  DynamicDrawUsage,
+  InstancedMesh,
+  MeshBasicMaterial,
   Mesh,
-  Sprite,
-  SpriteMaterial,
-  BackSide,
+  Object3D,
+  PlaneGeometry,
+  PerspectiveCamera,
+  SphereGeometry,
+  Vector3,
   type Scene,
 } from "three";
 import {
   type BuffType,
   type BuffDefinition,
+  BUFF_DEFINITIONS,
+  BUFF_TYPES,
   ORB_RADIUS_M,
   ORB_BOB_AMPLITUDE_M,
   ORB_BOB_FREQUENCY_HZ,
-  ORB_SPIN_RAD_PER_S,
   ORB_LIFETIME_S,
   ORB_SPAWN_HEIGHT_OFFSET_M,
 } from "./BuffTypes";
 import { type SlabAabb } from "../sim/collision/rayVsAabb";
 
 const TWO_PI = Math.PI * 2;
+const INITIAL_RENDER_CAPACITY = 8;
+const RENDER_CAPACITY_CHUNK = 8;
+const TYPE_PHASE_BY_BUFF: Record<BuffType, number> = {
+  speed_boost: 0,
+  rapid_fire: 0.85,
+  unlimited_ammo: 1.65,
+  health_boost: 2.35,
+};
 
-// ── Shared resources (created once, reused across all orbs) ────────────
+type OrbMaterialSet = {
+  core: MeshBasicMaterial;
+  innerGlow: MeshBasicMaterial;
+  outerGlow: MeshBasicMaterial;
+  energy: MeshBasicMaterial;
+};
+
+type OrbLayerSet = {
+  core: InstancedMesh<SphereGeometry, MeshBasicMaterial>;
+  innerGlow: InstancedMesh<PlaneGeometry, MeshBasicMaterial>;
+  outerGlow: InstancedMesh<PlaneGeometry, MeshBasicMaterial>;
+  energy: InstancedMesh<PlaneGeometry, MeshBasicMaterial>;
+};
+
+type OrbBucket = {
+  type: BuffType;
+  materials: OrbMaterialSet;
+  layers: OrbLayerSet;
+};
+
 let sharedCoreGeometry: SphereGeometry | null = null;
-let sharedOuterGeometry: SphereGeometry | null = null;
-const glowTextureCache = new Map<number, CanvasTexture>();
-const wispTextureCache = new Map<number, CanvasTexture>();
-const noiseTextureCache = new Map<number, CanvasTexture>();
+let sharedBillboardGeometry: PlaneGeometry | null = null;
+let sharedGlowTexture: CanvasTexture | null = null;
+let sharedEnergyTexture: CanvasTexture | null = null;
+const materialCache = new Map<BuffType, OrbMaterialSet>();
+const WARMUP_KEEPER_NAME = "buff-orb-warmup-keeper";
+
+const sphereDummy = new Object3D();
+const billboardDummy = new Object3D();
+const scratchForward = new Vector3();
 
 function getSharedCoreGeometry(): SphereGeometry {
   if (!sharedCoreGeometry) {
-    sharedCoreGeometry = new SphereGeometry(ORB_RADIUS_M, 24, 16);
+    sharedCoreGeometry = new SphereGeometry(ORB_RADIUS_M, 16, 12);
   }
   return sharedCoreGeometry;
 }
 
-function getSharedOuterGeometry(): SphereGeometry {
-  if (!sharedOuterGeometry) {
-    sharedOuterGeometry = new SphereGeometry(ORB_RADIUS_M * 1.35, 20, 14);
+function getSharedBillboardGeometry(): PlaneGeometry {
+  if (!sharedBillboardGeometry) {
+    sharedBillboardGeometry = new PlaneGeometry(1, 1);
   }
-  return sharedOuterGeometry;
+  return sharedBillboardGeometry;
 }
 
-function getGlowTexture(colorHex: number): CanvasTexture {
-  let tex = glowTextureCache.get(colorHex);
-  if (tex) return tex;
-  const [r, g, b] = hexToRgb(colorHex);
-  tex = createGlowTexture(r, g, b, 128);
-  glowTextureCache.set(colorHex, tex);
-  return tex;
-}
-
-function getWispTexture(colorHex: number): CanvasTexture {
-  let tex = wispTextureCache.get(colorHex);
-  if (tex) return tex;
-  const [r, g, b] = hexToRgb(colorHex);
-  tex = createWispTexture(r, g, b, 64);
-  wispTextureCache.set(colorHex, tex);
-  return tex;
-}
-
-function getNoiseTexture(colorHex: number): CanvasTexture {
-  let tex = noiseTextureCache.get(colorHex);
-  if (tex) return tex;
-  const [r, g, b] = hexToRgb(colorHex);
-  tex = createNoiseTexture(r, g, b, 128);
-  noiseTextureCache.set(colorHex, tex);
-  return tex;
-}
-
-function createGlowTexture(r: number, g: number, b: number, size: number): CanvasTexture {
+function createGlowTexture(size: number): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
-  const cx = size / 2;
+  const cx = size * 0.5;
 
   ctx.clearRect(0, 0, size, size);
   const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
-  grad.addColorStop(0, `rgba(255, 255, 255, 0.95)`);
-  grad.addColorStop(0.12, `rgba(${r}, ${g}, ${b}, 0.7)`);
-  grad.addColorStop(0.35, `rgba(${r}, ${g}, ${b}, 0.35)`);
-  grad.addColorStop(0.65, `rgba(${r}, ${g}, ${b}, 0.1)`);
-  grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+  grad.addColorStop(0, "rgba(255, 255, 255, 0.98)");
+  grad.addColorStop(0.18, "rgba(255, 255, 255, 0.80)");
+  grad.addColorStop(0.42, "rgba(255, 255, 255, 0.36)");
+  grad.addColorStop(0.72, "rgba(255, 255, 255, 0.10)");
+  grad.addColorStop(1, "rgba(255, 255, 255, 0)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
@@ -94,48 +102,42 @@ function createGlowTexture(r: number, g: number, b: number, size: number): Canva
   return texture;
 }
 
-function createWispTexture(r: number, g: number, b: number, size: number): CanvasTexture {
+function createEnergyTexture(size: number): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
-  const cx = size / 2;
-
-  ctx.clearRect(0, 0, size, size);
-  const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx * 0.6);
-  grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.8)`);
-  grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.25)`);
-  grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(cx, cx, cx, 0, TWO_PI);
-  ctx.fill();
-
-  const texture = new CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  return texture;
-}
-
-/** Procedural noise sprite — gives the orb a static/energy feel without shaders */
-function createNoiseTexture(r: number, g: number, b: number, size: number): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const cx = size / 2;
+  const cx = size * 0.5;
 
   ctx.clearRect(0, 0, size, size);
 
-  // Radial base
-  const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
-  grad.addColorStop(0, `rgba(255, 255, 255, 0.6)`);
-  grad.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, 0.4)`);
-  grad.addColorStop(0.7, `rgba(${r}, ${g}, ${b}, 0.15)`);
-  grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-  ctx.fillStyle = grad;
+  const baseGrad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
+  baseGrad.addColorStop(0, "rgba(255, 255, 255, 0.38)");
+  baseGrad.addColorStop(0.32, "rgba(255, 255, 255, 0.20)");
+  baseGrad.addColorStop(0.7, "rgba(255, 255, 255, 0.05)");
+  baseGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = baseGrad;
   ctx.fillRect(0, 0, size, size);
 
-  // Scatter bright static dots
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+  ctx.lineWidth = Math.max(1, size * 0.03);
+  ctx.lineCap = "round";
+  for (let index = 0; index < 3; index += 1) {
+    const angle = (index / 3) * TWO_PI + Math.random() * 0.4;
+    const innerR = size * (0.16 + Math.random() * 0.04);
+    const outerR = size * (0.34 + Math.random() * 0.1);
+    const ctrlR = size * (0.28 + Math.random() * 0.06);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * innerR, cx + Math.sin(angle) * innerR);
+    ctx.quadraticCurveTo(
+      cx + Math.cos(angle + 0.55) * ctrlR,
+      cx + Math.sin(angle + 0.55) * ctrlR,
+      cx + Math.cos(angle + 0.95) * outerR,
+      cx + Math.sin(angle + 0.95) * outerR,
+    );
+    ctx.stroke();
+  }
+
   const imgData = ctx.getImageData(0, 0, size, size);
   const data = imgData.data;
   for (let i = 0; i < data.length; i += 4) {
@@ -143,14 +145,12 @@ function createNoiseTexture(r: number, g: number, b: number, size: number): Canv
     const py = Math.floor(i / 4 / size);
     const dist = Math.hypot(px - cx, py - cx) / cx;
     if (dist > 1) continue;
-
-    // Random bright sparks
-    if (Math.random() < 0.04 * (1 - dist)) {
-      const brightness = 0.6 + Math.random() * 0.4;
-      data[i] = Math.min(255, data[i]! + r * brightness);
-      data[i + 1] = Math.min(255, data[i + 1]! + g * brightness);
-      data[i + 2] = Math.min(255, data[i + 2]! + b * brightness);
-      data[i + 3] = Math.min(255, data[i + 3]! + 180 * brightness);
+    if (Math.random() < 0.028 * (1 - dist)) {
+      const brightness = 0.7 + Math.random() * 0.3;
+      data[i] = Math.min(255, data[i]! + 255 * brightness);
+      data[i + 1] = Math.min(255, data[i + 1]! + 255 * brightness);
+      data[i + 2] = Math.min(255, data[i + 2]! + 255 * brightness);
+      data[i + 3] = Math.min(255, data[i + 3]! + 220 * brightness);
     }
   }
   ctx.putImageData(imgData, 0, 0);
@@ -160,263 +160,196 @@ function createNoiseTexture(r: number, g: number, b: number, size: number): Canv
   return texture;
 }
 
-function hexToRgb(hex: number): [number, number, number] {
-  return [(hex >> 16) & 0xff, (hex >> 8) & 0xff, hex & 0xff];
+function getSharedGlowTexture(): CanvasTexture {
+  if (!sharedGlowTexture) {
+    sharedGlowTexture = createGlowTexture(128);
+  }
+  return sharedGlowTexture;
 }
 
-/**
- * Pre-warm orb materials by creating a temporary orb far below the map.
- * Call this BEFORE renderer.compileSceneAsync() so Three.js compiles
- * the MeshStandardMaterial + SpriteMaterial shader variants during
- * the existing warmup phase, avoiding a frame-spike on first orb spawn.
- * Returns a dispose function to call after compile finishes.
- */
-export function warmupOrbMaterials(scene: Scene, definition: BuffDefinition): () => void {
-  const orb = new BuffOrb(scene, { x: 0, y: -1000, z: 0 }, definition);
-  return () => {
-    orb.dispose(scene);
+function getSharedEnergyTexture(): CanvasTexture {
+  if (!sharedEnergyTexture) {
+    sharedEnergyTexture = createEnergyTexture(128);
+  }
+  return sharedEnergyTexture;
+}
+
+function getMaterialSet(definition: BuffDefinition): OrbMaterialSet {
+  let materials = materialCache.get(definition.type);
+  if (materials) return materials;
+
+  materials = {
+    core: new MeshBasicMaterial({
+      color: definition.orbColor,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+    }),
+    innerGlow: new MeshBasicMaterial({
+      color: definition.orbColor,
+      map: getSharedGlowTexture(),
+      transparent: true,
+      opacity: 0.74,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    }),
+    outerGlow: new MeshBasicMaterial({
+      color: definition.orbEmissive,
+      map: getSharedGlowTexture(),
+      transparent: true,
+      opacity: 0.46,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    }),
+    energy: new MeshBasicMaterial({
+      color: definition.orbColor,
+      map: getSharedEnergyTexture(),
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false,
+      blending: AdditiveBlending,
+    }),
+  };
+
+  materialCache.set(definition.type, materials);
+  return materials;
+}
+
+function createSphereMesh(capacity: number, material: MeshBasicMaterial): InstancedMesh<SphereGeometry, MeshBasicMaterial> {
+  const mesh = new InstancedMesh(getSharedCoreGeometry(), material, capacity);
+  mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+  mesh.count = 0;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+function createBillboardMesh(capacity: number, material: MeshBasicMaterial): InstancedMesh<PlaneGeometry, MeshBasicMaterial> {
+  const mesh = new InstancedMesh(getSharedBillboardGeometry(), material, capacity);
+  mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+  mesh.count = 0;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+function createBucket(definition: BuffDefinition, capacity: number): OrbBucket {
+  const materials = getMaterialSet(definition);
+  return {
+    type: definition.type,
+    materials,
+    layers: {
+      core: createSphereMesh(capacity, materials.core),
+      innerGlow: createBillboardMesh(capacity, materials.innerGlow),
+      outerGlow: createBillboardMesh(capacity, materials.outerGlow),
+      energy: createBillboardMesh(capacity, materials.energy),
+    },
   };
 }
 
-// ── Wisp particle ──────────────────────────────────────────────────────
-const MAX_WISPS = 4;
+function addBucket(scene: Scene, bucket: OrbBucket): void {
+  scene.add(bucket.layers.core, bucket.layers.innerGlow, bucket.layers.outerGlow, bucket.layers.energy);
+}
 
-type Wisp = {
-  sprite: Sprite;
-  material: SpriteMaterial;
-  angle: number;
-  radius: number;
-  speed: number;
-  vertOffset: number;
-  vertSpeed: number;
-  baseScale: number;
-};
+function removeBucket(scene: Scene, bucket: OrbBucket): void {
+  scene.remove(bucket.layers.core, bucket.layers.innerGlow, bucket.layers.outerGlow, bucket.layers.energy);
+  bucket.layers.core.dispose();
+  bucket.layers.innerGlow.dispose();
+  bucket.layers.outerGlow.dispose();
+  bucket.layers.energy.dispose();
+}
+
+function markMeshDirty(mesh: InstancedMesh<SphereGeometry | PlaneGeometry, MeshBasicMaterial>, count: number): void {
+  mesh.count = count;
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
+function writeSphereMatrix(
+  mesh: InstancedMesh<SphereGeometry, MeshBasicMaterial>,
+  index: number,
+  x: number,
+  y: number,
+  z: number,
+  scale: number,
+): void {
+  sphereDummy.position.set(x, y, z);
+  sphereDummy.rotation.set(0, 0, 0);
+  sphereDummy.scale.setScalar(scale);
+  sphereDummy.updateMatrix();
+  mesh.setMatrixAt(index, sphereDummy.matrix);
+}
+
+function writeBillboardMatrix(
+  mesh: InstancedMesh<PlaneGeometry, MeshBasicMaterial>,
+  index: number,
+  x: number,
+  y: number,
+  z: number,
+  scale: number,
+  camera: PerspectiveCamera,
+  rotationRad = 0,
+): void {
+  billboardDummy.position.set(x, y, z);
+  billboardDummy.quaternion.copy(camera.quaternion);
+  billboardDummy.rotateZ(rotationRad);
+  billboardDummy.scale.set(scale, scale, scale);
+  billboardDummy.updateMatrix();
+  mesh.setMatrixAt(index, billboardDummy.matrix);
+}
+
+function normalizeForwardXZ(forward: { x: number; z: number }): { x: number; z: number } {
+  const length = Math.hypot(forward.x, forward.z);
+  if (length < 0.001) {
+    return { x: 0, z: 1 };
+  }
+  return { x: forward.x / length, z: forward.z / length };
+}
 
 export class BuffOrb {
-  // Core sphere (bright solid center)
-  private readonly coreMesh: Mesh;
-  private readonly coreMaterial: MeshStandardMaterial;
-
-  // Outer shell (translucent ethereal layer using standard material)
-  private readonly shellMesh: Mesh;
-  private readonly shellMaterial: MeshStandardMaterial;
-
-  // Glow sprite
-  private readonly glowSprite: Sprite;
-  private readonly glowMaterial: SpriteMaterial;
-
-  // Noise/static energy sprite (rotates independently for ethereal feel)
-  private readonly noiseSprite: Sprite;
-  private readonly noiseMaterial: SpriteMaterial;
-
-  // Secondary glow (smaller, brighter, different pulse phase)
-  private readonly innerGlowSprite: Sprite;
-  private readonly innerGlowMaterial: SpriteMaterial;
-
-  // Point light
-  private readonly light: PointLight;
-
-  // Wisps
-  private readonly wisps: Wisp[] = [];
-
-  // State
-  private readonly spawnX: number;
-  private readonly spawnY: number;
-  private readonly spawnZ: number;
+  readonly definition: BuffDefinition;
+  readonly spawnX: number;
+  readonly spawnY: number;
+  readonly spawnZ: number;
+  readonly bobPhase: number;
+  readonly breathePhase: number;
+  readonly pulsePhase: number;
+  readonly energyPhase: number;
+  readonly sizeJitter: number;
   private readonly buffType: BuffType;
   private readonly aabb: SlabAabb;
   private age = 0;
-  private disposed = false;
 
-  constructor(scene: Scene, position: { x: number; y: number; z: number }, definition: BuffDefinition) {
+  constructor(position: { x: number; y: number; z: number }, definition: BuffDefinition) {
+    this.definition = definition;
     this.buffType = definition.type;
     this.spawnX = position.x;
     this.spawnY = position.y + ORB_SPAWN_HEIGHT_OFFSET_M;
     this.spawnZ = position.z;
+    this.bobPhase = Math.random() * TWO_PI;
+    this.breathePhase = Math.random() * TWO_PI;
+    this.pulsePhase = Math.random() * TWO_PI;
+    this.energyPhase = Math.random() * TWO_PI;
+    this.sizeJitter = 0.94 + Math.random() * 0.18;
 
-    // ── Core sphere (bright solid center, slightly smaller) ────────
-    this.coreMaterial = new MeshStandardMaterial({
-      color: definition.orbColor,
-      emissive: definition.orbEmissive,
-      emissiveIntensity: 1.2,
-      transparent: true,
-      opacity: 0.85,
-      metalness: 0.3,
-      roughness: 0.1,
-    });
-    this.coreMesh = new Mesh(getSharedCoreGeometry(), this.coreMaterial);
-    this.coreMesh.scale.setScalar(0.55);
-    this.coreMesh.position.set(this.spawnX, this.spawnY, this.spawnZ);
-    scene.add(this.coreMesh);
-
-    // ── Outer shell (translucent back-face layer for volume) ───────
-    this.shellMaterial = new MeshStandardMaterial({
-      color: definition.orbColor,
-      emissive: definition.orbEmissive,
-      emissiveIntensity: 0.6,
-      transparent: true,
-      opacity: 0.18,
-      metalness: 0.1,
-      roughness: 0.6,
-      side: BackSide,
-      depthWrite: false,
-    });
-    this.shellMesh = new Mesh(getSharedOuterGeometry(), this.shellMaterial);
-    this.shellMesh.position.set(this.spawnX, this.spawnY, this.spawnZ);
-    scene.add(this.shellMesh);
-
-    // ── Noise/energy sprite (provides static/ethereal texture) ─────
-    this.noiseMaterial = new SpriteMaterial({
-      map: getNoiseTexture(definition.orbColor),
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      opacity: 0.55,
-      rotation: Math.random() * TWO_PI,
-    });
-    this.noiseSprite = new Sprite(this.noiseMaterial);
-    this.noiseSprite.scale.setScalar(1.1);
-    this.noiseSprite.position.set(this.spawnX, this.spawnY, this.spawnZ);
-    scene.add(this.noiseSprite);
-
-    // ── Inner glow (bright hot center) ─────────────────────────────
-    this.innerGlowMaterial = new SpriteMaterial({
-      map: getGlowTexture(definition.orbColor),
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      opacity: 0.7,
-    });
-    this.innerGlowSprite = new Sprite(this.innerGlowMaterial);
-    this.innerGlowSprite.scale.setScalar(0.8);
-    this.innerGlowSprite.position.set(this.spawnX, this.spawnY, this.spawnZ);
-    scene.add(this.innerGlowSprite);
-
-    // ── Outer glow sprite ──────────────────────────────────────────
-    this.glowMaterial = new SpriteMaterial({
-      map: getGlowTexture(definition.orbColor),
-      transparent: true,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      opacity: 0.5,
-    });
-    this.glowSprite = new Sprite(this.glowMaterial);
-    this.glowSprite.scale.setScalar(1.8);
-    this.glowSprite.position.set(this.spawnX, this.spawnY, this.spawnZ);
-    scene.add(this.glowSprite);
-
-    // ── Orbiting wisp particles ────────────────────────────────────
-    const wispTex = getWispTexture(definition.orbColor);
-    for (let i = 0; i < MAX_WISPS; i++) {
-      const mat = new SpriteMaterial({
-        map: wispTex,
-        transparent: true,
-        blending: AdditiveBlending,
-        depthWrite: false,
-        opacity: 0.5,
-      });
-      const sprite = new Sprite(mat);
-      const baseScale = 0.12 + Math.random() * 0.08;
-      sprite.scale.setScalar(baseScale);
-      sprite.position.set(this.spawnX, this.spawnY, this.spawnZ);
-      scene.add(sprite);
-
-      this.wisps.push({
-        sprite,
-        material: mat,
-        angle: (i / MAX_WISPS) * TWO_PI + Math.random() * 0.5,
-        radius: ORB_RADIUS_M * (1.2 + Math.random() * 0.8),
-        speed: 1.5 + Math.random() * 1.5,
-        vertOffset: Math.random() * TWO_PI,
-        vertSpeed: 0.8 + Math.random() * 0.6,
-        baseScale,
-      });
-    }
-
-    // ── Point light ────────────────────────────────────────────────
-    this.light = new PointLight(definition.orbColor, 2.0, 5);
-    this.light.position.set(this.spawnX, this.spawnY, this.spawnZ);
-    scene.add(this.light);
-
-    // ── AABB for raycast ───────────────────────────────────────────
     this.aabb = {
-      minX: this.spawnX - ORB_RADIUS_M * 1.5,
-      maxX: this.spawnX + ORB_RADIUS_M * 1.5,
+      minX: this.spawnX - ORB_RADIUS_M * 1.7,
+      maxX: this.spawnX + ORB_RADIUS_M * 1.7,
       minY: this.spawnY - ORB_RADIUS_M - ORB_BOB_AMPLITUDE_M,
       maxY: this.spawnY + ORB_RADIUS_M + ORB_BOB_AMPLITUDE_M,
-      minZ: this.spawnZ - ORB_RADIUS_M * 1.5,
-      maxZ: this.spawnZ + ORB_RADIUS_M * 1.5,
+      minZ: this.spawnZ - ORB_RADIUS_M * 1.7,
+      maxZ: this.spawnZ + ORB_RADIUS_M * 1.7,
     };
   }
 
   update(deltaSeconds: number): boolean {
-    if (this.disposed) return false;
     this.age += deltaSeconds;
-    if (this.age >= ORB_LIFETIME_S) return false;
-
-    // Bob animation
-    const bobY = Math.sin(this.age * TWO_PI * ORB_BOB_FREQUENCY_HZ) * ORB_BOB_AMPLITUDE_M;
-    const currentY = this.spawnY + bobY;
-
-    // Slow spin on core
-    this.coreMesh.rotation.y += ORB_SPIN_RAD_PER_S * 0.5 * deltaSeconds;
-
-    // Pulsing core
-    const corePulse = 0.7 + 0.15 * Math.sin(this.age * 4.0);
-    this.coreMaterial.opacity = corePulse;
-    this.coreMaterial.emissiveIntensity = 0.9 + 0.4 * Math.sin(this.age * 3.2);
-
-    // Shell pulse and rotation (ethereal drift)
-    this.shellMaterial.opacity = 0.12 + 0.08 * Math.sin(this.age * 2.5);
-    this.shellMaterial.emissiveIntensity = 0.4 + 0.3 * Math.sin(this.age * 3.8);
-    this.shellMesh.rotation.y += 0.35 * deltaSeconds;
-    this.shellMesh.rotation.x += 0.2 * deltaSeconds;
-
-    // Noise sprite rotation for energy/static feel
-    this.noiseMaterial.rotation += 0.8 * deltaSeconds;
-    this.noiseMaterial.opacity = 0.4 + 0.2 * Math.sin(this.age * 5.0);
-    const noiseScale = 1.0 + 0.15 * Math.sin(this.age * 3.5);
-    this.noiseSprite.scale.setScalar(noiseScale);
-
-    // Inner glow pulse (faster, brighter)
-    this.innerGlowMaterial.opacity = 0.5 + 0.25 * Math.sin(this.age * 4.5);
-    const innerScale = 0.7 + 0.15 * Math.sin(this.age * 3.0);
-    this.innerGlowSprite.scale.setScalar(innerScale);
-
-    // Outer glow pulse
-    this.glowMaterial.opacity = 0.35 + 0.2 * Math.sin(this.age * 2.8);
-    const glowScale = 1.6 + 0.3 * Math.sin(this.age * 2.0);
-    this.glowSprite.scale.setScalar(glowScale);
-
-    // Light intensity pulse
-    this.light.intensity = 1.5 + 0.8 * Math.sin(this.age * 3.0);
-
-    // Update all positions
-    this.coreMesh.position.y = currentY;
-    this.shellMesh.position.y = currentY;
-    this.noiseSprite.position.y = currentY;
-    this.innerGlowSprite.position.y = currentY;
-    this.glowSprite.position.y = currentY;
-    this.light.position.y = currentY;
-
-    // Update wisps
-    for (const wisp of this.wisps) {
-      wisp.angle += wisp.speed * deltaSeconds;
-      const wx = this.spawnX + Math.cos(wisp.angle) * wisp.radius;
-      const wz = this.spawnZ + Math.sin(wisp.angle) * wisp.radius;
-      const wy = currentY + Math.sin(this.age * wisp.vertSpeed + wisp.vertOffset) * ORB_RADIUS_M * 0.8;
-      wisp.sprite.position.set(wx, wy, wz);
-
-      const wispPulse = 0.3 + 0.3 * Math.sin(this.age * 4.0 + wisp.angle);
-      wisp.material.opacity = wispPulse;
-      wisp.sprite.scale.setScalar(wisp.baseScale * (0.8 + 0.4 * Math.sin(this.age * 3.0 + wisp.vertOffset)));
-    }
-
-    return true;
+    return this.age < ORB_LIFETIME_S;
   }
 
   getAabb(): SlabAabb {
     return this.aabb;
+  }
+
+  getAge(): number {
+    return this.age;
   }
 
   getPosition(): { x: number; y: number; z: number } {
@@ -426,34 +359,166 @@ export class BuffOrb {
   getBuffType(): BuffType {
     return this.buffType;
   }
+}
 
-  isExpired(): boolean {
-    return this.age >= ORB_LIFETIME_S;
-  }
+export class BuffOrbRenderer {
+  private readonly scene: Scene;
+  private readonly buckets = new Map<BuffType, OrbBucket>();
+  private capacity = 0;
+  private timeS = 0;
 
-  dispose(scene: Scene): void {
-    if (this.disposed) return;
-    this.disposed = true;
-
-    scene.remove(this.coreMesh);
-    scene.remove(this.shellMesh);
-    scene.remove(this.noiseSprite);
-    scene.remove(this.innerGlowSprite);
-    scene.remove(this.glowSprite);
-    scene.remove(this.light);
-
-    // Only dispose instance materials, NOT shared geometry/textures
-    this.coreMaterial.dispose();
-    this.shellMaterial.dispose();
-    this.noiseMaterial.dispose();
-    this.innerGlowMaterial.dispose();
-    this.glowMaterial.dispose();
-    this.light.dispose();
-
-    for (const wisp of this.wisps) {
-      scene.remove(wisp.sprite);
-      wisp.material.dispose();
+  constructor(scene: Scene, initialCapacity = INITIAL_RENDER_CAPACITY) {
+    this.scene = scene;
+    for (const type of BUFF_TYPES) {
+      getMaterialSet(BUFF_DEFINITIONS[type]);
     }
-    this.wisps.length = 0;
+    this.resize(Math.max(initialCapacity, INITIAL_RENDER_CAPACITY));
   }
+
+  getCapacity(): number {
+    return this.capacity;
+  }
+
+  clear(): void {
+    for (const bucket of this.buckets.values()) {
+      markMeshDirty(bucket.layers.core, 0);
+      markMeshDirty(bucket.layers.innerGlow, 0);
+      markMeshDirty(bucket.layers.outerGlow, 0);
+      markMeshDirty(bucket.layers.energy, 0);
+    }
+  }
+
+  update(orbs: readonly BuffOrb[], camera: PerspectiveCamera, deltaSeconds: number): void {
+    this.timeS += deltaSeconds;
+    this.ensureCapacity(orbs.length);
+
+    const countsByType: Record<BuffType, number> = {
+      speed_boost: 0,
+      rapid_fire: 0,
+      unlimited_ammo: 0,
+      health_boost: 0,
+    };
+
+    for (const type of BUFF_TYPES) {
+      const bucket = this.buckets.get(type);
+      if (!bucket) continue;
+      const typePhase = TYPE_PHASE_BY_BUFF[type];
+      bucket.materials.core.opacity = 0.82 + 0.08 * Math.sin(this.timeS * 2.6 + typePhase);
+      bucket.materials.innerGlow.opacity = 0.58 + 0.16 * Math.sin(this.timeS * 3.2 + typePhase * 1.1);
+      bucket.materials.outerGlow.opacity = 0.26 + 0.18 * Math.sin(this.timeS * 2.3 + typePhase * 0.8);
+      bucket.materials.energy.opacity = 0.18 + 0.14 * Math.sin(this.timeS * 4.1 + typePhase * 1.3);
+    }
+
+    for (const orb of orbs) {
+      const bucket = this.buckets.get(orb.getBuffType());
+      if (!bucket) continue;
+      const slot = countsByType[orb.getBuffType()];
+      countsByType[orb.getBuffType()] += 1;
+
+      const age = orb.getAge();
+      const bob = Math.sin(age * TWO_PI * ORB_BOB_FREQUENCY_HZ + orb.bobPhase);
+      const breathe = 0.5 + 0.5 * Math.sin(age * 2.4 + orb.breathePhase);
+      const pulse = 0.5 + 0.5 * Math.sin(age * 3.8 + orb.pulsePhase);
+      const shimmer = 0.5 + 0.5 * Math.sin(age * 5.1 + orb.energyPhase);
+      const currentY = orb.spawnY + bob * ORB_BOB_AMPLITUDE_M;
+
+      const coreScale = (0.52 + 0.18 * breathe) * orb.sizeJitter;
+      const innerScale = 0.92 + 0.20 * breathe + 0.12 * pulse;
+      const outerScale = 1.42 + 0.28 * pulse + 0.10 * breathe;
+      const energyScale = 1.08 + 0.14 * shimmer + 0.08 * pulse;
+      const energyRotation = age * (0.72 + 0.18 * orb.sizeJitter) + orb.energyPhase;
+
+      writeSphereMatrix(bucket.layers.core, slot, orb.spawnX, currentY, orb.spawnZ, coreScale);
+      writeBillboardMatrix(bucket.layers.innerGlow, slot, orb.spawnX, currentY, orb.spawnZ, innerScale, camera, 0);
+      writeBillboardMatrix(bucket.layers.outerGlow, slot, orb.spawnX, currentY, orb.spawnZ, outerScale, camera, 0);
+      writeBillboardMatrix(bucket.layers.energy, slot, orb.spawnX, currentY, orb.spawnZ, energyScale, camera, energyRotation);
+    }
+
+    for (const type of BUFF_TYPES) {
+      const bucket = this.buckets.get(type);
+      if (!bucket) continue;
+      const count = countsByType[type];
+      markMeshDirty(bucket.layers.core, count);
+      markMeshDirty(bucket.layers.innerGlow, count);
+      markMeshDirty(bucket.layers.outerGlow, count);
+      markMeshDirty(bucket.layers.energy, count);
+    }
+  }
+
+  dispose(): void {
+    for (const bucket of this.buckets.values()) {
+      removeBucket(this.scene, bucket);
+    }
+    this.buckets.clear();
+  }
+
+  private ensureCapacity(nextCount: number): void {
+    if (nextCount <= this.capacity) return;
+    const nextCapacity = Math.max(
+      INITIAL_RENDER_CAPACITY,
+      Math.ceil(nextCount / RENDER_CAPACITY_CHUNK) * RENDER_CAPACITY_CHUNK,
+    );
+    this.resize(nextCapacity);
+  }
+
+  private resize(nextCapacity: number): void {
+    if (this.capacity === nextCapacity) return;
+
+    for (const existing of this.buckets.values()) {
+      removeBucket(this.scene, existing);
+    }
+    this.buckets.clear();
+
+    for (const type of BUFF_TYPES) {
+      const bucket = createBucket(BUFF_DEFINITIONS[type], nextCapacity);
+      this.buckets.set(type, bucket);
+      addBucket(this.scene, bucket);
+    }
+
+    this.capacity = nextCapacity;
+  }
+}
+
+export function warmupOrbMaterials(scene: Scene, camera: PerspectiveCamera): () => void {
+  for (const type of BUFF_TYPES) {
+    getMaterialSet(BUFF_DEFINITIONS[type]);
+  }
+
+  const existing = scene.getObjectByName(WARMUP_KEEPER_NAME);
+  if (existing) {
+    scene.remove(existing);
+  }
+
+  const keeper = new Object3D();
+  keeper.name = WARMUP_KEEPER_NAME;
+
+  const materials = getMaterialSet(BUFF_DEFINITIONS.speed_boost);
+  const core = new Mesh(getSharedCoreGeometry(), materials.core);
+  const innerGlow = new Mesh(getSharedBillboardGeometry(), materials.innerGlow);
+  const outerGlow = new Mesh(getSharedBillboardGeometry(), materials.outerGlow);
+  const energy = new Mesh(getSharedBillboardGeometry(), materials.energy);
+  core.frustumCulled = false;
+  innerGlow.frustumCulled = false;
+  outerGlow.frustumCulled = false;
+  energy.frustumCulled = false;
+  innerGlow.scale.setScalar(1.0);
+  outerGlow.scale.setScalar(1.5);
+  energy.scale.setScalar(1.2);
+
+  keeper.add(core, innerGlow, outerGlow, energy);
+  scene.add(keeper);
+
+  const cameraDirection = normalizeForwardXZ(camera.getWorldDirection(scratchForward));
+  keeper.position.set(
+    camera.position.x + cameraDirection.x * 4,
+    camera.position.y - 0.35,
+    camera.position.z + cameraDirection.z * 4,
+  );
+  keeper.quaternion.copy(camera.quaternion);
+  keeper.updateMatrixWorld(true);
+
+  return () => {
+    keeper.position.set(0, -1000, 0);
+    keeper.updateMatrixWorld(true);
+  };
 }

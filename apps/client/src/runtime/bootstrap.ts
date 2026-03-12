@@ -33,7 +33,6 @@ import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
 import { BulletHoleManager } from "./effects/BulletHoleManager";
 import { BuffManager } from "./buffs/BuffManager";
 import { warmupOrbMaterials } from "./buffs/BuffOrb";
-import { BUFF_DEFINITIONS } from "./buffs/BuffTypes";
 import { BuffHud } from "./ui/BuffHud";
 import { BuffTextHud } from "./ui/BuffTextHud";
 import { BuffVignette } from "./ui/BuffVignette";
@@ -110,6 +109,10 @@ type DebugCombatFeedbackPayload = {
   didKill?: boolean;
   damage?: number;
   enemyName?: string;
+};
+
+type DebugBuffOrbPayload = {
+  count?: number;
 };
 
 function shouldReplaceSharedChampion(
@@ -452,6 +455,10 @@ export type RuntimeTextState = {
     combatFeedbackQueue: number;
     lastCombatFeedbackMs: number;
     lastKillFeedbackMs: number;
+    orbCount: number;
+    orbCapacity: number;
+    orbSpawnMs: number;
+    orbUpdateMs: number;
   };
 };
 
@@ -1346,7 +1353,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   bootTelemetry.hiddenWarmupRenderDone = true;
 
   // Pre-warm buff orb materials so shader variants compile during warmup (not on first orb spawn)
-  const disposeWarmupOrb = warmupOrbMaterials(game.scene, BUFF_DEFINITIONS.speed_boost);
+  const disposeWarmupOrb = warmupOrbMaterials(game.scene, game.camera);
 
   try {
     if (syncViewportIfChanged()) {
@@ -1525,6 +1532,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let lastCombatFeedbackMs = 0;
   let lastKillFeedbackMs = 0;
   const debugFeedbackForwardScratch = new Vector3();
+  const debugBuffForwardScratch = new Vector3();
   const enqueueCombatFeedback = (event: QueuedCombatFeedbackEvent): void => {
     combatFeedbackQueue.push(event);
   };
@@ -1627,6 +1635,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     const finalScore = lastRunScore ?? currentScore;
     const gameOverVisible = deathScreen.isVisible();
     const visibility = document.visibilityState === "hidden" ? "hidden" : "visible";
+    const buffPerf = buffManager.getPerfSnapshot();
     return {
       apiVersion: RUNTIME_TEXT_API_VERSION,
       mode: "runtime",
@@ -1788,6 +1797,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         combatFeedbackQueue: combatFeedbackQueue.length,
         lastCombatFeedbackMs,
         lastKillFeedbackMs,
+        orbCount: buffPerf.orbCount,
+        orbCapacity: buffPerf.orbCapacity,
+        orbSpawnMs: buffPerf.orbSpawnMs,
+        orbUpdateMs: buffPerf.orbUpdateMs,
       },
     };
   };
@@ -1991,7 +2004,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     }
 
     // ── Buff system per-frame update ──────────────────────────────────────────
-    buffManager.update(dt, game.getPlayerPosition());
+    buffManager.update(dt, game.getPlayerPosition(), game.camera);
     const activeBuffs = buffManager.getActiveBuffs();
     const rcActive = buffManager.isRallyingCryActive();
     buffHud.update({ buffs: activeBuffs, rallyingCryActive: rcActive }, dt);
@@ -2058,6 +2071,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (renderFrame && perfHud.isVisible()) {
       perfMsPerFrame = perfMsPerFrame * 0.9 + clampedMs * 0.1;
       perfFps = 1000 / Math.max(0.01, perfMsPerFrame);
+      const buffPerf = buffManager.getPerfSnapshot();
 
       const perfInfo = renderer.getPerfInfo();
       perfDrawCalls = perfInfo.drawCalls;
@@ -2084,6 +2098,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
         dpr: renderer.getCurrentPixelRatio(),
         dprCap: renderer.getPixelRatioCap(),
         debugEnabled: runtimeParams.debug,
+        orbCount: buffPerf.orbCount,
+        orbCapacity: buffPerf.orbCapacity,
+        orbSpawnMs: buffPerf.orbSpawnMs,
+        orbUpdateMs: buffPerf.orbUpdateMs,
       });
     } else if (renderFrame) {
       // Sample immediately when the HUD is re-enabled.
@@ -2243,6 +2261,14 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       enqueueDebugCombatFeedback(payload);
     };
     window.__debug_eliminate_all_bots = () => game.eliminateAllEnemiesForDebug();
+    window.__debug_set_buff_orbs = (payload: DebugBuffOrbPayload) => {
+      game.camera.getWorldDirection(debugBuffForwardScratch);
+      return buffManager.debugSetOrbCount(
+        Math.max(0, Math.floor(payload.count ?? 0)),
+        game.getPlayerPosition(),
+        debugBuffForwardScratch,
+      );
+    };
     window.__debug_set_player_pose = (payload: { x: number; y: number; z: number; yawDeg?: number }) => {
       const yawRad = typeof payload.yawDeg === "number" ? (payload.yawDeg * Math.PI) / 180 : undefined;
       game.debugSetPlayerPose({ x: payload.x, y: payload.y, z: payload.z }, yawRad);
@@ -2273,6 +2299,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     delete window.advanceTime;
     delete window.__debug_emit_combat_feedback;
     delete window.__debug_eliminate_all_bots;
+    delete window.__debug_set_buff_orbs;
     delete window.__debug_set_player_pose;
     delete window.__debug_reset_bot_knowledge;
     delete window.__debug_suppress_bot_intel_ms;
