@@ -14,6 +14,8 @@ type ActiveBuff = {
   durationS: number;
 };
 
+type BuffPickupResult = "activated" | "refreshed";
+
 type PendingOrbSpawn = {
   position: { x: number; y: number; z: number };
   definition: BuffDefinition;
@@ -52,7 +54,7 @@ export class BuffManager {
   // Callbacks
   private onBuffActivated: ((type: BuffType) => void) | null = null;
   private onBuffExpired: ((type: BuffType) => void) | null = null;
-  private onBuffPickedUp: ((type: BuffType) => void) | null = null;
+  private onBuffPickedUp: ((type: BuffType, result: BuffPickupResult) => void) | null = null;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -66,7 +68,7 @@ export class BuffManager {
     this.onBuffExpired = cb;
   }
 
-  setOnBuffPickedUp(cb: (type: BuffType) => void): void {
+  setOnBuffPickedUp(cb: (type: BuffType, result: BuffPickupResult) => void): void {
     this.onBuffPickedUp = cb;
   }
 
@@ -226,8 +228,8 @@ export class BuffManager {
     const orb = this.droppedOrbs[index]!;
     const buffType = orb.getBuffType();
     this.droppedOrbs.splice(index, 1);
-    this.activateBuff(buffType);
-    this.onBuffPickedUp?.(buffType);
+    const pickupResult = this.activateBuff(buffType);
+    this.onBuffPickedUp?.(buffType, pickupResult);
     return buffType;
   }
 
@@ -317,6 +319,17 @@ export class BuffManager {
     return this.droppedOrbs.length;
   }
 
+  debugActivateBuff(type: BuffType): BuffPickupResult {
+    return this.activateBuff(type);
+  }
+
+  debugDeactivateBuff(type: BuffType): void {
+    if (!this.activeBuffs.has(type)) return;
+    this.activeBuffs.delete(type);
+    this.onBuffExpired?.(type);
+    this._rallyingCryActive = false;
+  }
+
   private ensureOrbRenderer(): BuffOrbRenderer {
     if (!this.orbRenderer) {
       this.orbRenderer = new BuffOrbRenderer(this.scene);
@@ -331,19 +344,20 @@ export class BuffManager {
     }
   }
 
-  private activateBuff(type: BuffType): void {
+  private activateBuff(type: BuffType): BuffPickupResult {
     const def = BUFF_DEFINITIONS[type];
     const existing = this.activeBuffs.get(type);
     if (existing) {
       // Refresh timer
       existing.remainingS = def.durationS;
       existing.durationS = def.durationS;
-    } else {
-      this.activeBuffs.set(type, {
-        remainingS: def.durationS,
-        durationS: def.durationS,
-      });
-      this.onBuffActivated?.(type);
+      return "refreshed";
     }
+    this.activeBuffs.set(type, {
+      remainingS: def.durationS,
+      durationS: def.durationS,
+    });
+    this.onBuffActivated?.(type);
+    return "activated";
   }
 }

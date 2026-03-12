@@ -57,7 +57,7 @@ uniform vec2 uWallUvOffset;`,
     );
   }
 
-  if (!shader.vertexShader.includes("vec2 wallProjectedUv = vec2(wallProjectedU, vWallWorldPos.y)")) {
+  if (!shader.vertexShader.includes("float wallNormalY = abs(wallWorldNormal.y);")) {
     shader.vertexShader = shader.vertexShader.replace(
       "#include <worldpos_vertex>",
       `#include <worldpos_vertex>
@@ -74,8 +74,16 @@ vec3 wallObjectNormal = normal;
 wallObjectNormal = mat3(instanceMatrix) * wallObjectNormal;
 #endif
 vec3 wallWorldNormal = normalize(mat3(modelMatrix) * wallObjectNormal);
-float wallProjectedU = abs(wallWorldNormal.x) > abs(wallWorldNormal.z) ? vWallWorldPos.z : vWallWorldPos.x;
-vec2 wallProjectedUv = vec2(wallProjectedU, vWallWorldPos.y) / max(uWallTileSizeM, 0.001) + uWallUvOffset;
+float wallNormalY = abs(wallWorldNormal.y);
+float wallNormalX = abs(wallWorldNormal.x);
+float wallNormalZ = abs(wallWorldNormal.z);
+vec2 wallProjectedUv;
+if (wallNormalY >= wallNormalX && wallNormalY >= wallNormalZ) {
+  wallProjectedUv = vec2(vWallWorldPos.x, vWallWorldPos.z) / max(uWallTileSizeM, 0.001) + uWallUvOffset;
+} else {
+  float wallProjectedU = wallNormalX > wallNormalZ ? vWallWorldPos.z : vWallWorldPos.x;
+  wallProjectedUv = vec2(wallProjectedU, vWallWorldPos.y) / max(uWallTileSizeM, 0.001) + uWallUvOffset;
+}
 #if defined( USE_UV ) || defined( USE_ANISOTROPY )
 vUv = wallProjectedUv;
 #endif

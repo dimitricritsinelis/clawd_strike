@@ -1,3 +1,9 @@
+import { createEdgeVignetteLayer } from "./EdgeVignette";
+
+const HIT_COLOR_RGB = "180, 0, 0";
+const HIT_LAYER_MID_ALPHA = 0.18;
+const HIT_LAYER_OUTER_ALPHA = 0.84;
+
 export class HitVignette {
   private readonly hitLayer: HTMLDivElement;   // flash layer — triggered on damage
   private readonly lowHpLayer: HTMLDivElement; // persistent layer — danger signal at low HP
@@ -7,24 +13,19 @@ export class HitVignette {
   private peakOpacity = 1.0;
 
   constructor(mountEl: HTMLElement) {
-    const baseStyle: Partial<CSSStyleDeclaration> = {
-      position: "absolute",
-      inset: "0",
-      pointerEvents: "none",
-      background: "radial-gradient(ellipse at center, transparent 15%, rgba(180, 0, 0, 0.72) 100%)",
-    };
+    this.hitLayer = createEdgeVignetteLayer({
+      colorRgb: HIT_COLOR_RGB,
+      midAlpha: HIT_LAYER_MID_ALPHA,
+      outerAlpha: HIT_LAYER_OUTER_ALPHA,
+      zIndex: 28,
+    });
 
-    // Hit flash layer
-    this.hitLayer = document.createElement("div");
-    Object.assign(this.hitLayer.style, baseStyle);
-    this.hitLayer.style.zIndex = "28";
-    this.hitLayer.style.opacity = "0";
-
-    // Persistent low-HP layer — always present, opacity driven by health
-    this.lowHpLayer = document.createElement("div");
-    Object.assign(this.lowHpLayer.style, baseStyle);
-    this.lowHpLayer.style.zIndex = "27";
-    this.lowHpLayer.style.opacity = "0";
+    this.lowHpLayer = createEdgeVignetteLayer({
+      colorRgb: HIT_COLOR_RGB,
+      midAlpha: HIT_LAYER_MID_ALPHA,
+      outerAlpha: HIT_LAYER_OUTER_ALPHA,
+      zIndex: 27,
+    });
     this.lowHpLayer.style.transition = "opacity 0.5s ease-out";
 
     mountEl.append(this.lowHpLayer, this.hitLayer);

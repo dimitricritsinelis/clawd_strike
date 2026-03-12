@@ -1,149 +1,287 @@
 import {
   type BuffType,
   BUFF_DEFINITIONS,
-  BUFF_TYPES,
   RALLYING_CRY_VIGNETTE_COLOR,
 } from "../buffs/BuffTypes";
+import { createEdgeVignetteLayer, setEdgeVignetteColor } from "./EdgeVignette";
 
-const STEADY_OPACITY = 0.15;
-const FLASH_OPACITY = 0.35;
-const FLASH_DECAY_RATE = 2.5; // per second
-const PULSE_FREQUENCY = 0.5; // Hz — gentle pulse
-const PULSE_AMPLITUDE = 0.04;
-const FADE_OUT_RATE = 3.0; // per second
+const BASE_LAYER_MID_ALPHA = 0.18;
+const BASE_LAYER_OUTER_ALPHA = 0.84;
+const INNER_CLEAR_STOP_PCT = 35;
+const SHOULDER_STOP_PCT = 69;
+const PICKUP_FLASH_DURATION_S = 0.26;
+const PULSE_FREQUENCY_HZ = 0.92;
+const FADE_IN_RATE = 11.5;
+const FADE_OUT_RATE = 5.0;
+const BASE_LAYER_OPACITY = 0.19;
+const PULSE_LAYER_MIN_OPACITY = 0.055;
+const PULSE_LAYER_RANGE = 0.15;
+const FLASH_LAYER_OPACITY = 0.22;
+const PULSE_SCALE_RANGE = 0.026;
+const FLASH_SCALE_RANGE = 0.028;
 
-type VignetteLayer = {
-  element: HTMLDivElement;
-  targetOpacity: number;
-  currentOpacity: number;
-  flashTimer: number;
-  active: boolean;
+export type BuffVignetteDebugState = {
+  dominantBuff: BuffType | null;
+  colorRgb: string | null;
+  activeBuffCount: number;
+  visibility: number;
+  baseOpacity: number;
+  pulseOpacity: number;
+  flashOpacity: number;
 };
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function easeInOut(value: number): number {
+  const clamped = clamp01(value);
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
+function easeOutQuad(value: number): number {
+  const clamped = clamp01(value);
+  return clamped * clamped;
+}
+
 export class BuffVignette {
-  private readonly layers = new Map<BuffType, VignetteLayer>();
-  private rallyingCryLayer: VignetteLayer | null = null;
+  private readonly root: HTMLDivElement;
+  private readonly baseLayer: HTMLDivElement;
+  private readonly pulseLayer: HTMLDivElement;
+  private readonly flashLayer: HTMLDivElement;
+  private readonly activeBuffs = new Set<BuffType>();
+  private promotionOrder: BuffType[] = [];
+  private dominantBuff: BuffType | null = null;
   private rallyingCryActive = false;
   private elapsedS = 0;
+  private visibility = 0;
+  private flashTimerS = 0;
+  private currentColorRgb = RALLYING_CRY_VIGNETTE_COLOR;
+  private lastBaseOpacity = 0;
+  private lastPulseOpacity = 0;
+  private lastFlashOpacity = 0;
 
   constructor(mountEl: HTMLElement) {
-    for (const type of BUFF_TYPES) {
-      const def = BUFF_DEFINITIONS[type];
-      const layer = this.createLayer(mountEl, def.vignetteColor);
-      this.layers.set(type, layer);
-    }
+    this.root = document.createElement("div");
+    Object.assign(this.root.style, {
+      position: "absolute",
+      inset: "0",
+      overflow: "hidden",
+      pointerEvents: "none",
+      zIndex: "26",
+      opacity: "0",
+    } satisfies Partial<CSSStyleDeclaration>);
+
+    this.baseLayer = createEdgeVignetteLayer({
+      colorRgb: this.currentColorRgb,
+      midAlpha: BASE_LAYER_MID_ALPHA,
+      outerAlpha: BASE_LAYER_OUTER_ALPHA,
+      innerClearStopPct: INNER_CLEAR_STOP_PCT,
+      shoulderStopPct: SHOULDER_STOP_PCT,
+      zIndex: 0,
+    });
+    this.pulseLayer = createEdgeVignetteLayer({
+      colorRgb: this.currentColorRgb,
+      midAlpha: BASE_LAYER_MID_ALPHA,
+      outerAlpha: BASE_LAYER_OUTER_ALPHA,
+      innerClearStopPct: INNER_CLEAR_STOP_PCT,
+      shoulderStopPct: SHOULDER_STOP_PCT,
+      zIndex: 0,
+    });
+    this.flashLayer = createEdgeVignetteLayer({
+      colorRgb: this.currentColorRgb,
+      midAlpha: BASE_LAYER_MID_ALPHA,
+      outerAlpha: BASE_LAYER_OUTER_ALPHA,
+      innerClearStopPct: INNER_CLEAR_STOP_PCT,
+      shoulderStopPct: SHOULDER_STOP_PCT,
+      zIndex: 0,
+    });
+
+    this.root.append(this.baseLayer, this.pulseLayer, this.flashLayer);
+    mountEl.append(this.root);
+    this.applyColorToLayers(this.currentColorRgb);
   }
 
   activate(type: BuffType): void {
-    const layer = this.layers.get(type);
-    if (!layer) return;
-    layer.active = true;
-    layer.flashTimer = FLASH_OPACITY;
-    layer.targetOpacity = STEADY_OPACITY;
+    this.activeBuffs.add(type);
+    this.promote(type);
+    this.triggerFlash();
+    this.syncVisualColor();
+  }
+
+  refresh(type: BuffType): void {
+    this.activeBuffs.add(type);
+    this.promote(type);
+    this.triggerFlash();
+    this.syncVisualColor();
   }
 
   deactivate(type: BuffType): void {
-    const layer = this.layers.get(type);
-    if (!layer) return;
-    layer.active = false;
-    layer.targetOpacity = 0;
+    if (!this.activeBuffs.delete(type)) {
+      return;
+    }
+    this.promotionOrder = this.promotionOrder.filter((entry) => entry !== type);
+    this.dominantBuff = this.promotionOrder.length > 0
+      ? this.promotionOrder[this.promotionOrder.length - 1]!
+      : null;
+    this.syncVisualColor();
   }
 
-  setRallyingCry(active: boolean, mountEl: HTMLElement): void {
-    if (active && !this.rallyingCryActive) {
-      this.rallyingCryActive = true;
-      if (!this.rallyingCryLayer) {
-        this.rallyingCryLayer = this.createLayer(mountEl, RALLYING_CRY_VIGNETTE_COLOR);
-      }
-      this.rallyingCryLayer.active = true;
-      this.rallyingCryLayer.flashTimer = FLASH_OPACITY;
-      this.rallyingCryLayer.targetOpacity = STEADY_OPACITY;
-    } else if (!active && this.rallyingCryActive) {
-      this.rallyingCryActive = false;
-      if (this.rallyingCryLayer) {
-        this.rallyingCryLayer.active = false;
-        this.rallyingCryLayer.targetOpacity = 0;
-      }
+  setRallyingCry(active: boolean): void {
+    if (this.rallyingCryActive === active) {
+      return;
     }
+    this.rallyingCryActive = active;
+    if (active) {
+      this.triggerFlash();
+    }
+    this.syncVisualColor();
   }
 
   update(deltaSeconds: number): void {
     this.elapsedS += deltaSeconds;
-
-    for (const layer of this.layers.values()) {
-      this.updateLayer(layer, deltaSeconds);
-    }
-    if (this.rallyingCryLayer) {
-      this.updateLayer(this.rallyingCryLayer, deltaSeconds);
-    }
+    this.flashTimerS = Math.max(0, this.flashTimerS - deltaSeconds);
+    const targetVisibility = this.shouldRender() ? 1 : 0;
+    const fadeRate = targetVisibility > this.visibility ? FADE_IN_RATE : FADE_OUT_RATE;
+    this.visibility = this.moveToward(this.visibility, targetVisibility, fadeRate * deltaSeconds);
+    this.render();
   }
 
   clear(): void {
-    for (const layer of this.layers.values()) {
-      layer.active = false;
-      layer.targetOpacity = 0;
-      layer.currentOpacity = 0;
-      layer.flashTimer = 0;
-      layer.element.style.opacity = "0";
-    }
-    if (this.rallyingCryLayer) {
-      this.rallyingCryLayer.active = false;
-      this.rallyingCryLayer.targetOpacity = 0;
-      this.rallyingCryLayer.currentOpacity = 0;
-      this.rallyingCryLayer.flashTimer = 0;
-      this.rallyingCryLayer.element.style.opacity = "0";
-    }
+    this.activeBuffs.clear();
+    this.promotionOrder = [];
+    this.dominantBuff = null;
     this.rallyingCryActive = false;
+    this.elapsedS = 0;
+    this.visibility = 0;
+    this.flashTimerS = 0;
+    this.render(true);
   }
 
-  dispose(): void {
-    for (const layer of this.layers.values()) {
-      layer.element.remove();
-    }
-    this.layers.clear();
-    if (this.rallyingCryLayer) {
-      this.rallyingCryLayer.element.remove();
-      this.rallyingCryLayer = null;
-    }
-  }
-
-  private createLayer(mountEl: HTMLElement, colorRgb: string): VignetteLayer {
-    const element = document.createElement("div");
-    Object.assign(element.style, {
-      position: "absolute",
-      inset: "0",
-      pointerEvents: "none",
-      zIndex: "26",
-      opacity: "0",
-      background: `radial-gradient(ellipse at center, transparent 45%, rgba(${colorRgb}, 0.25) 100%)`,
-      transition: "none",
-    } satisfies Partial<CSSStyleDeclaration>);
-    mountEl.append(element);
-
+  getDebugState(): BuffVignetteDebugState {
     return {
-      element,
-      targetOpacity: 0,
-      currentOpacity: 0,
-      flashTimer: 0,
-      active: false,
+      dominantBuff: this.dominantBuff,
+      colorRgb: this.shouldRender() ? this.currentColorRgb : null,
+      activeBuffCount: this.activeBuffs.size,
+      visibility: this.visibility,
+      baseOpacity: this.lastBaseOpacity,
+      pulseOpacity: this.lastPulseOpacity,
+      flashOpacity: this.lastFlashOpacity,
     };
   }
 
-  private updateLayer(layer: VignetteLayer, deltaSeconds: number): void {
-    if (layer.flashTimer > 0) {
-      // Flash decay
-      layer.flashTimer = Math.max(0, layer.flashTimer - FLASH_DECAY_RATE * deltaSeconds);
-      layer.currentOpacity = layer.targetOpacity + layer.flashTimer;
-    } else if (layer.active) {
-      // Gentle pulse
-      const pulse = PULSE_AMPLITUDE * Math.sin(this.elapsedS * Math.PI * 2 * PULSE_FREQUENCY);
-      layer.currentOpacity = layer.targetOpacity + pulse;
-    } else {
-      // Fade out
-      layer.currentOpacity = Math.max(0, layer.currentOpacity - FADE_OUT_RATE * deltaSeconds);
+  dispose(): void {
+    this.root.remove();
+  }
+
+  private promote(type: BuffType): void {
+    this.promotionOrder = this.promotionOrder.filter((entry) => entry !== type);
+    this.promotionOrder.push(type);
+    this.dominantBuff = type;
+  }
+
+  private triggerFlash(): void {
+    this.flashTimerS = PICKUP_FLASH_DURATION_S;
+    this.visibility = Math.max(this.visibility, 0.82);
+  }
+
+  private shouldRender(): boolean {
+    return this.rallyingCryActive || this.dominantBuff !== null;
+  }
+
+  private syncVisualColor(): void {
+    const nextColor = this.resolveColorRgb();
+    if (!nextColor || nextColor === this.currentColorRgb) {
+      return;
+    }
+    this.currentColorRgb = nextColor;
+    this.applyColorToLayers(nextColor);
+  }
+
+  private resolveColorRgb(): string | null {
+    if (this.rallyingCryActive) {
+      return RALLYING_CRY_VIGNETTE_COLOR;
+    }
+    if (!this.dominantBuff) {
+      return null;
+    }
+    return BUFF_DEFINITIONS[this.dominantBuff].vignetteColor;
+  }
+
+  private render(forceHidden = false): void {
+    if (forceHidden || this.visibility <= 0.001) {
+      this.lastBaseOpacity = 0;
+      this.lastPulseOpacity = 0;
+      this.lastFlashOpacity = 0;
+      this.root.style.opacity = "0";
+      this.baseLayer.style.opacity = "0";
+      this.pulseLayer.style.opacity = "0";
+      this.flashLayer.style.opacity = "0";
+      this.baseLayer.style.transform = "scale(1)";
+      this.pulseLayer.style.transform = "scale(1)";
+      this.flashLayer.style.transform = "scale(1)";
+      return;
     }
 
-    const clamped = Math.max(0, Math.min(1, layer.currentOpacity));
-    layer.element.style.opacity = clamped.toFixed(3);
+    const pulse = this.computePulse();
+    const flashStrength = this.flashTimerS > 0
+      ? easeOutQuad(this.flashTimerS / PICKUP_FLASH_DURATION_S)
+      : 0;
+    const baseOpacity = clamp01(this.visibility * BASE_LAYER_OPACITY);
+    const pulseOpacity = clamp01(
+      this.visibility * (PULSE_LAYER_MIN_OPACITY + pulse * PULSE_LAYER_RANGE),
+    );
+    const flashOpacity = clamp01(this.visibility * flashStrength * FLASH_LAYER_OPACITY);
+
+    this.lastBaseOpacity = baseOpacity;
+    this.lastPulseOpacity = pulseOpacity;
+    this.lastFlashOpacity = flashOpacity;
+
+    this.root.style.opacity = "1";
+    this.baseLayer.style.opacity = baseOpacity.toFixed(3);
+    this.pulseLayer.style.opacity = pulseOpacity.toFixed(3);
+    this.flashLayer.style.opacity = flashOpacity.toFixed(3);
+    this.baseLayer.style.transform = "scale(1)";
+    this.pulseLayer.style.transform = `scale(${(1 + pulse * PULSE_SCALE_RANGE).toFixed(3)})`;
+    this.flashLayer.style.transform = `scale(${(1 + flashStrength * FLASH_SCALE_RANGE).toFixed(3)})`;
+  }
+
+  private applyColorToLayers(colorRgb: string): void {
+    setEdgeVignetteColor(
+      this.baseLayer,
+      colorRgb,
+      BASE_LAYER_MID_ALPHA,
+      BASE_LAYER_OUTER_ALPHA,
+      INNER_CLEAR_STOP_PCT,
+      SHOULDER_STOP_PCT,
+    );
+    setEdgeVignetteColor(
+      this.pulseLayer,
+      colorRgb,
+      BASE_LAYER_MID_ALPHA,
+      BASE_LAYER_OUTER_ALPHA,
+      INNER_CLEAR_STOP_PCT,
+      SHOULDER_STOP_PCT,
+    );
+    setEdgeVignetteColor(
+      this.flashLayer,
+      colorRgb,
+      BASE_LAYER_MID_ALPHA,
+      BASE_LAYER_OUTER_ALPHA,
+      INNER_CLEAR_STOP_PCT,
+      SHOULDER_STOP_PCT,
+    );
+  }
+
+  private moveToward(current: number, target: number, maxStep: number): number {
+    if (Math.abs(target - current) <= maxStep) {
+      return target;
+    }
+    return current + Math.sign(target - current) * maxStep;
+  }
+
+  private computePulse(): number {
+    const wave = 0.5 - 0.5 * Math.cos(this.elapsedS * Math.PI * 2 * PULSE_FREQUENCY_HZ);
+    return easeInOut(wave);
   }
 }

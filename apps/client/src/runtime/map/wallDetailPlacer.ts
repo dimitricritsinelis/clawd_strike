@@ -15,7 +15,14 @@ import type {
 } from "./types";
 import type { BoundarySegment } from "./buildBlockout";
 import type { WallDetailInstance } from "./wallDetailKit";
-import { CASTLE_DOOR_ID, ROLLERSHUTTER_ID, resolveCastleDoorSilhouette, type DoorModelPlacement } from "./buildDoorModels";
+import {
+  CASTLE_DOOR_ID,
+  ROLLERSHUTTER_ID,
+  resolveCastleDoorRevealWidth,
+  resolveCastleDoorSurroundRevealWidth,
+  resolveCastleDoorSilhouette,
+  type DoorModelPlacement,
+} from "./buildDoorModels";
 import { resolvePointedArchFrameFromAperture } from "./pointedArchProfile";
 import {
   resolveFacadeStyleForSegment,
@@ -54,6 +61,8 @@ const STAINED_GLASS_BRIGHT_MATERIAL_ID = "tm_stained_glass_bright";
 const STAINED_GLASS_DIM_MATERIAL_ID = "tm_stained_glass_dim";
 const RECESSED_PANEL_BACK_THICKNESS_M = 0.02;
 const MIN_RECESSED_PANEL_FRONT_INSET_M = 0.08;
+const DOOR_COVER_BLEED_MARGIN_M = 0.02;
+const DOOR_COVER_CENTER_Y_OFFSET_M = 0.01;
 
 // ── Standardized trim dimensions by story class ────────────────────────────
 // All trim pieces use fixed canonical sizes per story count rather than per-segment
@@ -302,6 +311,17 @@ export type WallDetailPlacementResult = {
 
 type WindowTreatment = "glass" | "dark" | "shuttered";
 
+type DoorCoverEnvelope = {
+  modelId: string;
+  effectiveDoorW: number;
+  coverShape: "arched" | "rect";
+  coverWidthM: number;
+  coverHeightM: number;
+  coverCenterYOffsetM: number;
+  trimThicknessM?: number;
+  revealWidthM?: number;
+};
+
 function authoredWindowLayoutKey(zoneId: string, face: FacadeFace, segmentOrdinal: number): string {
   return `${zoneId}:${face}:${segmentOrdinal}`;
 }
@@ -534,6 +554,7 @@ function tagTrim(
 function pushArchedDoorVoid(
   ctx: SegmentDecorContext,
   centerS: number,
+  centerY: number,
   doorH: number,
   inwardN: number,
   depth: number,
@@ -546,12 +567,73 @@ function pushArchedDoorVoid(
     null,
     ctx.frame,
     centerS,
-    doorH * 0.5,
+    centerY,
     inwardN,
     depth,
     doorH,
     doorW,
   );
+}
+
+function pushDoorCoverVoid(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  centerY: number,
+  inwardN: number,
+  depth: number,
+  widthM: number,
+  heightM: number,
+  shape: DoorCoverEnvelope["coverShape"],
+): boolean {
+  if (shape === "arched") {
+    return pushArchedDoorVoid(ctx, centerS, centerY, heightM, inwardN, depth, widthM);
+  }
+  return pushBox(
+    ctx.instances,
+    ctx.maxInstances,
+    "door_void",
+    null,
+    ctx.frame,
+    centerS,
+    centerY,
+    inwardN,
+    depth,
+    heightM,
+    widthM,
+  );
+}
+
+function resolve3dDoorCoverEnvelope(spec: FacadeSpec, isBrickBackdrop: boolean): DoorCoverEnvelope | null {
+  if (spec.doorH < 2.0 || spec.doorW < 0.8) {
+    return null;
+  }
+
+  const modelId = spec.doorW >= 1.2 ? CASTLE_DOOR_ID : ROLLERSHUTTER_ID;
+  if (modelId === CASTLE_DOOR_ID) {
+    const trimThicknessM = spec.frameThickness * (isBrickBackdrop ? 1.18 : 1);
+    const coverRevealWidthM = resolveCastleDoorRevealWidth(trimThicknessM);
+    const revealWidthM = resolveCastleDoorSurroundRevealWidth(trimThicknessM);
+    const silhouette = resolveCastleDoorSilhouette(spec.doorH);
+    return {
+      modelId,
+      effectiveDoorW: silhouette.widthM,
+      coverShape: "arched",
+      coverWidthM: silhouette.widthM + coverRevealWidthM * 2 + DOOR_COVER_BLEED_MARGIN_M,
+      coverHeightM: spec.doorH + coverRevealWidthM + DOOR_COVER_BLEED_MARGIN_M,
+      coverCenterYOffsetM: DOOR_COVER_CENTER_Y_OFFSET_M,
+      trimThicknessM,
+      revealWidthM,
+    };
+  }
+
+  return {
+    modelId,
+    effectiveDoorW: spec.doorW,
+    coverShape: "rect",
+    coverWidthM: spec.doorW + DOOR_COVER_BLEED_MARGIN_M,
+    coverHeightM: spec.doorH + DOOR_COVER_BLEED_MARGIN_M,
+    coverCenterYOffsetM: DOOR_COVER_CENTER_Y_OFFSET_M,
+  };
 }
 
 function resolveInsetSurfaceCenterOffset(requestedInsetM: number, depthM: number): number {
@@ -1590,19 +1672,17 @@ function placeArchedDoor(
   spec: FacadeSpec,
   doorStyleSource: RuntimeDoorStyleSource | null = null,
 ): void {
-  const uses3DModel = spec.doorH >= 2.0 && spec.doorW >= 0.8;
   const isSpawn = ctx.zone?.type === "spawn_plaza";
   const isBrickBackdrop = isSpawnGateBrickBackdropPreset(spec.compositionPreset);
   const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
   const trimDepthScale = isSpawnBCleanup ? SPAWN_B_SHELL_TRIM_DEPTH_SCALE : 1;
   const styleZoneId = doorStyleSource?.zoneId ?? ctx.zone?.id ?? null;
   const styleFacadeFace = doorStyleSource?.face ?? ctx.facadeFace;
+  const doorCoverEnvelope = resolve3dDoorCoverEnvelope(spec, isBrickBackdrop);
 
-  if (uses3DModel) {
-    const modelId = spec.doorW >= 1.2 ? CASTLE_DOOR_ID : ROLLERSHUTTER_ID;
-    const isCastleDoor = modelId === CASTLE_DOOR_ID;
-    const castleSilhouette = isCastleDoor ? resolveCastleDoorSilhouette(spec.doorH) : null;
-    const effectiveDoorW = castleSilhouette?.widthM ?? spec.doorW;
+  if (doorCoverEnvelope) {
+    const isCastleDoor = doorCoverEnvelope.modelId === CASTLE_DOOR_ID;
+    const effectiveDoorW = doorCoverEnvelope.effectiveDoorW;
 
     // 3D model fully replaces the flat void + lintel
     const wallCenter = toWorld(ctx.frame, centerS, spec.doorH * 0.5, 0);
@@ -1613,7 +1693,11 @@ function placeArchedDoor(
       yawRad: ctx.frame.yawRad,
       outwardX: -ctx.frame.inwardX,
       outwardZ: -ctx.frame.inwardZ,
-      modelId,
+      modelId: doorCoverEnvelope.modelId,
+      coverShape: doorCoverEnvelope.coverShape,
+      coverWidthM: doorCoverEnvelope.coverWidthM,
+      coverHeightM: doorCoverEnvelope.coverHeightM,
+      coverCenterYOffsetM: doorCoverEnvelope.coverCenterYOffsetM,
     };
     if (isCastleDoor) {
       const isSpawnBMainHeroDoor =
@@ -1627,9 +1711,13 @@ function placeArchedDoor(
             ctx.plinthDepth + 0.04,
           );
       placement.trimMaterialId = ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId;
-      placement.trimThicknessM = spec.frameThickness * (isBrickBackdrop ? 1.18 : 1);
       placement.surroundDepthM = surroundDepthM;
-      placement.revealWidthM = Math.max(0.035, Math.min(0.06, placement.trimThicknessM * 0.24));
+      if (typeof doorCoverEnvelope.trimThicknessM === "number") {
+        placement.trimThicknessM = doorCoverEnvelope.trimThicknessM;
+      }
+      if (typeof doorCoverEnvelope.revealWidthM === "number") {
+        placement.revealWidthM = doorCoverEnvelope.revealWidthM;
+      }
       // Negative outward moves the custom surround toward the playable/street side.
       placement.surroundCenterOffsetM = -surroundDepthM * 0.5;
     }
@@ -1637,13 +1725,15 @@ function placeArchedDoor(
 
     // Spawn doors get decorative framing around the 3D model
     if (isSpawn) {
-      pushArchedDoorVoid(
+      pushDoorCoverVoid(
         ctx,
         centerS,
-        spec.doorH,
+        spec.doorH * 0.5 + doorCoverEnvelope.coverCenterYOffsetM,
         -spec.recessDepth * 0.4,
         0.006,
-        effectiveDoorW,
+        doorCoverEnvelope.coverWidthM,
+        doorCoverEnvelope.coverHeightM,
+        doorCoverEnvelope.coverShape,
       );
 
       if (!isCastleDoor) {
@@ -1690,6 +1780,7 @@ function placeArchedDoor(
     pushArchedDoorVoid(
       ctx,
       centerS,
+      spec.doorH * 0.5,
       spec.doorH,
       -spec.recessDepth * 0.4,
       0.006,
@@ -2359,11 +2450,15 @@ function decorateSegment(ctx: SegmentDecorContext): void {
       }
     }
 
+    const authoredDoorCoverEnvelope = resolve3dDoorCoverEnvelope(
+      doorPlacementSpec,
+      isSpawnGateBrickBackdropPreset(doorPlacementSpec.compositionPreset),
+    );
     const doorGaps = doorCentersS
-      .filter(() => doorPlacementSpec.doorH >= 2.0 && doorPlacementSpec.doorW >= 0.8)
+      .filter(() => authoredDoorCoverEnvelope != null)
       .map((doorCenterS) => ({
         centerS: doorCenterS,
-        halfW: doorPlacementSpec.doorW * 0.5,
+        halfW: authoredDoorCoverEnvelope!.coverWidthM * 0.5,
       }));
     emitPlinthStrip(ctx, doorGaps);
     placeCableSegments(ctx);
@@ -2430,12 +2525,13 @@ function decorateSegment(ctx: SegmentDecorContext): void {
 
   // Emit plinth strips with gaps at 3D door positions
   const doorGaps: { centerS: number; halfW: number }[] = [];
+  const segmentDoorCoverEnvelope = resolve3dDoorCoverEnvelope(spec, isSpawnGateBrickBackdropPreset(spec.compositionPreset));
   for (let col = 0; col < spec.bayCount; col += 1) {
     if (spec.columnRoles[col] === "door"
-        && spec.doorH >= 2.0 && spec.doorW >= 0.8) {
+        && segmentDoorCoverEnvelope) {
       doorGaps.push({
         centerS: columnCenterS(spec, col),
-        halfW: spec.doorW * 0.5,
+        halfW: segmentDoorCoverEnvelope.coverWidthM * 0.5,
       });
     }
   }

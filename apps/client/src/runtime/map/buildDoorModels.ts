@@ -29,7 +29,13 @@ export type DoorModelPlacement = {
   surroundDepthM?: number;
   surroundCenterOffsetM?: number;
   revealWidthM?: number;
+  coverShape?: DoorCoverShape;
+  coverWidthM?: number;
+  coverHeightM?: number;
+  coverCenterYOffsetM?: number;
 };
+
+export type DoorCoverShape = "arched" | "rect";
 
 export const CASTLE_DOOR_ID = "ph_large_castle_door";
 export const ROLLERSHUTTER_ID = "ph_rollershutter_window_02";
@@ -38,14 +44,13 @@ const _bbox = new Box3();
 const _bboxSize = new Vector3();
 const DEFAULT_DOOR_OUTWARD_OFFSET_M = -0.01;
 const CASTLE_DOOR_OUTWARD_OFFSET_M = -0.09;
-const CASTLE_DOOR_BACKING_MATERIAL = new MeshStandardMaterial({
+const DOOR_BACKING_MATERIAL = new MeshStandardMaterial({
   color: 0x0c1218,
   roughness: 0.95,
   metalness: 0.0,
 });
-const CASTLE_DOOR_BACKING_DEPTH_M = 0.03;
-const CASTLE_DOOR_BACKING_FRONT_OFFSET_M = 0.05;
-const CASTLE_DOOR_BACKING_INSET_SCALE = 0.9;
+const DOOR_BACKING_DEPTH_M = 0.03;
+const DOOR_BACKING_FRONT_OFFSET_M = 0.05;
 const CASTLE_DOOR_MODEL_WIDTH_M = 2.012115716934204;
 const CASTLE_DOOR_MODEL_HEIGHT_M = 2.964752435684204;
 const FALLBACK_TRIM_COLOR = 0xd2c3a6;
@@ -67,6 +72,14 @@ export function resolveCastleDoorSilhouette(heightM: number): DoorSilhouette {
     radiusM,
     springLineOffsetYM: heightM * 0.5 - radiusM,
   };
+}
+
+export function resolveCastleDoorRevealWidth(trimThicknessM: number): number {
+  return Math.max(0.035, Math.min(0.06, trimThicknessM * 0.24));
+}
+
+export function resolveCastleDoorSurroundRevealWidth(trimThicknessM: number): number {
+  return Math.max(0.008, Math.min(0.018, trimThicknessM * 0.08));
 }
 
 function createCastleDoorBackingGeometry(widthM: number, heightM: number, depthM: number): BufferGeometry {
@@ -97,8 +110,8 @@ function createCastleDoorBacking(
   tangentOffsetM = 0,
 ): Mesh {
   const backing = new Mesh(
-    createCastleDoorBackingGeometry(widthM, heightM, CASTLE_DOOR_BACKING_DEPTH_M),
-    CASTLE_DOOR_BACKING_MATERIAL,
+    createCastleDoorBackingGeometry(widthM, heightM, DOOR_BACKING_DEPTH_M),
+    DOOR_BACKING_MATERIAL,
   );
   const tangentX = Math.cos(yawRad);
   const tangentZ = -Math.sin(yawRad);
@@ -106,11 +119,37 @@ function createCastleDoorBacking(
   // by the configured front-face offset.
   backing.position.set(
     placement.wallSurfacePos.x + placement.outwardX * centerOffsetM + tangentX * tangentOffsetM,
-    placement.wallSurfacePos.y,
+    placement.wallSurfacePos.y + (placement.coverCenterYOffsetM ?? 0),
     placement.wallSurfacePos.z + placement.outwardZ * centerOffsetM + tangentZ * tangentOffsetM,
   );
   backing.rotation.set(0, yawRad, 0);
   backing.name = "castle-door-backing";
+  backing.castShadow = false;
+  backing.receiveShadow = false;
+  return backing;
+}
+
+function createRectDoorBacking(
+  placement: DoorModelPlacement,
+  yawRad: number,
+  centerOffsetM: number,
+  widthM: number,
+  heightM: number,
+  tangentOffsetM = 0,
+): Mesh {
+  const backing = new Mesh(
+    new BoxGeometry(widthM, heightM, DOOR_BACKING_DEPTH_M),
+    DOOR_BACKING_MATERIAL,
+  );
+  const tangentX = Math.cos(yawRad);
+  const tangentZ = -Math.sin(yawRad);
+  backing.position.set(
+    placement.wallSurfacePos.x + placement.outwardX * centerOffsetM + tangentX * tangentOffsetM,
+    placement.wallSurfacePos.y + (placement.coverCenterYOffsetM ?? 0),
+    placement.wallSurfacePos.z + placement.outwardZ * centerOffsetM + tangentZ * tangentOffsetM,
+  );
+  backing.rotation.set(0, yawRad, 0);
+  backing.name = "door-backing-rect";
   backing.castShadow = false;
   backing.receiveShadow = false;
   return backing;
@@ -185,7 +224,7 @@ function createCastleDoorSurround(
   const centerY = placement.wallSurfacePos.y;
   const centerZ = placement.wallSurfacePos.z + placement.outwardZ * centerOffsetM + tangentZ * tangentOffsetM;
   const jambWidthM = trimThicknessM;
-  const revealWidthM = placement.revealWidthM ?? Math.max(0.035, Math.min(0.06, trimThicknessM * 0.24));
+  const revealWidthM = placement.revealWidthM ?? resolveCastleDoorSurroundRevealWidth(trimThicknessM);
   const openingWidthM = widthM + revealWidthM * 2;
 
   const createJamb = (side: -1 | 1): Mesh => {
@@ -382,13 +421,13 @@ export function buildDoorModels(
     root.add(clone);
     if (placement.modelId === CASTLE_DOOR_ID) {
       const silhouette = resolveCastleDoorSilhouette(placement.doorH);
-      const backingCenterOffset = -(CASTLE_DOOR_BACKING_FRONT_OFFSET_M + CASTLE_DOOR_BACKING_DEPTH_M * 0.5);
+      const backingCenterOffset = -(DOOR_BACKING_FRONT_OFFSET_M + DOOR_BACKING_DEPTH_M * 0.5);
       root.add(createCastleDoorBacking(
         placement,
         finalRotationY,
         backingCenterOffset,
-        silhouette.widthM * CASTLE_DOOR_BACKING_INSET_SCALE,
-        silhouette.heightM * CASTLE_DOOR_BACKING_INSET_SCALE,
+        placement.coverWidthM ?? silhouette.widthM,
+        placement.coverHeightM ?? silhouette.heightM,
         tangentOffsetM,
       ));
       if (
@@ -408,6 +447,15 @@ export function buildDoorModels(
           tangentOffsetM,
         ));
       }
+    } else {
+      const backingCenterOffset = -(DOOR_BACKING_FRONT_OFFSET_M + DOOR_BACKING_DEPTH_M * 0.5);
+      root.add(createRectDoorBacking(
+        placement,
+        finalRotationY,
+        backingCenterOffset,
+        placement.coverWidthM ?? placement.doorW,
+        placement.coverHeightM ?? placement.doorH,
+      ));
     }
   }
 

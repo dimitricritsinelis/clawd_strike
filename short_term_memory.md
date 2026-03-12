@@ -6,7 +6,7 @@ Do not use for: workflow policy, durable rationale, archive history, product tru
 Schema version: stm-v2
 Canonical playtest URL: http://127.0.0.1:4174/?map=bazaar-map
 Map approval status: NOT APPROVED
-Last compacted: 2026-03-12T01:15:53Z
+Last compacted: 2026-03-12T03:53:29Z
 
 # short_term_memory.md - Clawd Strike Status
 
@@ -15,6 +15,7 @@ Last compacted: 2026-03-12T01:15:53Z
 - STM-20260309-154233-codex | active | codex | ui-flow | Loading-screen champion b... | next: Wait for review or make a...
 - STM-20260309-223704-codex | blocked | codex | docs | Lean AGENTS and mirror docs | next: Resolve the blocked build...
 - STM-20260312-020306-codex | handoff | codex | perf | Scalable runtime perf pass | next: Claim the card and implem...
+- STM-20260312-151925-codex | active | codex | ui-flow | Buff vignette redesign | next: Replace the current broad...
 <!-- GENERATED END: active-snapshot -->
 
 ## Shared Ephemera
@@ -83,11 +84,33 @@ Recent Notes:
 - 2026-03-12T02:20:52Z | handoff | Orb scaling now stays within budget locally, but the zero-orb baseline remains above target and needs a follow-up non-orb perf pass.
 - 2026-03-12T02:20:52Z | progress | Implemented the pooled orb renderer, added orb perf telemetry/debug hooks, and added an orb-scaling perf smoke with paired controls.
 
+### STM-20260312-151925-codex | active | ui-flow | Buff vignette redesign
+Owner: codex
+Branch: main
+Goal: Rebuild the buff overlay around the hit-vignette silhouette with buff-color tint, clean-center edge weighting, and simple pulse/flash timing.
+Done when: Buff vignettes reuse the shared edge-vignette shape, latest active buff owns the color, red hit feedback stays on top, and typecheck/server/smoke validation pass.
+Authority:
+- apps/client/src/runtime/ui/BuffVignette.ts
+- apps/client/src/runtime/buffs/BuffTypes.ts
+- apps/client/src/runtime/bootstrap.ts
+Files:
+- apps/client/src/runtime/ui/BuffVignette.ts
+Next:
+- Await review or alpha/falloff-only tuning in a real headed Chrome pass.
+Blockers:
+- none
+Recent Notes:
+- 2026-03-12T17:11:00Z | status | Raised the sustained buff floor and pulse highs so the vignette stays obvious through the full 10-second lifetime, revalidated typecheck plus server/game smoke, and verified 5s and 9.2s runtime samples plus hit-overlap overlay capture.
+- 2026-03-12T16:56:01Z | status | Tuned the buff vignette to reach further inward with stronger base/pulse/flash pressure, kept hit feedback on the prior footprint, revalidated typecheck plus server/game smoke, and confirmed the larger edge occupation through debug-state checks and overlay captures.
+- 2026-03-12T16:25:24Z | status | Replaced the decorative buff wash with shared edge-vignette layers, removed separate screen-effect tint drift, verified latest-wins color fallback through debug hooks, and passed typecheck plus server/game smoke gates.
+- 2026-03-12T15:28:46Z | progress | Rebuilt BuffVignette around steady/pulse radial layers with peripheral vessel detail and added separate screen-effect tints in BuffTypes.
+- 2026-03-12T15:19:25Z | claim | Claimed task.
+
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->
+- STM-20260312-034350-codex | ui-flow | Buff vignette reliability fix | 2026-03-12 | Replaced the fragile buff vignette compositor with an inline-SVG alpha overlay, verified visible buff/hit states in a real Chrome human runtime on localhost, and passed typecheck plus smoke validation.
+- STM-20260312-033605-codex | map-geometry | Tighten door surround reveal | 2026-03-12 | Root cause was the castle-door surround intentionally centering the model inside a 3.5–6 cm reveal; cover-envelope math now stays wide for masking while the visible surround reveal is tightened to 0.8–1.8 cm, with regeneration and validation passing.
+- STM-20260312-032013-codex | ui-flow | Buff charged-vessel screen effect | 2026-03-12 | Implemented a masked charged-vessel buff overlay with dominant-color refresh behavior, localhost QA hooks, captured visual screenshots, and passing typecheck plus smoke validation.
+- STM-20260312-031419-codex | map-geometry | Seal door wall bleed | 2026-03-12 | Shared door cover-envelope math now seals all 3D door variants, Spawn B shot authority includes an explicit no-bleed check, maps were regenerated, and typecheck/server/smoke/completion validation passed.
 - STM-20260312-011359-codex | map-visual | Retune Spawn B balcony hero window midpoint | 2026-03-12 | Moved the Spawn B hero window to midpoint values between the original and prior lowered pass, regenerated the map outputs, passed qa:completion, and manually verified the updated facade from a fixed Spawn B debug camera.
-- STM-20260312-005430-codex | map-visual | Retune Spawn B balcony hero window | 2026-03-12 | Retuned the Spawn B north-wall balcony hero window to be deck-flush and lower against the roofline, regenerated derived map artifacts, passed qa:completion, and manually verified the updated facade in a debug-positioned browser capture.
-- STM-20260312-003607-codex | map-visual | Restore balcony arch cap | 2026-03-12 | Set the Spawn B balcony hero stone and glass arch starts to 8.2m, raised the opening and surround heights to restore visible arch cap, sharpened the hero curve, and qa:completion passed.
-- STM-20260312-003035-codex | map-visual | Set balcony arch start to 8m | 2026-03-12 | Set the Spawn B balcony hero stone and glass arch starts to 8.0m by updating the hero spring-line values; pnpm qa:completion passed.
-- STM-20260312-002235-codex | map-visual | Align arch to parapet top | 2026-03-12 | Aligned the Spawn B balcony hero window arch start to the top of the visible parapet trim above the roofline; pnpm qa:completion passed.
 <!-- TOOL-MANAGED END: completed-rollup -->

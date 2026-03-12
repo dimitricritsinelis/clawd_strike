@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { AgentAction } from "./runtime/input/AgentAction";
+import type { BuffType } from "./runtime/buffs/BuffTypes";
 
 declare global {
   interface Window {
@@ -14,10 +15,28 @@ declare global {
       damage?: number;
       enemyName?: string;
     }) => void;
+    __debug_trigger_hit_vignette?: (damage?: number) => void;
     __debug_eliminate_all_bots?: () => number;
     __debug_set_buff_orbs?: (payload: {
       count?: number;
     }) => number;
+    __debug_set_buff_vignette?: (payload: {
+      action?: "activate" | "deactivate" | "clear";
+      type?: BuffType | "rallying_cry";
+      exclusive?: boolean;
+    }) => {
+      buffs: BuffType[];
+      rallyingCryActive: boolean;
+      visual: {
+        dominantBuff: BuffType | null;
+        colorRgb: string | null;
+        activeBuffCount: number;
+        visibility: number;
+        baseOpacity: number;
+        pulseOpacity: number;
+        flashOpacity: number;
+      };
+    };
     __debug_set_player_pose?: (payload: {
       x: number;
       y: number;

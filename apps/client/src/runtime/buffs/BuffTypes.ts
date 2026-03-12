@@ -7,7 +7,7 @@ export type BuffDefinition = {
   iconPath: string;
   orbColor: number;
   orbEmissive: number;
-  vignetteColor: string; // CSS rgba base color
+  vignetteColor: string; // HUD/icon accent color
 };
 
 export const BUFF_DEFINITIONS: Record<BuffType, BuffDefinition> = {
