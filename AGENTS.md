@@ -9,7 +9,7 @@ Last updated: 2026-03-10
 
 ## Contract
 This is the only normative internal implementation doc in the repo; if internal prose conflicts, follow this file.
-Do not create duplicate policy docs, per-thread notes, or subsystem process guides.
+Do not create duplicate policy docs, per-thread notes, or subsystem process guides. The single exception is `REFACTOR_LOG.md`, which is explicitly allowed only for PR-review or refactor-trace logging artifacts.
 Prefer code, scripts, specs, and runtime contracts over prose when they can answer the question.
 
 ## Read / Precedence
@@ -19,6 +19,7 @@ Prefer code, scripts, specs, and runtime contracts over prose when they can answ
 4. Read only the code and scripts you will touch.
 
 Active status lives in one STM surface; `docs/decisions.md` owns durable prose memory.
+`REFACTOR_LOG.md` is allowed only as an explicit, narrowly scoped PR-review/refactor-trace artifact (for example, follow-up fix tracking or contract-response context), and is not a general duplicate note surface.
 `progress.md` is deprecated for this repo; do not create, update, read, or write it.
 Specs and contracts outrank prose; generated views and artifacts are evidence only.
 
@@ -80,4 +81,4 @@ Relevant authority: <owning spec or contract>
 - Keep the STM snapshot compact and current; collapse finished work into one-line rollups.
 - Keep `docs/decisions.md` short and durable; add entries only for lasting behavior changes.
 - Keep internal agent tooling separate from the repo root authority surface and from public `apps/client/public/skills.md`.
-- Do not create duplicate tool-specific policy docs.
+- Do not create duplicate policy docs, except for an explicit, scoped `REFACTOR_LOG.md` artifact for PR-review/refactor-trace logging when needed.
