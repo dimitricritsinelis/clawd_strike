@@ -24,6 +24,8 @@ type RendererOptions = {
   highVis: boolean;
   lightingPreset: RuntimeLightingPreset;
   ao: boolean;
+  maxPixelRatio?: number | undefined;
+  disableShadows?: boolean | undefined;
 };
 
 export type RendererPerfInfo = {
@@ -75,8 +77,10 @@ export class Renderer {
   private ssaoPass: SSAOPass | null = null;
   private width = 1;
   private height = 1;
+  private readonly effectiveMaxPixelRatio: number;
 
   constructor(private readonly mountEl: HTMLElement, options: RendererOptions) {
+    this.effectiveMaxPixelRatio = options.maxPixelRatio ?? MAX_PIXEL_RATIO;
     const palette = resolveBlockoutPalette(options.highVis);
     const canvas = document.createElement("canvas");
     const context = tryCreateWebGLContext(canvas);
@@ -112,12 +116,12 @@ export class Renderer {
       this.renderer.outputColorSpace = SRGBColorSpace;
       this.renderer.toneMapping = ACESFilmicToneMapping;
       this.renderer.toneMappingExposure = 1.50;
-      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.enabled = !options.disableShadows;
       this.renderer.shadowMap.type = PCFShadowMap;
       this.renderer.shadowMap.autoUpdate = false;
       this.renderer.shadowMap.needsUpdate = true;
       this.renderer.info.autoReset = false;
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, options.maxPixelRatio ?? MAX_PIXEL_RATIO));
       this.renderer.setClearColor(
         options.lightingPreset === "golden" ? 0xEADBC8 : palette.background,
         1,
@@ -200,7 +204,7 @@ export class Renderer {
     this.width = nextWidth;
     this.height = nextHeight;
     if (this.renderer) {
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.effectiveMaxPixelRatio));
       this.renderer.setSize(nextWidth, nextHeight, false);
       this.composer?.setSize(nextWidth, nextHeight);
       return;

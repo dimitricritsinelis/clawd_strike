@@ -30,6 +30,10 @@ import { FadeOverlay } from "./ui/FadeOverlay";
 import { HeadshotBanner } from "./ui/HeadshotBanner";
 import { parseRuntimeUrlParams, type RuntimeControlMode } from "./utils/UrlParams";
 import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
+import { isMobileDevice } from "./input/MobileDetect";
+import { TouchInputManager } from "./input/TouchInputManager";
+import { MobileTouchHud } from "./ui/MobileTouchHud";
+import { MobileOrientationGuard } from "./ui/MobileOrientationGuard";
 import { BulletHoleManager } from "./effects/BulletHoleManager";
 import { BuffManager } from "./buffs/BuffManager";
 import { warmupOrbMaterials } from "./buffs/BuffOrb";
@@ -821,10 +825,13 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     !performanceSafeFallback && (warmupAssets?.enemyVisualsReady ?? true),
   );
 
+  const mobile = isMobileDevice();
   const renderer = new Renderer(runtimeRoot, {
     highVis: runtimeParams.highVis,
     lightingPreset: runtimeParams.lightingPreset,
-    ao: performanceSafeFallback ? false : runtimeParams.ao,
+    ao: (performanceSafeFallback || mobile) ? false : runtimeParams.ao,
+    maxPixelRatio: mobile ? 1.0 : undefined,
+    disableShadows: mobile,
   });
   let disposed = false;
   let shadowWarmupFrames = 0;
@@ -1192,12 +1199,15 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     onDryFire: () => weaponAudio.playDryFire(),
   });
 
-  // Pause menu: resume by re-requesting pointer lock
+  // Pause menu: resume by re-requesting pointer lock (desktop) or just unfreezing (mobile)
   pauseMenu.onResume = () => {
-    if (runtimeParams.controlMode === "human") {
+    if (runtimeParams.controlMode === "human" && !mobile) {
       void renderer.canvas.requestPointerLock();
     }
   };
+  if (mobile) {
+    pauseMenu.setMobileMode(true);
+  }
   pauseMenu.onReturnToLobby = () => {
     const lobbyUrl = `${window.location.origin}${window.location.pathname}`;
     window.location.href = lobbyUrl;
@@ -1298,7 +1308,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       pauseMenu.hide();
       howToPlayOverlay.hide();
       controlsOverlay.hide();
-      if (runtimeParams.controlMode === "human") {
+      if (runtimeParams.controlMode === "human" && !mobile) {
         void renderer.canvas.requestPointerLock();
       }
       respawnInProgress = false;
@@ -1377,7 +1387,52 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   bootTelemetry.revealPhase = "ready";
 
   let pointerLock: PointerLockController | null = null;
-  if (!inputFrozen && runtimeParams.controlMode === "human") {
+  let touchInput: TouchInputManager | null = null;
+  let mobileTouchHud: MobileTouchHud | null = null;
+  let mobileOrientationGuard: MobileOrientationGuard | null = null;
+
+  if (mobile && !inputFrozen && runtimeParams.controlMode === "human") {
+    // ── Mobile: touch controls instead of pointer lock ──────────────
+    game.setMobileActive(true);
+    touchInput = new TouchInputManager(runtimeRoot);
+    mobileTouchHud = new MobileTouchHud(runtimeRoot, touchInput);
+    mobileOrientationGuard = new MobileOrientationGuard(runtimeRoot);
+    void mobileOrientationGuard.requestLandscape();
+
+    // Pause button wiring
+    mobileTouchHud.onPause = () => {
+      if (game.getIsDead() || inputFrozen) return;
+      if (pauseMenu.isVisible()) {
+        pauseMenu.hide();
+        pauseMenu.onResume?.();
+      } else {
+        pauseMenu.show();
+      }
+    };
+
+    // Unlock audio on first touch (since there's no pointer lock gesture)
+    const unlockAudioOnTouch = (): void => {
+      weaponAudio.ensureResumedFromGesture();
+      weaponAudio.startAmbient();
+      runtimeRoot.removeEventListener("touchstart", unlockAudioOnTouch);
+    };
+    runtimeRoot.addEventListener("touchstart", unlockAudioOnTouch, { passive: true });
+
+    // Adjust HUD positions to avoid overlapping with touch controls
+    healthHud.root.style.bottom = "130px";
+    healthHud.root.style.left = `calc(12px + env(safe-area-inset-left, 0px))`;
+    ammoHud.root.style.bottom = "130px";
+    ammoHud.root.style.right = `calc(12px + env(safe-area-inset-right, 0px))`;
+    scoreHud.root.style.top = `calc(8px + env(safe-area-inset-top, 0px))`;
+    scoreHud.root.style.right = `calc(8px + env(safe-area-inset-right, 0px))`;
+    scoreHud.root.style.transform = "scale(0.85)";
+    scoreHud.root.style.transformOrigin = "top right";
+    timerHud.root.style.top = `calc(8px + env(safe-area-inset-top, 0px))`;
+
+    // Add touch-action: manipulation to root to prevent 300ms tap delay
+    runtimeRoot.style.touchAction = "manipulation";
+  } else if (!inputFrozen && runtimeParams.controlMode === "human") {
+    // ── Desktop: pointer lock as before ─────────────────────────────
     pointerLock = new PointerLockController({
       lockEl: renderer.canvas,
       onLockChange: (locked) => {
@@ -1850,6 +1905,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   function onResize(): void {
     syncViewportNow();
+    mobileOrientationGuard?.check();
+    mobileTouchHud?.relayout();
   }
 
   const step = (deltaMs: number, options: { renderFrame?: boolean } = {}): void => {
@@ -1858,8 +1915,31 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     const renderFrame = options.renderFrame ?? true;
     applyQueuedAgentActions();
 
-    // Freeze game input when pause menu or overlays are open (death-freeze is managed inside Game.ts)
-    if (pauseMenu.isVisible() || howToPlayOverlay.isVisible() || controlsOverlay.isVisible()) {
+    // Feed mobile touch input before game update
+    if (touchInput) {
+      game.feedMobileInput({
+        moveX: touchInput.moveX,
+        moveZ: touchInput.moveZ,
+        lookDeltaX: touchInput.lookDeltaX,
+        lookDeltaY: touchInput.lookDeltaY,
+        fire: touchInput.fireHeld,
+        jump: touchInput.jumpQueued,
+        reload: touchInput.reloadQueued,
+        crouch: touchInput.crouchHeld,
+      });
+      touchInput.consumeFrame();
+
+      // Update button visual feedback
+      mobileTouchHud?.updateFireVisual(touchInput.fireHeld);
+      mobileTouchHud?.updateCrouchVisual(touchInput.crouchHeld);
+
+      // Hide touch controls during death/pause
+      const touchVisible = !game.getIsDead() && !pauseMenu.isVisible();
+      mobileTouchHud?.setVisible(touchVisible);
+    }
+
+    // Freeze game input when pause menu, overlays, or orientation guard are open (death-freeze is managed inside Game.ts)
+    if (pauseMenu.isVisible() || howToPlayOverlay.isVisible() || controlsOverlay.isVisible() || mobileOrientationGuard?.isBlocking()) {
       game.setFreezeInput(true);
     } else if (!game.getIsDead() && !inputFrozen) {
       game.setFreezeInput(false);
@@ -2130,6 +2210,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const onVisibilityModeChange = (): void => {
     previousFrameTime = performance.now();
     lastAgentRenderTime = 0;
+    // Reset mobile touch state — browser drops touch events when app is backgrounded
+    touchInput?.resetState();
     if (isAgentHiddenLowPowerMode()) {
       scheduleHiddenAgentLoop();
       return;
@@ -2191,10 +2273,14 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const attachRuntimeBindings = (): void => {
     if (runtimeBindingsAttached) return;
     runtimeBindingsAttached = true;
-    window.addEventListener("keydown", onKeyDownPause);
+    if (!mobile) {
+      window.addEventListener("keydown", onKeyDownPause);
+    }
     window.addEventListener("resize", onResize);
     document.addEventListener("visibilitychange", onVisibilityModeChange);
     pointerLock?.init();
+    touchInput?.init();
+    mobileOrientationGuard?.check();
   };
 
   const beginReveal = (): void => {
@@ -2278,6 +2364,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     delete window.__debug_suppress_bot_intel_ms;
 
     pointerLock?.dispose();
+    touchInput?.dispose();
+    mobileTouchHud?.dispose();
+    mobileOrientationGuard?.dispose();
     game.teardown();
     weaponAudio.dispose();
     perfHud.dispose();
@@ -2300,7 +2389,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     howToPlayOverlay.dispose();
     controlsOverlay.dispose();
     fadeOverlay.dispose();
-    window.removeEventListener("keydown", onKeyDownPause);
+    if (!mobile) {
+      window.removeEventListener("keydown", onKeyDownPause);
+    }
     propModels?.dispose();
     viewModel?.dispose();
     renderer.dispose();
