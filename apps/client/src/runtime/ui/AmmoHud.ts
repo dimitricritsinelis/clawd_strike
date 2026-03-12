@@ -10,7 +10,7 @@ const COLOR_LOW = "#f5b24a";
 const COLOR_EMPTY = "#ff5f5f";
 
 export class AmmoHud {
-  private readonly root: HTMLDivElement;
+  readonly root: HTMLDivElement;
   private readonly magEl: HTMLDivElement;
   private readonly reserveEl: HTMLSpanElement;
   private readonly reloadBarTrack: HTMLDivElement;

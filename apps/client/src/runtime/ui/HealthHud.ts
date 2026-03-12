@@ -14,7 +14,7 @@ function healthColor(hp: number): string {
 }
 
 export class HealthHud {
-  private readonly root: HTMLDivElement;
+  readonly root: HTMLDivElement;
   private readonly barFill: HTMLDivElement;
   private readonly numericEl: HTMLDivElement;
   private readonly godModeEl: HTMLDivElement;

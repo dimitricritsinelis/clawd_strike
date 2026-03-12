@@ -61,6 +61,7 @@ function createOrnamentalDivider(): HTMLDivElement {
 
 export class PauseMenu {
   readonly root: HTMLDivElement;
+  private hintEl: HTMLDivElement | null = null;
 
   private visible = false;
   private fadeTimerS = 0;
@@ -119,7 +120,8 @@ export class PauseMenu {
 
     const divider = createOrnamentalDivider();
 
-    const hintEl = document.createElement("div");
+    this.hintEl = document.createElement("div");
+    const hintEl = this.hintEl;
     Object.assign(hintEl.style, {
       fontFamily: SERIF_FONT,
       fontSize: "15px",
@@ -241,6 +243,14 @@ export class PauseMenu {
 
   isVisible(): boolean {
     return this.visible;
+  }
+
+  setMobileMode(enabled: boolean): void {
+    if (this.hintEl) {
+      this.hintEl.textContent = enabled
+        ? "Tap Resume to return to game"
+        : "Press Escape to return to game";
+    }
   }
 
   dispose(): void {

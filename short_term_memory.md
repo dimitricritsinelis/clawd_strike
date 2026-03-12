@@ -6,7 +6,7 @@ Do not use for: workflow policy, durable rationale, archive history, product tru
 Schema version: stm-v2
 Canonical playtest URL: http://127.0.0.1:4174/?map=bazaar-map
 Map approval status: NOT APPROVED
-Last compacted: 2026-03-12T03:53:29Z
+Last compacted: 2026-03-12T19:48:35Z
 
 # short_term_memory.md - Clawd Strike Status
 
@@ -15,7 +15,7 @@ Last compacted: 2026-03-12T03:53:29Z
 - STM-20260309-154233-codex | active | codex | ui-flow | Loading-screen champion b... | next: Wait for review or make a...
 - STM-20260309-223704-codex | blocked | codex | docs | Lean AGENTS and mirror docs | next: Resolve the blocked build...
 - STM-20260312-020306-codex | handoff | codex | perf | Scalable runtime perf pass | next: Claim the card and implem...
-- STM-20260312-151925-codex | active | codex | ui-flow | Buff vignette redesign | next: Replace the current broad...
+- STM-20260312-151925-codex | active | codex | ui-flow | Buff vignette redesign | next: Await review or alpha/fal...
 <!-- GENERATED END: active-snapshot -->
 
 ## Shared Ephemera
@@ -100,11 +100,9 @@ Next:
 Blockers:
 - none
 Recent Notes:
-- 2026-03-12T17:11:00Z | status | Raised the sustained buff floor and pulse highs so the vignette stays obvious through the full 10-second lifetime, revalidated typecheck plus server/game smoke, and verified 5s and 9.2s runtime samples plus hit-overlap overlay capture.
-- 2026-03-12T16:56:01Z | status | Tuned the buff vignette to reach further inward with stronger base/pulse/flash pressure, kept hit feedback on the prior footprint, revalidated typecheck plus server/game smoke, and confirmed the larger edge occupation through debug-state checks and overlay captures.
-- 2026-03-12T16:25:24Z | status | Replaced the decorative buff wash with shared edge-vignette layers, removed separate screen-effect tint drift, verified latest-wins color fallback through debug hooks, and passed typecheck plus server/game smoke gates.
-- 2026-03-12T15:28:46Z | progress | Rebuilt BuffVignette around steady/pulse radial layers with peripheral vessel detail and added separate screen-effect tints in BuffTypes.
-- 2026-03-12T15:19:25Z | claim | Claimed task.
+- 2026-03-12T17:11:00Z | progress | Raised sustained buff floor/pulse highs, revalidated typecheck plus smoke, verified 5s and 9.2s runtime samples.
+- 2026-03-12T16:56:01Z | progress | Tuned buff vignette inward reach with stronger base/pulse/flash, revalidated typecheck plus smoke gates.
+- 2026-03-12T16:25:24Z | progress | Replaced decorative buff wash with shared edge-vignette layers, passed typecheck plus smoke gates.
 
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->

@@ -36,6 +36,7 @@ import { resetTickIntent, type AgentAction, type TickIntent } from "../input/Age
 
 const DEFAULT_FOV = 75;
 const LOOK_SENSITIVITY = 0.002;
+const MOBILE_LOOK_SENSITIVITY = 0.15; // degrees per pixel of touch drag
 const MIN_PITCH = -(Math.PI / 2) + 0.001;
 const MAX_PITCH = (Math.PI / 2) - 0.001;
 const EYE_HEIGHT_LERP_RATE = 17.1;
@@ -156,6 +157,15 @@ export class Game {
   private agentReloadQueued = false;
   private agentFireHeld = false;
   private agentCrouchHeld = false;
+  private mobileActive = false;
+  private mobileMoveX = 0;
+  private mobileMoveZ = 0;
+  private mobileLookDeltaX = 0;
+  private mobileLookDeltaY = 0;
+  private mobileFireHeld = false;
+  private mobileJumpQueued = false;
+  private mobileReloadQueued = false;
+  private mobileCrouchHeld = false;
   private spawn: RuntimeSpawnId = "A";
   private mapId = "bazaar-map";
   private seedOverride: number | null = null;
@@ -388,6 +398,30 @@ export class Game {
     if (!locked && this.controlMode === "human") {
       this.resetInputState();
     }
+  }
+
+  setMobileActive(active: boolean): void {
+    this.mobileActive = active;
+  }
+
+  feedMobileInput(input: {
+    moveX: number;
+    moveZ: number;
+    lookDeltaX: number;
+    lookDeltaY: number;
+    fire: boolean;
+    jump: boolean;
+    reload: boolean;
+    crouch: boolean;
+  }): void {
+    this.mobileMoveX = input.moveX;
+    this.mobileMoveZ = input.moveZ;
+    this.mobileLookDeltaX += input.lookDeltaX;
+    this.mobileLookDeltaY += input.lookDeltaY;
+    this.mobileFireHeld = input.fire;
+    if (input.jump) this.mobileJumpQueued = true;
+    if (input.reload) this.mobileReloadQueued = true;
+    this.mobileCrouchHeld = input.crouch;
   }
 
   setFreezeInput(freeze: boolean): void {
@@ -952,7 +986,7 @@ export class Game {
       return false;
     }
     if (this.controlMode === "human") {
-      return this.pointerLocked;
+      return this.pointerLocked || this.mobileActive;
     }
     return true;
   }
@@ -961,7 +995,11 @@ export class Game {
     resetTickIntent(this.tickIntent);
 
     if (this.controlMode === "human") {
-      this.buildHumanIntent();
+      if (this.mobileActive) {
+        this.buildMobileIntent();
+      } else {
+        this.buildHumanIntent();
+      }
     } else {
       this.buildAgentIntent();
     }
@@ -991,6 +1029,22 @@ export class Game {
     this.humanReloadQueued = false;
     this.humanLookDeltaX = 0;
     this.humanLookDeltaY = 0;
+  }
+
+  private buildMobileIntent(): void {
+    this.tickIntent.moveX = Math.max(-1, Math.min(1, this.mobileMoveX));
+    this.tickIntent.moveZ = Math.max(-1, Math.min(1, this.mobileMoveZ));
+    this.tickIntent.crouch = this.mobileCrouchHeld;
+    this.tickIntent.jump = this.mobileJumpQueued;
+    this.tickIntent.fire = this.mobileFireHeld;
+    this.tickIntent.reload = this.mobileReloadQueued;
+    this.tickIntent.lookYawDelta = this.mobileLookDeltaX * MOBILE_LOOK_SENSITIVITY;
+    this.tickIntent.lookPitchDelta = -this.mobileLookDeltaY * MOBILE_LOOK_SENSITIVITY;
+
+    this.mobileJumpQueued = false;
+    this.mobileReloadQueued = false;
+    this.mobileLookDeltaX = 0;
+    this.mobileLookDeltaY = 0;
   }
 
   private buildAgentIntent(): void {
