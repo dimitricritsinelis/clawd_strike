@@ -10,14 +10,14 @@
 const SERIF_FONT = 'Georgia, "Palatino Linotype", Palatino, "Book Antiqua", serif';
 const SANS_FONT = '"Segoe UI", Tahoma, Verdana, sans-serif';
 
-function applyButtonHover(btn: HTMLButtonElement): void {
+function applyButtonHover(btn: HTMLButtonElement, restBg: string, hoverBg: string): void {
   btn.addEventListener("mouseenter", () => {
     btn.style.borderColor = "rgba(255, 214, 150, 0.40)";
-    btn.style.background = "rgba(56, 30, 12, 0.90)";
+    btn.style.background = hoverBg;
   });
   btn.addEventListener("mouseleave", () => {
     btn.style.borderColor = "rgba(255, 214, 150, 0.26)";
-    btn.style.background = "rgba(44, 24, 10, 0.86)";
+    btn.style.background = restBg;
   });
 }
 
@@ -70,6 +70,8 @@ export class PauseMenu {
   onResume: (() => void) | null = null;
   /** Called when the player wants to return to lobby. */
   onReturnToLobby: (() => void) | null = null;
+  /** Called when the player wants to see the How to Play guide. */
+  onShowHowToPlay: (() => void) | null = null;
   /** Called when the player wants to see controls. */
   onShowControls: (() => void) | null = null;
 
@@ -128,22 +130,16 @@ export class PauseMenu {
     });
     hintEl.textContent = "Press Escape to return to game";
 
-    const actionsEl = document.createElement("div");
-    Object.assign(actionsEl.style, {
-      display: "flex",
+    const buttonsGrid = document.createElement("div");
+    Object.assign(buttonsGrid.style, {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
       gap: "12px",
-      alignItems: "center",
-      justifyContent: "center",
-      flexWrap: "wrap",
+      width: "100%",
     });
 
-    const gameBtn = document.createElement("button");
-    gameBtn.type = "button";
-    gameBtn.textContent = "Return to Game";
-    Object.assign(gameBtn.style, {
+    const baseBtnStyle = {
       border: "1px solid rgba(255, 214, 150, 0.26)",
-      background: "rgba(44, 24, 10, 0.86)",
-      color: "rgba(255, 241, 224, 0.94)",
       borderRadius: "8px",
       padding: "10px 14px",
       fontFamily: SANS_FONT,
@@ -151,55 +147,40 @@ export class PauseMenu {
       fontWeight: "600",
       letterSpacing: "0.03em",
       cursor: "pointer",
-    });
-    applyButtonHover(gameBtn);
+    };
 
-    const lobbyBtn = document.createElement("button");
-    lobbyBtn.type = "button";
-    lobbyBtn.textContent = "Return to Lobby";
-    Object.assign(lobbyBtn.style, {
-      border: "1px solid rgba(255, 214, 150, 0.26)",
-      background: "rgba(44, 24, 10, 0.86)",
-      color: "rgba(255, 241, 224, 0.94)",
-      borderRadius: "8px",
-      padding: "10px 14px",
-      fontFamily: SANS_FONT,
-      fontSize: "13px",
-      fontWeight: "600",
-      letterSpacing: "0.03em",
-      cursor: "pointer",
-    });
-    applyButtonHover(lobbyBtn);
+    const PRIMARY_BG = "rgba(44, 24, 10, 0.86)";
+    const PRIMARY_HOVER = "rgba(56, 30, 12, 0.90)";
+    const SECONDARY_BG = "rgba(22, 12, 5, 0.82)";
+    const SECONDARY_HOVER = "rgba(34, 18, 8, 0.88)";
 
-    actionsEl.append(gameBtn, lobbyBtn);
-
-    const controlsRow = document.createElement("div");
-    Object.assign(controlsRow.style, {
-      display: "flex",
-      justifyContent: "center",
-      marginTop: "10px",
-    });
+    const howToPlayBtn = document.createElement("button");
+    howToPlayBtn.type = "button";
+    howToPlayBtn.textContent = "How to Play";
+    Object.assign(howToPlayBtn.style, baseBtnStyle, { background: PRIMARY_BG, color: "rgba(255, 241, 224, 0.94)" });
+    applyButtonHover(howToPlayBtn, PRIMARY_BG, PRIMARY_HOVER);
 
     const controlsBtn = document.createElement("button");
     controlsBtn.type = "button";
     controlsBtn.textContent = "Controls";
-    Object.assign(controlsBtn.style, {
-      border: "1px solid rgba(255, 214, 150, 0.26)",
-      background: "rgba(44, 24, 10, 0.86)",
-      color: "rgba(255, 241, 224, 0.94)",
-      borderRadius: "8px",
-      padding: "10px 14px",
-      fontFamily: SANS_FONT,
-      fontSize: "13px",
-      fontWeight: "600",
-      letterSpacing: "0.03em",
-      cursor: "pointer",
-    });
-    applyButtonHover(controlsBtn);
+    Object.assign(controlsBtn.style, baseBtnStyle, { background: PRIMARY_BG, color: "rgba(255, 241, 224, 0.94)" });
+    applyButtonHover(controlsBtn, PRIMARY_BG, PRIMARY_HOVER);
 
-    controlsRow.append(controlsBtn);
+    const gameBtn = document.createElement("button");
+    gameBtn.type = "button";
+    gameBtn.textContent = "Return to Game";
+    Object.assign(gameBtn.style, baseBtnStyle, { background: SECONDARY_BG, color: "rgba(241, 213, 175, 0.70)" });
+    applyButtonHover(gameBtn, SECONDARY_BG, SECONDARY_HOVER);
 
-    panel.append(titleEl, divider, hintEl, actionsEl, controlsRow);
+    const lobbyBtn = document.createElement("button");
+    lobbyBtn.type = "button";
+    lobbyBtn.textContent = "Return to Lobby";
+    Object.assign(lobbyBtn.style, baseBtnStyle, { background: SECONDARY_BG, color: "rgba(241, 213, 175, 0.70)" });
+    applyButtonHover(lobbyBtn, SECONDARY_BG, SECONDARY_HOVER);
+
+    buttonsGrid.append(howToPlayBtn, controlsBtn, gameBtn, lobbyBtn);
+
+    panel.append(titleEl, divider, hintEl, buttonsGrid);
     this.root.append(panel);
     mountEl.append(this.root);
 
@@ -213,6 +194,11 @@ export class PauseMenu {
       if (!this.visible) return;
       this.hide();
       this.onReturnToLobby?.();
+    });
+
+    howToPlayBtn.addEventListener("click", () => {
+      if (!this.visible) return;
+      this.onShowHowToPlay?.();
     });
 
     controlsBtn.addEventListener("click", () => {
@@ -255,11 +241,6 @@ export class PauseMenu {
 
   isVisible(): boolean {
     return this.visible;
-  }
-
-  /** External controls overlay handles its own dismiss flow. */
-  handleEscapeFromControls(): boolean {
-    return false;
   }
 
   dispose(): void {

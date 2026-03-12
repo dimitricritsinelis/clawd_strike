@@ -50,6 +50,10 @@ export class Ak47Weapon {
   onReloadCancel: (() => void) | null = null;
   onDryFire: (() => void) | null = null;
 
+  // Buff modifiers
+  private unlimitedAmmo = false;
+  private reloadSpeedMultiplier = 1.0;
+
   // Dry-fire rate-limiting: only click once per trigger pull
   private dryFireCooldownS = 0;
   private wasFireHeld = false;
@@ -62,6 +66,22 @@ export class Ak47Weapon {
     this.reloadQueued = true;
   }
 
+  setUnlimitedAmmo(unlimited: boolean): void {
+    this.unlimitedAmmo = unlimited;
+    if (unlimited) {
+      if (this.reloading) this.cancelReload(true);
+      this.mag = MAG_CAPACITY;
+    }
+  }
+
+  setFireIntervalS(interval: number): void {
+    this.fireController.setFireIntervalS(interval);
+  }
+
+  setReloadSpeedMultiplier(multiplier: number): void {
+    this.reloadSpeedMultiplier = Math.max(0.1, multiplier);
+  }
+
   reset(): void {
     if (this.reloading) {
       this.cancelReload(true);
@@ -71,6 +91,8 @@ export class Ak47Weapon {
     this.reloadQueued = false;
     this.dryFireCooldownS = 0;
     this.wasFireHeld = false;
+    this.unlimitedAmmo = false;
+    this.reloadSpeedMultiplier = 1.0;
     this.fireController.reset();
   }
 
@@ -97,7 +119,7 @@ export class Ak47Weapon {
     }
 
     if (this.reloading) {
-      this.reloadTimerS += Math.max(0, input.deltaSeconds);
+      this.reloadTimerS += Math.max(0, input.deltaSeconds) * this.reloadSpeedMultiplier;
 
       // Reload cancel: if trigger is pulled mid-reload and mag has bullets, interrupt
       if (input.fireHeld && !this.wasFireHeld && this.mag > 0) {
@@ -114,12 +136,12 @@ export class Ak47Weapon {
       return this.updateWithoutFiring(input);
     }
 
-    if (wantsReload && this.mag < MAG_CAPACITY && this.startReload()) {
+    if (!this.unlimitedAmmo && wantsReload && this.mag < MAG_CAPACITY && this.startReload()) {
       this.wasFireHeld = input.fireHeld;
       return this.updateWithoutFiring(input);
     }
 
-    if (this.mag === 0 && this.reserve > 0 && this.startReload()) {
+    if (!this.unlimitedAmmo && this.mag === 0 && this.reserve > 0 && this.startReload()) {
       this.wasFireHeld = input.fireHeld;
       return this.updateWithoutFiring(input);
     }
@@ -136,7 +158,7 @@ export class Ak47Weapon {
 
     const fireResult = this.forwardToFireController(input, input.fireHeld, this.mag, onShot);
 
-    if (fireResult.shotsFired > 0) {
+    if (fireResult.shotsFired > 0 && !this.unlimitedAmmo) {
       this.mag = Math.max(0, this.mag - fireResult.shotsFired);
       if (this.mag === 0 && this.reserve > 0) {
         this.startReload();

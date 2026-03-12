@@ -398,7 +398,7 @@ export class EnemyManager {
   private controllers: EnemyController[] = [];
   private visuals: EnemyVisual[] = [];
   private weaponAudio: WeaponAudio | null = null;
-  private onEnemyKilled: ((name: string, isHeadshot: boolean) => void) | null = null;
+  private onEnemyKilled: ((name: string, isHeadshot: boolean, deathPos: { x: number; y: number; z: number }, enemyIndex: number) => void) | null = null;
 
   private readonly deathFadeStarted = new Set<number>();
   private waveNumber = 0;
@@ -486,7 +486,7 @@ export class EnemyManager {
     this.weaponAudio = audio;
   }
 
-  setKillCallback(cb: (name: string, isHeadshot: boolean) => void): void {
+  setKillCallback(cb: (name: string, isHeadshot: boolean, deathPos: { x: number; y: number; z: number }, enemyIndex: number) => void): void {
     this.onEnemyKilled = cb;
   }
 
@@ -1759,7 +1759,8 @@ export class EnemyManager {
         if (!this.deathFadeStarted.has(i)) {
           this.deathFadeStarted.add(i);
           visual.startDeathFade();
-          this.onEnemyKilled?.(controller.name, controller.wasLastHitHeadshot());
+          const deathPos = controller.getPosition();
+          this.onEnemyKilled?.(controller.name, controller.wasLastHitHeadshot(), { x: deathPos.x, y: deathPos.y, z: deathPos.z }, i);
         }
         visual.updateDeathFade(deltaSeconds);
         continue;

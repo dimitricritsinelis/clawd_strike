@@ -15,7 +15,6 @@ export class AmmoHud {
   private readonly reserveEl: HTMLSpanElement;
   private readonly reloadBarTrack: HTMLDivElement;
   private readonly reloadBarFill: HTMLDivElement;
-  private readonly godModeEl: HTMLDivElement;
 
   private visible = true;
   private lastMag = -1;
@@ -38,23 +37,6 @@ export class AmmoHud {
     this.root.style.backdropFilter = "blur(1.5px)";
     this.root.style.display = "block";
     this.root.style.userSelect = "none";
-
-    this.godModeEl = document.createElement("div");
-    this.godModeEl.style.position = "absolute";
-    this.godModeEl.style.right = "0";
-    this.godModeEl.style.bottom = "100%";
-    this.godModeEl.style.marginBottom = "8px";
-    this.godModeEl.style.fontFamily = '"Segoe UI", Tahoma, Verdana, sans-serif';
-    this.godModeEl.style.fontSize = "24px";
-    this.godModeEl.style.fontWeight = "780";
-    this.godModeEl.style.letterSpacing = "0.08em";
-    this.godModeEl.style.lineHeight = "1";
-    this.godModeEl.style.color = "#ff6b6b";
-    this.godModeEl.style.textTransform = "uppercase";
-    this.godModeEl.style.textShadow = "0 2px 8px rgba(255, 55, 55, 0.5)";
-    this.godModeEl.textContent = "GOD MODE";
-    this.godModeEl.style.display = "none";
-    this.root.append(this.godModeEl);
 
     const row = document.createElement("div");
     row.style.display = "flex";
@@ -120,10 +102,6 @@ export class AmmoHud {
     this.reloadBarTrack.append(this.reloadBarFill);
     this.root.append(row, this.reloadBarTrack);
     mountEl.append(this.root);
-  }
-
-  setGodModeEnabled(enabled: boolean): void {
-    this.godModeEl.style.display = enabled ? "block" : "none";
   }
 
   setVisible(visible: boolean): void {

@@ -24,12 +24,19 @@ import { RoundEndScreen, type RoundStats } from "./ui/RoundEndScreen";
 import { TimerHud } from "./ui/TimerHud";
 import { DamageNumbers } from "./ui/DamageNumbers";
 import { PauseMenu } from "./ui/PauseMenu";
+import { HowToPlayOverlay } from "./ui/HowToPlayOverlay";
 import { ControlsOverlay } from "./ui/ControlsOverlay";
 import { FadeOverlay } from "./ui/FadeOverlay";
 import { HeadshotBanner } from "./ui/HeadshotBanner";
 import { parseRuntimeUrlParams, type RuntimeControlMode } from "./utils/UrlParams";
 import { normalizeAgentAction, type AgentAction } from "./input/AgentAction";
 import { BulletHoleManager } from "./effects/BulletHoleManager";
+import { BuffManager } from "./buffs/BuffManager";
+import { warmupOrbMaterials } from "./buffs/BuffOrb";
+import { BUFF_DEFINITIONS } from "./buffs/BuffTypes";
+import { BuffHud } from "./ui/BuffHud";
+import { BuffTextHud } from "./ui/BuffTextHud";
+import { BuffVignette } from "./ui/BuffVignette";
 import type { RuntimeWarmupAssets } from "./warmup";
 import { isLocalhostHostname } from "../shared/hostEnvironment";
 import {
@@ -772,8 +779,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const crosshair = createCrosshair(runtimeRoot);
   const perfHud = new PerfHud(runtimeRoot, runtimeParams.perf);
   const ammoHud = new AmmoHud(runtimeRoot);
-  ammoHud.setGodModeEnabled(effectiveUnlimitedHealth);
   const healthHud = new HealthHud(runtimeRoot);
+  healthHud.setGodModeEnabled(effectiveUnlimitedHealth);
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
   const hitMarker = new HitMarker(crosshair);
@@ -787,6 +794,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const headshotBanner = new HeadshotBanner(runtimeRoot);
   const damageNumbers = new DamageNumbers(runtimeRoot);
   const pauseMenu = new PauseMenu(runtimeRoot);
+  const howToPlayOverlay = new HowToPlayOverlay(runtimeRoot);
   const controlsOverlay = new ControlsOverlay(runtimeRoot);
   const fadeOverlay = new FadeOverlay(runtimeRoot);
   killFeed.prewarm(4);
@@ -1093,6 +1101,16 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
           // Bullet hit world surface (wall/floor/prop), not an enemy — spawn decal
           bulletHoles?.spawn(shot.hitPoint!, shot.hitNormal);
         }
+
+        // Check if bullet hit a buff orb (pick up by shooting)
+        const orbHit = buffManager.checkRaycastHit(
+          camPos.x, camPos.y, camPos.z,
+          camFwd.x, camFwd.y, camFwd.z,
+          worldHitDist + 0.5,
+        );
+        if (orbHit.hit) {
+          buffManager.collectOrbAtIndex(orbHit.orbIndex);
+        }
       }
     },
     ...(isLocalHumanRuntime ? { playerRunSpeedMps: 9 } : {}),
@@ -1102,6 +1120,61 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   // Bullet hole decals on world surfaces
   bulletHoles = new BulletHoleManager(game.scene, runtimeParams.seed ?? 1);
+
+  // ── Buff system ─────────────────────────────────────────────────────────────
+  const buffManager = new BuffManager(game.scene);
+  const buffHud = new BuffHud(runtimeRoot);
+  const buffTextHud = new BuffTextHud(runtimeRoot);
+  const buffVignette = new BuffVignette(runtimeRoot);
+
+  const resetAllBuffModifiers = (): void => {
+    game.setPlayerSpeedMultiplier(1.0);
+    game.setWeaponFireInterval(0.1);
+    game.setWeaponReloadSpeed(1.0);
+    game.setWeaponUnlimitedAmmo(false);
+    game.setOvershield(0);
+    buffVignette.clear();
+  };
+
+  buffManager.setOnBuffActivated((type) => {
+    switch (type) {
+      case "speed_boost":
+        game.setPlayerSpeedMultiplier(1.5);
+        break;
+      case "rapid_fire":
+        game.setWeaponFireInterval(0.05);
+        game.setWeaponReloadSpeed(2.0);
+        break;
+      case "unlimited_ammo":
+        game.setWeaponUnlimitedAmmo(true);
+        break;
+      case "health_boost":
+        game.setOvershield(50);
+        break;
+    }
+    buffVignette.activate(type);
+  });
+
+  buffManager.setOnBuffExpired((type) => {
+    switch (type) {
+      case "speed_boost":
+        game.setPlayerSpeedMultiplier(1.0);
+        break;
+      case "rapid_fire":
+        game.setWeaponFireInterval(0.1);
+        game.setWeaponReloadSpeed(1.0);
+        break;
+      case "unlimited_ammo":
+        game.setWeaponUnlimitedAmmo(false);
+        break;
+      case "health_boost":
+        game.setOvershield(0);
+        break;
+    }
+    buffVignette.deactivate(type);
+    // Update Rallying Cry vignette state
+    buffVignette.setRallyingCry(buffManager.isRallyingCryActive(), runtimeRoot);
+  });
 
   // Wire enemy gunshot audio (quiet distant shots from AI enemies)
   game.setEnemyAudio(weaponAudio);
@@ -1129,6 +1202,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     const lobbyUrl = `${window.location.origin}${window.location.pathname}`;
     window.location.href = lobbyUrl;
   };
+  pauseMenu.onShowHowToPlay = () => {
+    howToPlayOverlay.show();
+  };
   pauseMenu.onShowControls = () => {
     controlsOverlay.show();
   };
@@ -1137,12 +1213,14 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   // Wire kill events → feed + ding + score counter
   const TOTAL_ENEMIES = ENEMIES_PER_WAVE;
   scoreHud.setTotal(TOTAL_ENEMIES);
-  game.setEnemyKillCallback((name, isHeadshot) => {
+  game.setEnemyKillCallback((name, isHeadshot, deathPos, enemyIndex) => {
     enqueueCombatFeedback({
       type: "kill",
       enemyName: name,
       isHeadshot,
     });
+    buffManager.recordKill(isHeadshot);
+    buffManager.onEnemyDeath(enemyIndex, deathPos);
   });
 
   // New wave → keep run score, but reset per-wave breakdowns and timing.
@@ -1159,6 +1237,16 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     waveStats.shotsFired = 0;
     waveStats.shotsHit = 0;
     waveStats.headshots = 0;
+
+    // Buff system: check Rallying Cry, clear orbs
+    buffManager.onNewWave();
+    buffManager.clearOrbs();
+    if (buffManager.checkRallyingCry()) {
+      // Previous wave was 10/10 headshots — defer activation so player
+      // sees the round-end screen disappear before buffs kick in
+      pendingRallyingCry = true;
+      rallyingCryDelayS = 0.5;
+    }
   });
 
   // Death screen restart handler — fires on both click and auto-countdown.
@@ -1172,8 +1260,13 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       lastCombatFeedbackMs = 0;
       lastKillFeedbackMs = 0;
       game.restartRun();
+      buffManager.clearAllBuffs();
+      resetAllBuffModifiers();
+      buffHud.clear();
+      buffTextHud.clear();
       roundEndScreen.hide();
       roundEndShowing = false;
+      pendingRallyingCry = false;
       killFeed.clear();
       headshotBanner.clear();
       hitMarker.clear();
@@ -1203,6 +1296,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       beginSharedChampionRun();
       game.setFreezeInput(false);
       pauseMenu.hide();
+      howToPlayOverlay.hide();
       controlsOverlay.hide();
       if (runtimeParams.controlMode === "human") {
         void renderer.canvas.requestPointerLock();
@@ -1251,6 +1345,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   renderStagedFrame();
   bootTelemetry.hiddenWarmupRenderDone = true;
 
+  // Pre-warm buff orb materials so shader variants compile during warmup (not on first orb spawn)
+  const disposeWarmupOrb = warmupOrbMaterials(game.scene, BUFF_DEFINITIONS.speed_boost);
+
   try {
     if (syncViewportIfChanged()) {
       renderStagedFrame();
@@ -1268,6 +1365,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       `Shader precompile failed. Continuing without compile warmup.\n${error instanceof Error ? error.message : String(error)}`,
     );
   }
+
+  // Clean up warmup orb now that shaders are compiled
+  disposeWarmupOrb();
 
   if (syncViewportIfChanged()) {
     renderStagedFrame();
@@ -1312,6 +1412,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   // Round / wave timing
   let waveElapsedS = 0;         // time elapsed since current wave started
   let roundEndShowing = false;  // true while round-end overlay is displayed
+  let pendingRallyingCry = false;  // true when rallying cry should fire after delay
+  let rallyingCryDelayS = 0;       // countdown before rallying cry activates
 
   // Per-wave stats counters (reset each new wave)
   const waveStats: RoundStats = {
@@ -1756,8 +1858,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     const renderFrame = options.renderFrame ?? true;
     applyQueuedAgentActions();
 
-    // Freeze game input when pause menu or controls overlay is open (death-freeze is managed inside Game.ts)
-    if (pauseMenu.isVisible() || controlsOverlay.isVisible()) {
+    // Freeze game input when pause menu or overlays are open (death-freeze is managed inside Game.ts)
+    if (pauseMenu.isVisible() || howToPlayOverlay.isVisible() || controlsOverlay.isVisible()) {
       game.setFreezeInput(true);
     } else if (!game.getIsDead() && !inputFrozen) {
       game.setFreezeInput(false);
@@ -1874,11 +1976,31 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     timerHud.setVisible(!overviewCamera);
     if (!overviewCamera) {
       ammoHud.update(game.getAmmoSnapshot());
-      healthHud.update({ health: currentHealth }, dt);
+      const overshield = game.getOvershield();
+      healthHud.update({ health: currentHealth + overshield, maxHealth: overshield > 0 ? 150 : 100 }, dt);
     }
 
-    // Update pause menu and controls overlay
+    // ── Deferred Rallying Cry activation ──────────────────────────────────────
+    if (pendingRallyingCry && !roundEndShowing) {
+      rallyingCryDelayS -= dt;
+      if (rallyingCryDelayS <= 0) {
+        pendingRallyingCry = false;
+        buffManager.activateRallyingCry();
+        buffVignette.setRallyingCry(true, runtimeRoot);
+      }
+    }
+
+    // ── Buff system per-frame update ──────────────────────────────────────────
+    buffManager.update(dt, game.getPlayerPosition());
+    const activeBuffs = buffManager.getActiveBuffs();
+    const rcActive = buffManager.isRallyingCryActive();
+    buffHud.update({ buffs: activeBuffs, rallyingCryActive: rcActive }, dt);
+    buffTextHud.update(activeBuffs, rcActive);
+    buffVignette.update(dt);
+
+    // Update pause menu and overlays
     pauseMenu.update(dt);
+    howToPlayOverlay.update(dt);
     controlsOverlay.update(dt);
 
     // ── Timer: pause while dead or round-end showing ─────────────────────────
@@ -2041,16 +2163,15 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (e.code !== "Escape") return;
     if (game.getIsDead()) return; // ignore Esc on death screen
     if (inputFrozen) return;
-    // If controls overlay is open, close it (pause menu stays visible)
+    // If how-to-play or controls overlay is open, close it (pause menu stays visible)
+    if (howToPlayOverlay.isVisible()) {
+      howToPlayOverlay.hide();
+      howToPlayOverlay.onClose?.();
+      return;
+    }
     if (controlsOverlay.isVisible()) {
       controlsOverlay.hide();
       controlsOverlay.onClose?.();
-      return;
-    }
-    // When Escape is pressed, pointer lock exits first (browser default),
-    // then we show the pause menu.
-    // If controls sub-screen is open, go back to pause (don't resume game).
-    if (pauseMenu.isVisible() && pauseMenu.handleEscapeFromControls()) {
       return;
     }
     // If we're already showing pause, hide it and try to re-lock.
@@ -2162,6 +2283,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     perfHud.dispose();
     ammoHud.dispose();
     healthHud.dispose();
+    buffManager.dispose();
+    buffHud.dispose();
+    buffTextHud.dispose();
+    buffVignette.dispose();
     hitVignette.dispose();
     deathScreen.dispose();
     killFeed.dispose();
@@ -2172,6 +2297,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     timerHud.dispose();
     damageNumbers.dispose();
     pauseMenu.dispose();
+    howToPlayOverlay.dispose();
     controlsOverlay.dispose();
     fadeOverlay.dispose();
     window.removeEventListener("keydown", onKeyDownPause);

@@ -209,6 +209,7 @@ export class Game {
   };
   private enemyManager: EnemyManager | null = null;
   private playerHealth = 100;
+  private overshield = 0;
   private isDead = false;
   private spawnPoseCache: SpawnPose | null = null;
   private wasGrounded = true;
@@ -503,7 +504,13 @@ export class Game {
         if (this.unlimitedHealth) {
           this.playerHealth = 100;
         } else {
-          this.playerHealth = Math.max(0, this.playerHealth - delta);
+          let remaining = delta;
+          if (this.overshield > 0 && remaining > 0) {
+            const absorbed = Math.min(this.overshield, remaining);
+            this.overshield -= absorbed;
+            remaining -= absorbed;
+          }
+          this.playerHealth = Math.max(0, this.playerHealth - remaining);
         }
         // ── Damage shake: proportional to damage taken ──────────────────────
         if (delta > 0) {
@@ -658,6 +665,30 @@ export class Game {
     return this.playerHealth;
   }
 
+  getOvershield(): number {
+    return this.overshield;
+  }
+
+  setOvershield(amount: number): void {
+    this.overshield = Math.max(0, amount);
+  }
+
+  setPlayerSpeedMultiplier(multiplier: number): void {
+    this.playerController.setSpeedMultiplier(multiplier);
+  }
+
+  setWeaponFireInterval(intervalS: number): void {
+    this.weapon.setFireIntervalS(intervalS);
+  }
+
+  setWeaponReloadSpeed(multiplier: number): void {
+    this.weapon.setReloadSpeedMultiplier(multiplier);
+  }
+
+  setWeaponUnlimitedAmmo(unlimited: boolean): void {
+    this.weapon.setUnlimitedAmmo(unlimited);
+  }
+
   checkEnemyRaycastHit(origin: Vector3, dir: Vector3, maxDist: number): EnemyHitResult {
     return this.enemyManager?.checkRaycastHit(origin, dir, maxDist) ?? { hit: false };
   }
@@ -693,13 +724,14 @@ export class Game {
     this.enemyManager?.setAudio(audio);
   }
 
-  setEnemyKillCallback(cb: (name: string, isHeadshot: boolean) => void): void {
+  setEnemyKillCallback(cb: (name: string, isHeadshot: boolean, deathPos: { x: number; y: number; z: number }, enemyIndex: number) => void): void {
     this.enemyManager?.setKillCallback(cb);
   }
 
   setEnemyNewWaveCallback(cb: (wave: number) => void): void {
     this.enemyManager?.setNewWaveCallback((wave) => {
       this.playerHealth = 100;
+      this.overshield = 0;
       this.weapon.reset();
       cb(wave);
     });
@@ -800,6 +832,7 @@ export class Game {
 
   restartRun(): void {
     this.playerHealth = 100;
+    this.overshield = 0;
     this.isDead = false;
     this.wasGrounded = true;
     this.shakeX = 0; this.shakeXVel = 0;

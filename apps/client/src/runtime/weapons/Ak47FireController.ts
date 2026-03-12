@@ -7,7 +7,7 @@ import { DeterministicRng, deriveSubSeed } from "../utils/Rng";
 const DEG_TO_RAD = Math.PI / 180;
 const TAU = Math.PI * 2;
 
-const FIRE_INTERVAL_S = 0.1; // 600 RPM
+const DEFAULT_FIRE_INTERVAL_S = 0.1; // 600 RPM
 const MAX_RANGE_M = 200;
 const MAX_SHOTS_PER_UPDATE = 3;
 
@@ -132,6 +132,7 @@ export class Ak47FireController {
     colliderKind: "wall",
   };
 
+  private fireIntervalS = DEFAULT_FIRE_INTERVAL_S;
   private fireHeldLastFrame = false;
   private timeUntilNextShotS = 0;
   private timeSinceLastShotS = Number.POSITIVE_INFINITY;
@@ -152,7 +153,12 @@ export class Ak47FireController {
     this.recoilRng = new DeterministicRng(deriveSubSeed(rootSeed, "recoil"));
   }
 
+  setFireIntervalS(interval: number): void {
+    this.fireIntervalS = Math.max(0.02, interval);
+  }
+
   reset(): void {
+    this.fireIntervalS = DEFAULT_FIRE_INTERVAL_S;
     this.spreadRng.reset();
     this.recoilRng.reset();
     this.fireHeldLastFrame = false;
@@ -215,7 +221,7 @@ export class Ak47FireController {
     this.timeUntilNextShotS -= deltaSeconds;
 
     while (this.timeUntilNextShotS <= 0 && shotsFired < MAX_SHOTS_PER_UPDATE && shotsFired < shotBudget) {
-      this.timeUntilNextShotS += FIRE_INTERVAL_S;
+      this.timeUntilNextShotS += this.fireIntervalS;
 
       const recoil = this.fireSingleShot(input, onShot);
       recoilPitchRad += recoil.pitchRad;

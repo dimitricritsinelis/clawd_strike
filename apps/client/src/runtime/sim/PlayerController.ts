@@ -43,6 +43,7 @@ export class PlayerController {
   private currentHeight = PLAYER_HEIGHT_M;
   private currentEyeHeight = PLAYER_EYE_HEIGHT_M;
   private readonly runSpeedMps: number;
+  private speedMultiplier = 1.0;
 
   constructor(runSpeedOverrideMps = RUN_SPEED_MPS) {
     const normalizedRunSpeed = Number.isFinite(runSpeedOverrideMps)
@@ -108,7 +109,7 @@ export class PlayerController {
         right *= invLength;
       }
 
-      const speedMps = input.crouchHeld ? CROUCH_SPEED_MPS : this.runSpeedMps;
+      const speedMps = (input.crouchHeld ? CROUCH_SPEED_MPS : this.runSpeedMps) * this.speedMultiplier;
       const sinYaw = Math.sin(yaw);
       const cosYaw = Math.cos(yaw);
       const forwardX = -sinYaw;
@@ -202,6 +203,10 @@ export class PlayerController {
 
   getCurrentEyeHeight(): number {
     return this.currentEyeHeight;
+  }
+
+  setSpeedMultiplier(multiplier: number): void {
+    this.speedMultiplier = Math.max(0.1, multiplier);
   }
 
   isWithinPlayableBounds(): boolean {

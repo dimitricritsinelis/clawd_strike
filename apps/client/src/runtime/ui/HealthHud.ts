@@ -17,6 +17,7 @@ export class HealthHud {
   private readonly root: HTMLDivElement;
   private readonly barFill: HTMLDivElement;
   private readonly numericEl: HTMLDivElement;
+  private readonly godModeEl: HTMLDivElement;
 
   private visible = true;
   private displayHealth = 100;
@@ -84,9 +85,31 @@ export class HealthHud {
     this.barFill.style.background = COLOR_HEALTHY;
     this.barFill.style.boxShadow = "0 0 8px rgba(110, 232, 122, 0.45)";
 
+    // GOD MODE label (hidden by default)
+    this.godModeEl = document.createElement("div");
+    this.godModeEl.style.position = "absolute";
+    this.godModeEl.style.left = "0";
+    this.godModeEl.style.bottom = "100%";
+    this.godModeEl.style.marginBottom = "8px";
+    this.godModeEl.style.fontFamily = '"Segoe UI", Tahoma, Verdana, sans-serif';
+    this.godModeEl.style.fontSize = "18px";
+    this.godModeEl.style.fontWeight = "780";
+    this.godModeEl.style.letterSpacing = "0.08em";
+    this.godModeEl.style.lineHeight = "1";
+    this.godModeEl.style.color = "#ff6b6b";
+    this.godModeEl.style.textTransform = "uppercase";
+    this.godModeEl.style.textShadow = "0 2px 8px rgba(255, 55, 55, 0.5)";
+    this.godModeEl.style.whiteSpace = "nowrap";
+    this.godModeEl.textContent = "GOD MODE";
+    this.godModeEl.style.display = "none";
+
     barTrack.append(this.barFill);
-    this.root.append(labelEl, this.numericEl, barTrack);
+    this.root.append(this.godModeEl, labelEl, this.numericEl, barTrack);
     mountEl.append(this.root);
+  }
+
+  setGodModeEnabled(enabled: boolean): void {
+    this.godModeEl.style.display = enabled ? "block" : "none";
   }
 
   setVisible(visible: boolean): void {
