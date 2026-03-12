@@ -168,16 +168,16 @@
             "depthM": 1.1,
             "parapetHeightM": 0.8,
             "openingSurroundWidthM": 4.0,
-            "openingSurroundHeightM": 4.4,
-            "openingSurroundBottomOffsetM": 1.6,
+            "openingSurroundHeightM": 4.15,
+            "openingSurroundBottomOffsetM": 0.76,
             "roofBreakWidthM": 4.0,
             "roofBreakBottomOffsetM": 0.9,
             "roofBreakHeightM": 0.0,
             "roofBreakCapHeightM": 0.0,
             "opening": {
               "width": 2.8,
-              "height": 4.0,
-              "sillOffsetM": 1.84,
+              "height": 3.81,
+              "sillOffsetM": 0.96,
               "headShape": "pointed_arch",
               "glassStyle": "stained_glass_bright"
             }

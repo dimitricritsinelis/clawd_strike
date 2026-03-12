@@ -6,7 +6,7 @@ Do not use for: workflow policy, durable rationale, archive history, product tru
 Schema version: stm-v2
 Canonical playtest URL: http://127.0.0.1:4174/?map=bazaar-map
 Map approval status: NOT APPROVED
-Last compacted: 2026-03-12T00:38:50Z
+Last compacted: 2026-03-12T01:15:53Z
 
 # short_term_memory.md - Clawd Strike Status
 
@@ -64,9 +64,9 @@ Recent Notes:
 
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->
+- STM-20260312-011359-codex | map-visual | Retune Spawn B balcony hero window midpoint | 2026-03-12 | Moved the Spawn B hero window to midpoint values between the original and prior lowered pass, regenerated the map outputs, passed qa:completion, and manually verified the updated facade from a fixed Spawn B debug camera.
+- STM-20260312-005430-codex | map-visual | Retune Spawn B balcony hero window | 2026-03-12 | Retuned the Spawn B north-wall balcony hero window to be deck-flush and lower against the roofline, regenerated derived map artifacts, passed qa:completion, and manually verified the updated facade in a debug-positioned browser capture.
 - STM-20260312-003607-codex | map-visual | Restore balcony arch cap | 2026-03-12 | Set the Spawn B balcony hero stone and glass arch starts to 8.2m, raised the opening and surround heights to restore visible arch cap, sharpened the hero curve, and qa:completion passed.
 - STM-20260312-003035-codex | map-visual | Set balcony arch start to 8m | 2026-03-12 | Set the Spawn B balcony hero stone and glass arch starts to 8.0m by updating the hero spring-line values; pnpm qa:completion passed.
 - STM-20260312-002235-codex | map-visual | Align arch to parapet top | 2026-03-12 | Aligned the Spawn B balcony hero window arch start to the top of the visible parapet trim above the roofline; pnpm qa:completion passed.
-- STM-20260312-001800-codex | map-visual | Raise balcony arch start | 2026-03-12 | Corrected the balcony hero window arch start by raising the spring line while preserving the current placement and overall height; pnpm qa:completion passed.
-- STM-20260312-000854-codex | map-visual | Lift balcony window again | 2026-03-12 | Raised the Spawn B balcony hero window another 0.35m without changing its shape so the arch start moves closer to the roofline; pnpm qa:completion passed.
 <!-- TOOL-MANAGED END: completed-rollup -->
