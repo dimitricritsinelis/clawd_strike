@@ -6,11 +6,16 @@ import type {
   RuntimeAnchorsSpec,
   RuntimeBalconyLayoutOverride,
   RuntimeBlockoutZone,
+  RuntimeCompositionLayoutOverride,
   RuntimeDoorLayoutOverride,
+  RuntimeDoorModule,
   RuntimeDoorStyleSource,
   RuntimeFacadeOverride,
   RuntimeFacadeOverridePreset,
+  RuntimeHeroBayModule,
+  RuntimeWallModuleRegistry,
   RuntimeWindowLayoutOverride,
+  RuntimeWindowModule,
   WindowGlassStyle,
 } from "./types";
 import type { BoundarySegment } from "./buildBlockout";
@@ -271,6 +276,10 @@ type SegmentDecorContext = {
   authoredDoorStyleSource: RuntimeDoorStyleSource | null;
   authoredWindowLayout: RuntimeWindowLayoutOverride | null;
   authoredBalconyLayout: RuntimeBalconyLayoutOverride | null;
+  authoredCompositionLayout: RuntimeCompositionLayoutOverride | null;
+  windowModules: ReadonlyMap<string, RuntimeWindowModule>;
+  doorModules: ReadonlyMap<string, RuntimeDoorModule>;
+  heroBayModules: ReadonlyMap<string, RuntimeHeroBayModule>;
 };
 
 export type BuildWallDetailProfile = "blockout" | "pbr";
@@ -280,6 +289,8 @@ export type BuildWallDetailPlacementsOptions = {
   zones: readonly RuntimeBlockoutZone[];
   anchors: RuntimeAnchorsSpec | null;
   facadeOverrides: readonly RuntimeFacadeOverride[];
+  moduleRegistry: RuntimeWallModuleRegistry;
+  compositionLayoutOverrides: readonly RuntimeCompositionLayoutOverride[];
   doorLayoutOverrides: readonly RuntimeDoorLayoutOverride[];
   windowLayoutOverrides: readonly RuntimeWindowLayoutOverride[];
   balconyLayoutOverrides: readonly RuntimeBalconyLayoutOverride[];
@@ -331,6 +342,10 @@ function authoredDoorLayoutKey(zoneId: string, face: FacadeFace, segmentOrdinal:
 }
 
 function authoredBalconyLayoutKey(zoneId: string, face: FacadeFace, segmentOrdinal: number): string {
+  return `${zoneId}:${face}:${segmentOrdinal}`;
+}
+
+function compositionLayoutKey(zoneId: string, face: FacadeFace, segmentOrdinal: number): string {
   return `${zoneId}:${face}:${segmentOrdinal}`;
 }
 
@@ -1532,6 +1547,325 @@ function resolveStainedGlassMaterialId(glassStyle: WindowGlassStyle): string {
     : STAINED_GLASS_DIM_MATERIAL_ID;
 }
 
+function requireWindowModule(ctx: SegmentDecorContext, moduleId: string): RuntimeWindowModule {
+  const module = ctx.windowModules.get(moduleId);
+  if (!module) {
+    throw new Error(`[wall-detail] window module '${moduleId}' not found`);
+  }
+  return module;
+}
+
+function requireDoorModule(ctx: SegmentDecorContext, moduleId: string): RuntimeDoorModule {
+  const module = ctx.doorModules.get(moduleId);
+  if (!module) {
+    throw new Error(`[wall-detail] door module '${moduleId}' not found`);
+  }
+  return module;
+}
+
+function requireHeroBayModule(ctx: SegmentDecorContext, moduleId: string): RuntimeHeroBayModule {
+  const module = ctx.heroBayModules.get(moduleId);
+  if (!module) {
+    throw new Error(`[wall-detail] hero bay module '${moduleId}' not found`);
+  }
+  return module;
+}
+
+function computeEqualMarginCenters(
+  leftBoundary: number,
+  rightBoundary: number,
+  widthM: number,
+  count: number,
+): { gapM: number; centersS: number[] } {
+  const clearWidth = rightBoundary - leftBoundary;
+  const gapM = (clearWidth - count * widthM) / (count + 1);
+  if (!(gapM > 0)) {
+    throw new Error(`[wall-detail] equal-margin layout has no positive gap (clear=${clearWidth.toFixed(3)} width=${widthM.toFixed(3)} count=${count})`);
+  }
+  return {
+    gapM,
+    centersS: Array.from({ length: count }, (_, index) => (
+      leftBoundary + gapM + widthM * 0.5 + index * (widthM + gapM)
+    )),
+  };
+}
+
+function mirrorCentersAcrossZero(centersS: readonly number[]): number[] {
+  return [...centersS].map((centerS) => -centerS).reverse();
+}
+
+function computeWindowDoorWindowCenters(
+  leftBoundary: number,
+  rightBoundary: number,
+  windowWidthM: number,
+  doorWidthM: number,
+): { gapM: number; windowCentersS: [number, number]; doorCenterS: number } {
+  const clearWidth = rightBoundary - leftBoundary;
+  const gapM = (clearWidth - (2 * windowWidthM + doorWidthM)) / 4;
+  if (!(gapM > 0)) {
+    throw new Error(`[wall-detail] window-door-window layout has no positive gap (clear=${clearWidth.toFixed(3)} window=${windowWidthM.toFixed(3)} door=${doorWidthM.toFixed(3)})`);
+  }
+
+  const leftWindowCenterS = leftBoundary + gapM + windowWidthM * 0.5;
+  const doorCenterS = leftWindowCenterS + windowWidthM * 0.5 + gapM + doorWidthM * 0.5;
+  const rightWindowCenterS = doorCenterS + doorWidthM * 0.5 + gapM + windowWidthM * 0.5;
+
+  return {
+    gapM,
+    windowCentersS: [leftWindowCenterS, rightWindowCenterS],
+    doorCenterS,
+  };
+}
+
+function placeModuleWindow(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  sillY: number,
+  module: RuntimeWindowModule,
+): void {
+  const frameMetrics = resolvePointedArchFrameFromAperture(module.apertureWidthM, module.apertureHeightM);
+  if (
+    Math.abs(frameMetrics.frameWidth - module.frameWidthM) > 0.025
+    || Math.abs(frameMetrics.frameHeight - module.frameHeightM) > 0.025
+  ) {
+    throw new Error(
+      `[wall-detail] window module '${module.id}' outer bounds drift from pointed-arch profile (expected ${frameMetrics.frameWidth.toFixed(3)}x${frameMetrics.frameHeight.toFixed(3)}, got ${module.frameWidthM.toFixed(3)}x${module.frameHeightM.toFixed(3)})`,
+    );
+  }
+
+  const frameCenterY = sillY + frameMetrics.frameCenterYOffsetFromSill;
+  const apertureCenterY = frameCenterY + frameMetrics.apertureCenterYOffsetFromFrameCenter;
+
+  pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_void", null,
+    ctx.frame, centerS, apertureCenterY, module.voidInsetM,
+    0.02, module.apertureHeightM, module.apertureWidthM);
+
+  pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_glass", null,
+    ctx.frame, centerS, apertureCenterY, module.glassInsetM,
+    WINDOW_GLASS_THICKNESS_M, module.apertureHeightM, module.apertureWidthM);
+  tagTrim(ctx.instances, null, resolveStainedGlassMaterialId(module.glassStyle));
+
+  pushBox(ctx.instances, ctx.maxInstances, "window_pointed_arch_frame", ctx.wallMaterialId,
+    ctx.frame, centerS, frameCenterY, module.frameDepthM * 0.5,
+    module.frameDepthM, module.frameHeightM, module.frameWidthM);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
+
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, sillY - module.sillHeightM * 0.5, module.sillDepthM * 0.5,
+    module.sillDepthM, module.sillHeightM, module.sillWidthM);
+  tagTrim(ctx.instances, ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId);
+
+  pushBox(ctx.instances, ctx.maxInstances, "recessed_panel_frame_h", ctx.wallMaterialId,
+    ctx.frame, centerS, sillY - module.apronOffsetBelowSillM, module.apronDepthM * 0.5,
+    module.apronDepthM, module.apronHeightM, module.apronWidthM);
+  tagTrim(ctx.instances, ctx.trimLightMaterialId ?? ctx.trimHeavyMaterialId);
+}
+
+function placeModuleDoor(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  module: RuntimeDoorModule,
+): void {
+  if (module.coverShape === "arched") {
+    pushArchedDoorVoid(
+      ctx,
+      centerS,
+      module.doorHeightM * 0.5 + module.coverCenterYOffsetM,
+      module.coverHeightM,
+      module.voidInsetM,
+      module.voidDepthM,
+      module.coverWidthM,
+    );
+  } else {
+    pushDoorCoverVoid(
+      ctx,
+      centerS,
+      module.doorHeightM * 0.5 + module.coverCenterYOffsetM,
+      module.voidInsetM,
+      module.voidDepthM,
+      module.coverWidthM,
+      module.coverHeightM,
+      module.coverShape,
+    );
+  }
+
+  const wallSurfacePos = toWorld(ctx.frame, centerS, module.doorHeightM * 0.5, 0);
+  ctx.doorModelPlacements.push({
+    wallSurfacePos,
+    doorW: module.doorWidthM,
+    doorH: module.doorHeightM,
+    yawRad: ctx.frame.yawRad,
+    outwardX: -ctx.frame.inwardX,
+    outwardZ: -ctx.frame.inwardZ,
+    modelId: module.modelId,
+    trimMaterialId: ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId,
+    trimThicknessM: module.trimThicknessM,
+    surroundDepthM: module.surroundDepthM,
+    surroundCenterOffsetM: -module.surroundDepthM * 0.5,
+    revealWidthM: module.revealWidthM,
+    coverShape: module.coverShape,
+    coverWidthM: module.coverWidthM,
+    coverHeightM: module.coverHeightM,
+    coverCenterYOffsetM: module.coverCenterYOffsetM,
+  });
+}
+
+function computeSymmetricOffsets(count: number, spreadM: number): number[] {
+  if (count <= 1) return [0];
+  return Array.from({ length: count }, (_, index) => (
+    -spreadM * 0.5 + (spreadM * index) / (count - 1)
+  ));
+}
+
+function placeHeroBayModule(
+  ctx: SegmentDecorContext,
+  centerS: number,
+  module: RuntimeHeroBayModule,
+): void {
+  const trimMaterialId = ctx.trimHeavyMaterialId ?? ctx.trimLightMaterialId;
+  const surroundCenterY = module.surroundBottomY + module.surroundHeightM * 0.5;
+  const openingCenterY = module.openingSillY + module.openingHeightM * 0.5;
+
+  pushBox(ctx.instances, ctx.maxInstances, "hero_window_pointed_arch_frame", ctx.wallMaterialId,
+    ctx.frame, centerS, surroundCenterY, module.frameDepthM * 0.5,
+    module.frameDepthM, module.surroundHeightM, module.surroundWidthM);
+  tagTrim(ctx.instances, trimMaterialId);
+
+  pushBox(ctx.instances, ctx.maxInstances, "hero_window_pointed_arch_void", null,
+    ctx.frame, centerS, openingCenterY, module.voidInsetM,
+    0.024, module.openingHeightM, module.openingWidthM);
+
+  pushBox(ctx.instances, ctx.maxInstances, "hero_window_pointed_arch_glass", null,
+    ctx.frame, centerS, openingCenterY, module.glassInsetM,
+    WINDOW_GLASS_THICKNESS_M, module.openingHeightM, module.openingWidthM);
+  tagTrim(ctx.instances, null, resolveStainedGlassMaterialId(module.glassStyle));
+
+  const pilasterOffsetS = module.surroundWidthM * 0.5 - module.pilasterWidthM * 0.5;
+  const pilasterCenterY = module.pilasterBottomY + module.pilasterHeightM * 0.5;
+  for (const side of [-1, 1] as const) {
+    pushBox(ctx.instances, ctx.maxInstances, "pilaster", ctx.wallMaterialId,
+      ctx.frame, centerS + side * pilasterOffsetS, pilasterCenterY, module.pilasterDepthM * 0.5,
+      module.pilasterDepthM, module.pilasterHeightM, module.pilasterWidthM);
+    tagTrim(ctx.instances, trimMaterialId);
+  }
+
+  pushBox(ctx.instances, ctx.maxInstances, "balcony_slab", ctx.wallMaterialId,
+    ctx.frame, centerS, module.entablatureCenterY, module.entablatureDepthM * 0.5,
+    module.entablatureDepthM, module.entablatureThicknessM, module.entablatureWidthM);
+  tagTrim(ctx.instances, trimMaterialId);
+
+  pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
+    ctx.frame, centerS, module.entablatureCapCenterY, module.entablatureCapDepthM * 0.5,
+    module.entablatureCapDepthM, module.entablatureCapThicknessM, module.entablatureCapWidthM);
+  tagTrim(ctx.instances, trimMaterialId);
+
+  for (const offsetS of computeSymmetricOffsets(module.corbelCount, module.corbelSpreadM)) {
+    pushBox(ctx.instances, ctx.maxInstances, "balcony_bracket", ctx.wallMaterialId,
+      ctx.frame, centerS + offsetS, module.corbelCenterY,
+      Math.max(module.corbelDepthM * 0.5, module.entablatureDepthM * 0.6),
+      module.corbelDepthM, module.corbelHeightM, module.corbelWidthM);
+    tagTrim(ctx.instances, trimMaterialId);
+  }
+
+  for (let layerIndex = 0; layerIndex < module.pedimentLayerCount; layerIndex += 1) {
+    const layerWidth = module.pedimentBaseWidthM - module.pedimentWidthStepM * layerIndex;
+    if (layerWidth <= 0.05) {
+      throw new Error(`[wall-detail] hero bay module '${module.id}' pediment width became non-positive at layer ${layerIndex}`);
+    }
+    const layerDepth = Math.max(0.08, module.pedimentDepthM - layerIndex * 0.03);
+    pushBox(ctx.instances, ctx.maxInstances, "cornice_strip", ctx.wallMaterialId,
+      ctx.frame,
+      centerS,
+      module.pedimentBottomY + module.pedimentLayerHeightM * (layerIndex + 0.5),
+      layerDepth * 0.5,
+      layerDepth,
+      module.pedimentLayerHeightM,
+      layerWidth);
+    tagTrim(ctx.instances, trimMaterialId);
+  }
+}
+
+function placeCompositionLayout(
+  ctx: SegmentDecorContext,
+  layout: RuntimeCompositionLayoutOverride,
+): void {
+  const windowModule = requireWindowModule(ctx, layout.windowModuleId);
+  const doorModule = requireDoorModule(ctx, layout.doorModuleId);
+  const leftBoundary = -ctx.frame.lengthM * 0.5 + SEGMENT_EDGE_MARGIN_M;
+  const rightBoundary = ctx.frame.lengthM * 0.5 - SEGMENT_EDGE_MARGIN_M;
+
+  switch (layout.kind) {
+    case "spawn_b_front_courtyard": {
+      if (!layout.heroBayModuleId) {
+        throw new Error("[wall-detail] Spawn B front composition requires a hero bay module");
+      }
+      const heroBayModule = requireHeroBayModule(ctx, layout.heroBayModuleId);
+      const upperLeft = computeEqualMarginCenters(
+        leftBoundary,
+        -heroBayModule.surroundWidthM * 0.5,
+        windowModule.frameWidthM,
+        3,
+      );
+      const upperRightCenters = mirrorCentersAcrossZero(upperLeft.centersS);
+      const lowerLeft = computeEqualMarginCenters(
+        leftBoundary,
+        -doorModule.coverWidthM * 0.5,
+        windowModule.frameWidthM,
+        3,
+      );
+      const lowerRightCenters = mirrorCentersAcrossZero(lowerLeft.centersS);
+
+      for (const center of upperLeft.centersS) {
+        placeModuleWindow(ctx, center, layout.upperWindowSillY, windowModule);
+      }
+      for (const center of upperRightCenters) {
+        placeModuleWindow(ctx, center, layout.upperWindowSillY, windowModule);
+      }
+      for (const center of lowerLeft.centersS) {
+        placeModuleWindow(ctx, center, layout.lowerWindowSillY, windowModule);
+      }
+      for (const center of lowerRightCenters) {
+        placeModuleWindow(ctx, center, layout.lowerWindowSillY, windowModule);
+      }
+      placeModuleDoor(ctx, 0, doorModule);
+      placeHeroBayModule(ctx, 0, heroBayModule);
+      emitPlinthStrip(ctx, [{ centerS: 0, halfW: doorModule.coverWidthM * 0.5 }]);
+      return;
+    }
+    case "spawn_b_side_courtyard": {
+      const upperCenters = computeEqualMarginCenters(
+        leftBoundary,
+        rightBoundary,
+        windowModule.frameWidthM,
+        3,
+      );
+      const lowerCenters = computeWindowDoorWindowCenters(
+        leftBoundary,
+        rightBoundary,
+        windowModule.frameWidthM,
+        doorModule.coverWidthM,
+      );
+      if (Math.abs(lowerCenters.doorCenterS) > 1e-6) {
+        throw new Error(`[wall-detail] side composition door center drifted off centerline by ${lowerCenters.doorCenterS}`);
+      }
+
+      for (const center of upperCenters.centersS) {
+        placeModuleWindow(ctx, center, layout.upperWindowSillY, windowModule);
+      }
+      for (const center of lowerCenters.windowCentersS) {
+        placeModuleWindow(ctx, center, layout.lowerWindowSillY, windowModule);
+      }
+      placeModuleDoor(ctx, lowerCenters.doorCenterS, doorModule);
+      emitPlinthStrip(ctx, [{ centerS: lowerCenters.doorCenterS, halfW: doorModule.coverWidthM * 0.5 }]);
+      return;
+    }
+    default: {
+      const exhaustive: never = layout.kind;
+      throw new Error(`[wall-detail] unsupported composition layout '${String(exhaustive)}'`);
+    }
+  }
+}
+
 function placeAuthoredPointedArchWindow(
   ctx: SegmentDecorContext,
   window: RuntimeAuthoredWindow,
@@ -2413,6 +2747,12 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   placeStringCourses(ctx);
   placeCorniceStrip(ctx);
 
+  if (ctx.authoredCompositionLayout) {
+    placeCompositionLayout(ctx, ctx.authoredCompositionLayout);
+    placeCableSegments(ctx);
+    return;
+  }
+
   // Compute facade spec — all proportions decided once
   const spec = computeFacadeSpec(ctx);
   if (!spec) {
@@ -2614,6 +2954,27 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   for (const override of options.facadeOverrides) {
     facadeOverrideMap.set(`${override.zoneId}:${override.face}`, override.preset);
   }
+  const windowModuleMap = new Map<string, RuntimeWindowModule>();
+  for (const module of options.moduleRegistry.windowModules) {
+    if (windowModuleMap.has(module.id)) {
+      throw new Error(`[wall-detail] duplicate window module '${module.id}'`);
+    }
+    windowModuleMap.set(module.id, module);
+  }
+  const doorModuleMap = new Map<string, RuntimeDoorModule>();
+  for (const module of options.moduleRegistry.doorModules) {
+    if (doorModuleMap.has(module.id)) {
+      throw new Error(`[wall-detail] duplicate door module '${module.id}'`);
+    }
+    doorModuleMap.set(module.id, module);
+  }
+  const heroBayModuleMap = new Map<string, RuntimeHeroBayModule>();
+  for (const module of options.moduleRegistry.heroBayModules) {
+    if (heroBayModuleMap.has(module.id)) {
+      throw new Error(`[wall-detail] duplicate hero bay module '${module.id}'`);
+    }
+    heroBayModuleMap.set(module.id, module);
+  }
   const authoredDoorLayoutMap = new Map<string, RuntimeDoorLayoutOverride>();
   for (const override of options.doorLayoutOverrides) {
     authoredDoorLayoutMap.set(authoredDoorLayoutKey(override.zoneId, override.face, override.segmentOrdinal), override);
@@ -2625,6 +2986,14 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
   const authoredBalconyLayoutMap = new Map<string, RuntimeBalconyLayoutOverride>();
   for (const override of options.balconyLayoutOverrides) {
     authoredBalconyLayoutMap.set(authoredBalconyLayoutKey(override.zoneId, override.face, override.segmentOrdinal), override);
+  }
+  const compositionLayoutMap = new Map<string, RuntimeCompositionLayoutOverride>();
+  for (const override of options.compositionLayoutOverrides) {
+    const key = compositionLayoutKey(override.zoneId, override.face, override.segmentOrdinal);
+    if (compositionLayoutMap.has(key)) {
+      throw new Error(`[wall-detail] duplicate composition layout override '${key}'`);
+    }
+    compositionLayoutMap.set(key, override);
   }
 
   const segmentMetaByIndex = new Map<number, {
@@ -2692,6 +3061,7 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     authoredDoorLayout: RuntimeDoorLayoutOverride | null;
     authoredWindowLayout: RuntimeWindowLayoutOverride | null;
     authoredBalconyLayout: RuntimeBalconyLayoutOverride | null;
+    authoredCompositionLayout: RuntimeCompositionLayoutOverride | null;
     wallRole: WallRole;
   };
 
@@ -2791,6 +3161,9 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     const authoredBalconyLayout = zone && segmentMeta?.segmentOrdinal
       ? authoredBalconyLayoutMap.get(authoredBalconyLayoutKey(zone.id, facadeFace, segmentMeta.segmentOrdinal)) ?? null
       : null;
+    const authoredCompositionLayout = zone && segmentMeta?.segmentOrdinal
+      ? compositionLayoutMap.get(compositionLayoutKey(zone.id, facadeFace, segmentMeta.segmentOrdinal)) ?? null
+      : null;
     const wallRole = resolveWallRole(zone, facadeFace, isInsideWall, isSpawnEntryWall);
 
     const descriptor: SegmentDescriptor = {
@@ -2821,6 +3194,7 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       authoredDoorLayout,
       authoredWindowLayout,
       authoredBalconyLayout,
+      authoredCompositionLayout,
       wallRole,
     };
     segmentDescriptorCache.set(index, descriptor);
@@ -2888,6 +3262,10 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       authoredDoorStyleSource: null,
       authoredWindowLayout: sourceDescriptor.authoredWindowLayout,
       authoredBalconyLayout: sourceDescriptor.authoredBalconyLayout,
+      authoredCompositionLayout: sourceDescriptor.authoredCompositionLayout,
+      windowModules: windowModuleMap,
+      doorModules: doorModuleMap,
+      heroBayModules: heroBayModuleMap,
     });
     if (!sourceSpec) {
       throw new Error(`[wall-detail] unable to resolve authored door style for source '${sourceKey}'`);
@@ -2947,6 +3325,10 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       authoredDoorStyleSource: authoredDoorStyle.source,
       authoredWindowLayout: descriptor.authoredWindowLayout,
       authoredBalconyLayout: descriptor.authoredBalconyLayout,
+      authoredCompositionLayout: descriptor.authoredCompositionLayout,
+      windowModules: windowModuleMap,
+      doorModules: doorModuleMap,
+      heroBayModules: heroBayModuleMap,
     });
     if (instances.length > countBefore) {
       segmentsDecorated += 1;

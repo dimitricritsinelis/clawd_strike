@@ -6,7 +6,7 @@ Do not use for: workflow policy, durable rationale, archive history, product tru
 Schema version: stm-v2
 Canonical playtest URL: http://127.0.0.1:4174/?map=bazaar-map
 Map approval status: NOT APPROVED
-Last compacted: 2026-03-12T19:48:35Z
+Last compacted: 2026-03-13T04:29:23Z
 
 # short_term_memory.md - Clawd Strike Status
 
@@ -106,9 +106,9 @@ Recent Notes:
 
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->
+- STM-20260313-041415-codex | map-geometry | Spawn B courtyard registry pass | 2026-03-13 | Spawn B now uses module-driven composition overrides with one standard window family, one standard door family, a rebuilt centered hero bay, regenerated runtime map/shot data, and passing typecheck/test:server/smoke:game/qa:completion plus manual screenshot capture.
 - STM-20260312-034350-codex | ui-flow | Buff vignette reliability fix | 2026-03-12 | Replaced the fragile buff vignette compositor with an inline-SVG alpha overlay, verified visible buff/hit states in a real Chrome human runtime on localhost, and passed typecheck plus smoke validation.
 - STM-20260312-033605-codex | map-geometry | Tighten door surround reveal | 2026-03-12 | Root cause was the castle-door surround intentionally centering the model inside a 3.5–6 cm reveal; cover-envelope math now stays wide for masking while the visible surround reveal is tightened to 0.8–1.8 cm, with regeneration and validation passing.
 - STM-20260312-032013-codex | ui-flow | Buff charged-vessel screen effect | 2026-03-12 | Implemented a masked charged-vessel buff overlay with dominant-color refresh behavior, localhost QA hooks, captured visual screenshots, and passing typecheck plus smoke validation.
 - STM-20260312-031419-codex | map-geometry | Seal door wall bleed | 2026-03-12 | Shared door cover-envelope math now seals all 3D door variants, Spawn B shot authority includes an explicit no-bleed check, maps were regenerated, and typecheck/server/smoke/completion validation passed.
-- STM-20260312-011359-codex | map-visual | Retune Spawn B balcony hero window midpoint | 2026-03-12 | Moved the Spawn B hero window to midpoint values between the original and prior lowered pass, regenerated the map outputs, passed qa:completion, and manually verified the updated facade from a fixed Spawn B debug camera.
 <!-- TOOL-MANAGED END: completed-rollup -->

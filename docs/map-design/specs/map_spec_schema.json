@@ -79,6 +79,219 @@
             }
           }
         },
+        "module_registry": {
+          "type": "object",
+          "properties": {
+            "window_modules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "headShape",
+                  "glassStyle",
+                  "apertureWidthM",
+                  "apertureHeightM",
+                  "frameWidthM",
+                  "frameHeightM",
+                  "frameDepthM",
+                  "voidInsetM",
+                  "glassInsetM",
+                  "sillWidthM",
+                  "sillHeightM",
+                  "sillDepthM",
+                  "apronWidthM",
+                  "apronHeightM",
+                  "apronDepthM",
+                  "apronOffsetBelowSillM"
+                ],
+                "properties": {
+                  "id": { "type": "string" },
+                  "headShape": {
+                    "type": "string",
+                    "enum": ["pointed_arch"]
+                  },
+                  "glassStyle": {
+                    "type": "string",
+                    "enum": ["stained_glass_bright", "stained_glass_dim"]
+                  },
+                  "apertureWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "apertureHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "frameWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "frameHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "frameDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "voidInsetM": { "type": "number" },
+                  "glassInsetM": { "type": "number" },
+                  "sillWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "sillHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "sillDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "apronWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "apronHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "apronDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "apronOffsetBelowSillM": { "type": "number" }
+                }
+              }
+            },
+            "door_modules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "modelId",
+                  "coverShape",
+                  "doorWidthM",
+                  "doorHeightM",
+                  "coverWidthM",
+                  "coverHeightM",
+                  "coverCenterYOffsetM",
+                  "trimThicknessM",
+                  "revealWidthM",
+                  "surroundDepthM",
+                  "voidInsetM",
+                  "voidDepthM"
+                ],
+                "properties": {
+                  "id": { "type": "string" },
+                  "modelId": { "type": "string" },
+                  "coverShape": {
+                    "type": "string",
+                    "enum": ["arched", "rect"]
+                  },
+                  "doorWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "doorHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "coverWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "coverHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "coverCenterYOffsetM": { "type": "number" },
+                  "trimThicknessM": { "type": "number", "exclusiveMinimum": 0 },
+                  "revealWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "surroundDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "voidInsetM": { "type": "number" },
+                  "voidDepthM": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
+            },
+            "hero_bay_modules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "glassStyle",
+                  "openingWidthM",
+                  "openingHeightM",
+                  "openingSillY",
+                  "surroundWidthM",
+                  "surroundHeightM",
+                  "surroundBottomY",
+                  "frameDepthM",
+                  "voidInsetM",
+                  "glassInsetM",
+                  "pilasterWidthM",
+                  "pilasterDepthM",
+                  "pilasterHeightM",
+                  "pilasterBottomY",
+                  "entablatureWidthM",
+                  "entablatureDepthM",
+                  "entablatureThicknessM",
+                  "entablatureCenterY",
+                  "entablatureCapWidthM",
+                  "entablatureCapDepthM",
+                  "entablatureCapThicknessM",
+                  "entablatureCapCenterY",
+                  "corbelWidthM",
+                  "corbelDepthM",
+                  "corbelHeightM",
+                  "corbelCenterY",
+                  "corbelCount",
+                  "corbelSpreadM",
+                  "pedimentBaseWidthM",
+                  "pedimentDepthM",
+                  "pedimentLayerHeightM",
+                  "pedimentLayerCount",
+                  "pedimentWidthStepM",
+                  "pedimentBottomY"
+                ],
+                "properties": {
+                  "id": { "type": "string" },
+                  "glassStyle": {
+                    "type": "string",
+                    "enum": ["stained_glass_bright", "stained_glass_dim"]
+                  },
+                  "openingWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "openingHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "openingSillY": { "type": "number" },
+                  "surroundWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "surroundHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "surroundBottomY": { "type": "number" },
+                  "frameDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "voidInsetM": { "type": "number" },
+                  "glassInsetM": { "type": "number" },
+                  "pilasterWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pilasterDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pilasterHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pilasterBottomY": { "type": "number" },
+                  "entablatureWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "entablatureDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "entablatureThicknessM": { "type": "number", "exclusiveMinimum": 0 },
+                  "entablatureCenterY": { "type": "number" },
+                  "entablatureCapWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "entablatureCapDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "entablatureCapThicknessM": { "type": "number", "exclusiveMinimum": 0 },
+                  "entablatureCapCenterY": { "type": "number" },
+                  "corbelWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "corbelDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "corbelHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "corbelCenterY": { "type": "number" },
+                  "corbelCount": { "type": "integer", "minimum": 1 },
+                  "corbelSpreadM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pedimentBaseWidthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pedimentDepthM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pedimentLayerHeightM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pedimentLayerCount": { "type": "integer", "minimum": 1 },
+                  "pedimentWidthStepM": { "type": "number", "exclusiveMinimum": 0 },
+                  "pedimentBottomY": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "composition_layout_overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "zoneId",
+              "face",
+              "segmentOrdinal",
+              "kind",
+              "windowModuleId",
+              "doorModuleId",
+              "lowerWindowSillY",
+              "upperWindowSillY"
+            ],
+            "properties": {
+              "zoneId": { "type": "string" },
+              "face": {
+                "type": "string",
+                "enum": ["north", "south", "east", "west"]
+              },
+              "segmentOrdinal": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "kind": {
+                "type": "string",
+                "enum": ["spawn_b_front_courtyard", "spawn_b_side_courtyard"]
+              },
+              "windowModuleId": { "type": "string" },
+              "doorModuleId": { "type": "string" },
+              "heroBayModuleId": { "type": "string" },
+              "lowerWindowSillY": { "type": "number" },
+              "upperWindowSillY": { "type": "number" }
+            }
+          }
+        },
         "door_layout_overrides": {
           "type": "array",
           "items": {

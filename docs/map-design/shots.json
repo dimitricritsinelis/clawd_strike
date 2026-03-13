@@ -275,7 +275,7 @@
     {
       "id": "SHOT_11_SPAWN_B_BACK_WALL",
       "label": "Spawn B back wall",
-      "description": "Spawn B courtyard shell review; validates the brick hero wall hierarchy, restrained side returns, and readable door/window composition.",
+      "description": "Spawn B courtyard shell review; validates the centered front-door composition, repeated standard windows, and mirrored side returns.",
       "camera": {
         "pos": {
           "x": 25.0,
@@ -297,20 +297,20 @@
       ],
       "reviewPriority": "high",
       "reviewFocus": [
-        "brick mass and plaster infill balance",
-        "door surround hierarchy without balcony clutter",
-        "calm return-wall support treatment"
+        "centered ground-floor door hierarchy",
+        "standard-window rhythm across front and sides",
+        "trim precision without one-off variants"
       ],
       "mustShow": [
-        "two preserved ground-floor doors",
-        "brick wrapping around openings and corners",
-        "no repeated square-frame wallpaper"
+        "single centered front door",
+        "three standard windows on each side of the front door",
+        "three upper standard windows on each side of the hero bay"
       ]
     },
     {
       "id": "SHOT_12_SPAWN_B_BALCONY_HERO",
-      "label": "Spawn B balcony hero",
-      "description": "Spawn B north wall balcony review; validates door-to-balcony symmetry, stained-glass presence, and the integrated center-bay surround behind the balcony.",
+      "label": "Spawn B center-bay hero",
+      "description": "Spawn B north wall hero review; validates the dominant stained-glass bay, layered pediment, and stone entablature centered above the main door.",
       "camera": {
         "pos": {
           "x": 25.0,
@@ -332,15 +332,15 @@
       ],
       "reviewPriority": "high",
       "reviewFocus": [
-        "balcony and stained-glass opening reading as one centered composition",
-        "moderate roofline rise above the arch",
-        "integrated roof-and-window composition"
+        "hero window dominance over the standard window field",
+        "layered pediment and entablature reading as one centered axis",
+        "pilaster and corbel symmetry"
       ],
       "mustShow": [
-        "single centered 2-bay balcony",
-        "bright stained-glass arch visually tied to the balcony opening",
-        "arch protruding above the roofline without dominating it",
-        "two outer upper windows framing the center composition"
+        "hero stained-glass bay centered directly over the front door",
+        "stone entablature with symmetric corbels below the hero bay",
+        "layered pediment above the hero surround",
+        "three upper standard windows framing each side of the center bay"
       ]
     }
   ]

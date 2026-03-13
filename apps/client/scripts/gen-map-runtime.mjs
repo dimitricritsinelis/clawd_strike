@@ -344,6 +344,343 @@ function deriveBlockoutSpec(spec, zones) {
           });
         })()
       : [];
+  const moduleRegistry =
+    wallDetailsRaw && typeof wallDetailsRaw.module_registry !== "undefined"
+      ? (() => {
+          if (!wallDetailsRaw.module_registry || typeof wallDetailsRaw.module_registry !== "object") {
+            fail("wall_details.module_registry must be an object when provided");
+          }
+
+          const registry = wallDetailsRaw.module_registry;
+          const windowModules =
+            typeof registry.window_modules === "undefined"
+              ? []
+              : (() => {
+                  if (!Array.isArray(registry.window_modules)) {
+                    fail("wall_details.module_registry.window_modules must be an array when provided");
+                  }
+                  return registry.window_modules.map((module, index) => {
+                    if (!module || typeof module !== "object") {
+                      fail(`wall_details.module_registry.window_modules[${index}] must be an object`);
+                    }
+                    const headShape = ensureString(
+                      module.headShape,
+                      `wall_details.module_registry.window_modules[${index}].headShape`,
+                    );
+                    if (headShape !== "pointed_arch") {
+                      fail(`wall_details.module_registry.window_modules[${index}].headShape must be 'pointed_arch'`);
+                    }
+                    const glassStyle = ensureString(
+                      module.glassStyle,
+                      `wall_details.module_registry.window_modules[${index}].glassStyle`,
+                    );
+                    if (!["stained_glass_bright", "stained_glass_dim"].includes(glassStyle)) {
+                      fail(`wall_details.module_registry.window_modules[${index}].glassStyle must be supported`);
+                    }
+                    return {
+                      id: ensureString(module.id, `wall_details.module_registry.window_modules[${index}].id`),
+                      headShape,
+                      glassStyle,
+                      apertureWidthM: asNumber(
+                        module.apertureWidthM,
+                        `wall_details.module_registry.window_modules[${index}].apertureWidthM`,
+                      ),
+                      apertureHeightM: asNumber(
+                        module.apertureHeightM,
+                        `wall_details.module_registry.window_modules[${index}].apertureHeightM`,
+                      ),
+                      frameWidthM: asNumber(
+                        module.frameWidthM,
+                        `wall_details.module_registry.window_modules[${index}].frameWidthM`,
+                      ),
+                      frameHeightM: asNumber(
+                        module.frameHeightM,
+                        `wall_details.module_registry.window_modules[${index}].frameHeightM`,
+                      ),
+                      frameDepthM: asNumber(
+                        module.frameDepthM,
+                        `wall_details.module_registry.window_modules[${index}].frameDepthM`,
+                      ),
+                      voidInsetM: asNumber(
+                        module.voidInsetM,
+                        `wall_details.module_registry.window_modules[${index}].voidInsetM`,
+                      ),
+                      glassInsetM: asNumber(
+                        module.glassInsetM,
+                        `wall_details.module_registry.window_modules[${index}].glassInsetM`,
+                      ),
+                      sillWidthM: asNumber(
+                        module.sillWidthM,
+                        `wall_details.module_registry.window_modules[${index}].sillWidthM`,
+                      ),
+                      sillHeightM: asNumber(
+                        module.sillHeightM,
+                        `wall_details.module_registry.window_modules[${index}].sillHeightM`,
+                      ),
+                      sillDepthM: asNumber(
+                        module.sillDepthM,
+                        `wall_details.module_registry.window_modules[${index}].sillDepthM`,
+                      ),
+                      apronWidthM: asNumber(
+                        module.apronWidthM,
+                        `wall_details.module_registry.window_modules[${index}].apronWidthM`,
+                      ),
+                      apronHeightM: asNumber(
+                        module.apronHeightM,
+                        `wall_details.module_registry.window_modules[${index}].apronHeightM`,
+                      ),
+                      apronDepthM: asNumber(
+                        module.apronDepthM,
+                        `wall_details.module_registry.window_modules[${index}].apronDepthM`,
+                      ),
+                      apronOffsetBelowSillM: asNumber(
+                        module.apronOffsetBelowSillM,
+                        `wall_details.module_registry.window_modules[${index}].apronOffsetBelowSillM`,
+                      ),
+                    };
+                  });
+                })();
+          const doorModules =
+            typeof registry.door_modules === "undefined"
+              ? []
+              : (() => {
+                  if (!Array.isArray(registry.door_modules)) {
+                    fail("wall_details.module_registry.door_modules must be an array when provided");
+                  }
+                  return registry.door_modules.map((module, index) => {
+                    if (!module || typeof module !== "object") {
+                      fail(`wall_details.module_registry.door_modules[${index}] must be an object`);
+                    }
+                    const coverShape = ensureString(
+                      module.coverShape,
+                      `wall_details.module_registry.door_modules[${index}].coverShape`,
+                    );
+                    if (!["arched", "rect"].includes(coverShape)) {
+                      fail(`wall_details.module_registry.door_modules[${index}].coverShape must be supported`);
+                    }
+                    return {
+                      id: ensureString(module.id, `wall_details.module_registry.door_modules[${index}].id`),
+                      modelId: ensureString(module.modelId, `wall_details.module_registry.door_modules[${index}].modelId`),
+                      coverShape,
+                      doorWidthM: asNumber(
+                        module.doorWidthM,
+                        `wall_details.module_registry.door_modules[${index}].doorWidthM`,
+                      ),
+                      doorHeightM: asNumber(
+                        module.doorHeightM,
+                        `wall_details.module_registry.door_modules[${index}].doorHeightM`,
+                      ),
+                      coverWidthM: asNumber(
+                        module.coverWidthM,
+                        `wall_details.module_registry.door_modules[${index}].coverWidthM`,
+                      ),
+                      coverHeightM: asNumber(
+                        module.coverHeightM,
+                        `wall_details.module_registry.door_modules[${index}].coverHeightM`,
+                      ),
+                      coverCenterYOffsetM: asNumber(
+                        module.coverCenterYOffsetM,
+                        `wall_details.module_registry.door_modules[${index}].coverCenterYOffsetM`,
+                      ),
+                      trimThicknessM: asNumber(
+                        module.trimThicknessM,
+                        `wall_details.module_registry.door_modules[${index}].trimThicknessM`,
+                      ),
+                      revealWidthM: asNumber(
+                        module.revealWidthM,
+                        `wall_details.module_registry.door_modules[${index}].revealWidthM`,
+                      ),
+                      surroundDepthM: asNumber(
+                        module.surroundDepthM,
+                        `wall_details.module_registry.door_modules[${index}].surroundDepthM`,
+                      ),
+                      voidInsetM: asNumber(
+                        module.voidInsetM,
+                        `wall_details.module_registry.door_modules[${index}].voidInsetM`,
+                      ),
+                      voidDepthM: asNumber(
+                        module.voidDepthM,
+                        `wall_details.module_registry.door_modules[${index}].voidDepthM`,
+                      ),
+                    };
+                  });
+                })();
+          const heroBayModules =
+            typeof registry.hero_bay_modules === "undefined"
+              ? []
+              : (() => {
+                  if (!Array.isArray(registry.hero_bay_modules)) {
+                    fail("wall_details.module_registry.hero_bay_modules must be an array when provided");
+                  }
+                  return registry.hero_bay_modules.map((module, index) => {
+                    if (!module || typeof module !== "object") {
+                      fail(`wall_details.module_registry.hero_bay_modules[${index}] must be an object`);
+                    }
+                    const glassStyle = ensureString(
+                      module.glassStyle,
+                      `wall_details.module_registry.hero_bay_modules[${index}].glassStyle`,
+                    );
+                    if (!["stained_glass_bright", "stained_glass_dim"].includes(glassStyle)) {
+                      fail(`wall_details.module_registry.hero_bay_modules[${index}].glassStyle must be supported`);
+                    }
+                    const corbelCount = asNumber(
+                      module.corbelCount,
+                      `wall_details.module_registry.hero_bay_modules[${index}].corbelCount`,
+                    );
+                    if (!Number.isInteger(corbelCount) || corbelCount <= 0) {
+                      fail(`wall_details.module_registry.hero_bay_modules[${index}].corbelCount must be an integer > 0`);
+                    }
+                    const pedimentLayerCount = asNumber(
+                      module.pedimentLayerCount,
+                      `wall_details.module_registry.hero_bay_modules[${index}].pedimentLayerCount`,
+                    );
+                    if (!Number.isInteger(pedimentLayerCount) || pedimentLayerCount <= 0) {
+                      fail(`wall_details.module_registry.hero_bay_modules[${index}].pedimentLayerCount must be an integer > 0`);
+                    }
+                    return {
+                      id: ensureString(module.id, `wall_details.module_registry.hero_bay_modules[${index}].id`),
+                      glassStyle,
+                      openingWidthM: asNumber(
+                        module.openingWidthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].openingWidthM`,
+                      ),
+                      openingHeightM: asNumber(
+                        module.openingHeightM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].openingHeightM`,
+                      ),
+                      openingSillY: asNumber(
+                        module.openingSillY,
+                        `wall_details.module_registry.hero_bay_modules[${index}].openingSillY`,
+                      ),
+                      surroundWidthM: asNumber(
+                        module.surroundWidthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].surroundWidthM`,
+                      ),
+                      surroundHeightM: asNumber(
+                        module.surroundHeightM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].surroundHeightM`,
+                      ),
+                      surroundBottomY: asNumber(
+                        module.surroundBottomY,
+                        `wall_details.module_registry.hero_bay_modules[${index}].surroundBottomY`,
+                      ),
+                      frameDepthM: asNumber(
+                        module.frameDepthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].frameDepthM`,
+                      ),
+                      voidInsetM: asNumber(
+                        module.voidInsetM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].voidInsetM`,
+                      ),
+                      glassInsetM: asNumber(
+                        module.glassInsetM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].glassInsetM`,
+                      ),
+                      pilasterWidthM: asNumber(
+                        module.pilasterWidthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pilasterWidthM`,
+                      ),
+                      pilasterDepthM: asNumber(
+                        module.pilasterDepthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pilasterDepthM`,
+                      ),
+                      pilasterHeightM: asNumber(
+                        module.pilasterHeightM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pilasterHeightM`,
+                      ),
+                      pilasterBottomY: asNumber(
+                        module.pilasterBottomY,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pilasterBottomY`,
+                      ),
+                      entablatureWidthM: asNumber(
+                        module.entablatureWidthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureWidthM`,
+                      ),
+                      entablatureDepthM: asNumber(
+                        module.entablatureDepthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureDepthM`,
+                      ),
+                      entablatureThicknessM: asNumber(
+                        module.entablatureThicknessM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureThicknessM`,
+                      ),
+                      entablatureCenterY: asNumber(
+                        module.entablatureCenterY,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureCenterY`,
+                      ),
+                      entablatureCapWidthM: asNumber(
+                        module.entablatureCapWidthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureCapWidthM`,
+                      ),
+                      entablatureCapDepthM: asNumber(
+                        module.entablatureCapDepthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureCapDepthM`,
+                      ),
+                      entablatureCapThicknessM: asNumber(
+                        module.entablatureCapThicknessM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureCapThicknessM`,
+                      ),
+                      entablatureCapCenterY: asNumber(
+                        module.entablatureCapCenterY,
+                        `wall_details.module_registry.hero_bay_modules[${index}].entablatureCapCenterY`,
+                      ),
+                      corbelWidthM: asNumber(
+                        module.corbelWidthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].corbelWidthM`,
+                      ),
+                      corbelDepthM: asNumber(
+                        module.corbelDepthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].corbelDepthM`,
+                      ),
+                      corbelHeightM: asNumber(
+                        module.corbelHeightM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].corbelHeightM`,
+                      ),
+                      corbelCenterY: asNumber(
+                        module.corbelCenterY,
+                        `wall_details.module_registry.hero_bay_modules[${index}].corbelCenterY`,
+                      ),
+                      corbelCount,
+                      corbelSpreadM: asNumber(
+                        module.corbelSpreadM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].corbelSpreadM`,
+                      ),
+                      pedimentBaseWidthM: asNumber(
+                        module.pedimentBaseWidthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pedimentBaseWidthM`,
+                      ),
+                      pedimentDepthM: asNumber(
+                        module.pedimentDepthM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pedimentDepthM`,
+                      ),
+                      pedimentLayerHeightM: asNumber(
+                        module.pedimentLayerHeightM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pedimentLayerHeightM`,
+                      ),
+                      pedimentLayerCount,
+                      pedimentWidthStepM: asNumber(
+                        module.pedimentWidthStepM,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pedimentWidthStepM`,
+                      ),
+                      pedimentBottomY: asNumber(
+                        module.pedimentBottomY,
+                        `wall_details.module_registry.hero_bay_modules[${index}].pedimentBottomY`,
+                      ),
+                    };
+                  });
+                })();
+
+          return {
+            window_modules: windowModules,
+            door_modules: doorModules,
+            hero_bay_modules: heroBayModules,
+          };
+        })()
+      : {
+          window_modules: [],
+          door_modules: [],
+          hero_bay_modules: [],
+        };
   const doorLayoutOverrides =
     wallDetailsRaw && typeof wallDetailsRaw.door_layout_overrides !== "undefined"
       ? (() => {
@@ -698,6 +1035,95 @@ function deriveBlockoutSpec(spec, zones) {
           });
         })()
       : [];
+  const compositionLayoutOverrides =
+    wallDetailsRaw && typeof wallDetailsRaw.composition_layout_overrides !== "undefined"
+      ? (() => {
+          if (!Array.isArray(wallDetailsRaw.composition_layout_overrides)) {
+            fail("wall_details.composition_layout_overrides must be an array when provided");
+          }
+
+          const windowModuleIds = new Set(moduleRegistry.window_modules.map((module) => module.id));
+          const doorModuleIds = new Set(moduleRegistry.door_modules.map((module) => module.id));
+          const heroBayModuleIds = new Set(moduleRegistry.hero_bay_modules.map((module) => module.id));
+
+          return wallDetailsRaw.composition_layout_overrides.map((override, index) => {
+            if (!override || typeof override !== "object") {
+              fail(`wall_details.composition_layout_overrides[${index}] must be an object`);
+            }
+
+            const zoneId = ensureString(override.zoneId, `wall_details.composition_layout_overrides[${index}].zoneId`);
+            if (!zones.some((zone) => zone.id === zoneId)) {
+              fail(`wall_details.composition_layout_overrides[${index}].zoneId '${zoneId}' does not match a known zone`);
+            }
+
+            const face = ensureString(override.face, `wall_details.composition_layout_overrides[${index}].face`);
+            if (!["north", "south", "east", "west"].includes(face)) {
+              fail(`wall_details.composition_layout_overrides[${index}].face must be one of north/south/east/west`);
+            }
+
+            const segmentOrdinal = asNumber(
+              override.segmentOrdinal,
+              `wall_details.composition_layout_overrides[${index}].segmentOrdinal`,
+            );
+            if (!Number.isInteger(segmentOrdinal) || segmentOrdinal <= 0) {
+              fail(`wall_details.composition_layout_overrides[${index}].segmentOrdinal must be an integer > 0`);
+            }
+
+            const kind = ensureString(override.kind, `wall_details.composition_layout_overrides[${index}].kind`);
+            if (!["spawn_b_front_courtyard", "spawn_b_side_courtyard"].includes(kind)) {
+              fail(`wall_details.composition_layout_overrides[${index}].kind must be a supported composition kind`);
+            }
+
+            const windowModuleId = ensureString(
+              override.windowModuleId,
+              `wall_details.composition_layout_overrides[${index}].windowModuleId`,
+            );
+            if (!windowModuleIds.has(windowModuleId)) {
+              fail(`wall_details.composition_layout_overrides[${index}].windowModuleId '${windowModuleId}' is unknown`);
+            }
+
+            const doorModuleId = ensureString(
+              override.doorModuleId,
+              `wall_details.composition_layout_overrides[${index}].doorModuleId`,
+            );
+            if (!doorModuleIds.has(doorModuleId)) {
+              fail(`wall_details.composition_layout_overrides[${index}].doorModuleId '${doorModuleId}' is unknown`);
+            }
+
+            const heroBayModuleId =
+              typeof override.heroBayModuleId === "undefined"
+                ? undefined
+                : ensureString(
+                    override.heroBayModuleId,
+                    `wall_details.composition_layout_overrides[${index}].heroBayModuleId`,
+                  );
+            if (kind === "spawn_b_front_courtyard" && !heroBayModuleId) {
+              fail(`wall_details.composition_layout_overrides[${index}].heroBayModuleId is required for front Spawn B compositions`);
+            }
+            if (heroBayModuleId && !heroBayModuleIds.has(heroBayModuleId)) {
+              fail(`wall_details.composition_layout_overrides[${index}].heroBayModuleId '${heroBayModuleId}' is unknown`);
+            }
+
+            return {
+              zoneId,
+              face,
+              segmentOrdinal,
+              kind,
+              windowModuleId,
+              doorModuleId,
+              ...(heroBayModuleId ? { heroBayModuleId } : {}),
+              lowerWindowSillY: asNumber(
+                override.lowerWindowSillY,
+                `wall_details.composition_layout_overrides[${index}].lowerWindowSillY`,
+              ),
+              upperWindowSillY: asNumber(
+                override.upperWindowSillY,
+                `wall_details.composition_layout_overrides[${index}].upperWindowSillY`,
+              ),
+            };
+          });
+        })()
+      : [];
 
   return {
     mapId: MAP_ID,
@@ -714,6 +1140,8 @@ function deriveBlockoutSpec(spec, zones) {
       density: Math.max(0, Math.min(1.25, wallDetailDensity)),
       maxProtrusion: Math.max(0.02, Math.min(0.2, wallDetailMaxProtrusion)),
       facade_overrides: facadeOverrides,
+      module_registry: moduleRegistry,
+      composition_layout_overrides: compositionLayoutOverrides,
       door_layout_overrides: doorLayoutOverrides,
       window_layout_overrides: windowLayoutOverrides,
       balcony_layout_overrides: balconyLayoutOverrides,

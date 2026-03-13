@@ -379,6 +379,8 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
     zones: spec.zones,
     anchors: options.anchors,
     facadeOverrides: spec.wall_details.facadeOverrides,
+    moduleRegistry: spec.wall_details.moduleRegistry,
+    compositionLayoutOverrides: spec.wall_details.compositionLayoutOverrides,
     doorLayoutOverrides: spec.wall_details.doorLayoutOverrides,
     windowLayoutOverrides: spec.wall_details.windowLayoutOverrides,
     balconyLayoutOverrides: spec.wall_details.balconyLayoutOverrides,

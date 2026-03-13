@@ -81,110 +81,121 @@
         "preset": "spawn_courtyard_landmark"
       }
     ],
-    "door_layout_overrides": [
+    "module_registry": {
+      "window_modules": [
+        {
+          "id": "spawn_standard_window",
+          "headShape": "pointed_arch",
+          "glassStyle": "stained_glass_bright",
+          "apertureWidthM": 0.96,
+          "apertureHeightM": 1.28,
+          "frameWidthM": 1.4117647059,
+          "frameHeightM": 1.8028169014,
+          "frameDepthM": 0.205,
+          "voidInsetM": 0.014,
+          "glassInsetM": 0.048,
+          "sillWidthM": 1.76,
+          "sillHeightM": 0.16,
+          "sillDepthM": 0.34,
+          "apronWidthM": 1.58,
+          "apronHeightM": 0.06,
+          "apronDepthM": 0.23,
+          "apronOffsetBelowSillM": 0.12
+        }
+      ],
+      "door_modules": [
+        {
+          "id": "spawn_standard_door",
+          "modelId": "ph_large_castle_door",
+          "coverShape": "arched",
+          "doorWidthM": 1.6322233995,
+          "doorHeightM": 2.405,
+          "coverWidthM": 1.7722233995,
+          "coverHeightM": 2.485,
+          "coverCenterYOffsetM": 0.01,
+          "trimThicknessM": 0.2963426646,
+          "revealWidthM": 0.018,
+          "surroundDepthM": 0.21,
+          "voidInsetM": -0.09,
+          "voidDepthM": 0.01
+        }
+      ],
+      "hero_bay_modules": [
+        {
+          "id": "spawn_b_center_hero",
+          "glassStyle": "stained_glass_bright",
+          "openingWidthM": 3.24,
+          "openingHeightM": 4.18,
+          "openingSillY": 3.46,
+          "surroundWidthM": 4.8,
+          "surroundHeightM": 4.84,
+          "surroundBottomY": 3.24,
+          "frameDepthM": 0.22,
+          "voidInsetM": 0.08,
+          "glassInsetM": 0.098,
+          "pilasterWidthM": 0.36,
+          "pilasterDepthM": 0.18,
+          "pilasterHeightM": 5.82,
+          "pilasterBottomY": 2.30,
+          "entablatureWidthM": 5.68,
+          "entablatureDepthM": 0.92,
+          "entablatureThicknessM": 0.18,
+          "entablatureCenterY": 3.02,
+          "entablatureCapWidthM": 5.96,
+          "entablatureCapDepthM": 0.34,
+          "entablatureCapThicknessM": 0.12,
+          "entablatureCapCenterY": 3.16,
+          "corbelWidthM": 0.24,
+          "corbelDepthM": 0.28,
+          "corbelHeightM": 0.44,
+          "corbelCenterY": 2.74,
+          "corbelCount": 4,
+          "corbelSpreadM": 3.18,
+          "pedimentBaseWidthM": 5.44,
+          "pedimentDepthM": 0.28,
+          "pedimentLayerHeightM": 0.12,
+          "pedimentLayerCount": 4,
+          "pedimentWidthStepM": 0.38,
+          "pedimentBottomY": 7.88
+        }
+      ]
+    },
+    "composition_layout_overrides": [
       {
         "zoneId": "SPAWN_B_GATE_PLAZA",
         "face": "north",
         "segmentOrdinal": 1,
-        "doors": [
-          { "centerS": -6.0857142857 },
-          { "centerS": 6.0857142857 }
-        ]
+        "kind": "spawn_b_front_courtyard",
+        "windowModuleId": "spawn_standard_window",
+        "doorModuleId": "spawn_standard_door",
+        "heroBayModuleId": "spawn_b_center_hero",
+        "lowerWindowSillY": 0.98,
+        "upperWindowSillY": 3.78
       },
       {
         "zoneId": "SPAWN_B_GATE_PLAZA",
         "face": "east",
         "segmentOrdinal": 2,
-        "styleSource": {
-          "zoneId": "SPAWN_B_GATE_PLAZA",
-          "face": "north",
-          "segmentOrdinal": 1
-        },
-        "doors": [
-          { "centerS": 0.0 }
-        ]
+        "kind": "spawn_b_side_courtyard",
+        "windowModuleId": "spawn_standard_window",
+        "doorModuleId": "spawn_standard_door",
+        "lowerWindowSillY": 0.98,
+        "upperWindowSillY": 3.78
       },
       {
         "zoneId": "SPAWN_B_GATE_PLAZA",
         "face": "west",
         "segmentOrdinal": 2,
-        "styleSource": {
-          "zoneId": "SPAWN_B_GATE_PLAZA",
-          "face": "north",
-          "segmentOrdinal": 1
-        },
-        "doors": [
-          { "centerS": 0.0 }
-        ]
+        "kind": "spawn_b_side_courtyard",
+        "windowModuleId": "spawn_standard_window",
+        "doorModuleId": "spawn_standard_door",
+        "lowerWindowSillY": 0.98,
+        "upperWindowSillY": 3.78
       }
     ],
-    "window_layout_overrides": [
-      {
-        "zoneId": "SPAWN_B_GATE_PLAZA",
-        "face": "north",
-        "segmentOrdinal": 1,
-        "windows": [
-          { "centerS": -9.1285714286, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 9.1285714286, "sillY": 3.78, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": -9.1285714286, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": -3.0428571429, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 3.0428571429, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 9.1285714286, "sillY": 0.98, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
-        ]
-      },
-      {
-        "zoneId": "SPAWN_B_GATE_PLAZA",
-        "face": "east",
-        "segmentOrdinal": 2,
-        "windows": [
-          { "centerS": -2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": -2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
-        ]
-      },
-      {
-        "zoneId": "SPAWN_B_GATE_PLAZA",
-        "face": "west",
-        "segmentOrdinal": 2,
-        "windows": [
-          { "centerS": -2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": 2.3271414036, "sillY": 3.92, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_bright" },
-          { "centerS": -2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" },
-          { "centerS": 2.3271414036, "sillY": 1.02, "width": 0.96, "height": 1.28, "headShape": "pointed_arch", "glassStyle": "stained_glass_dim" }
-        ]
-      }
-    ],
-    "balcony_layout_overrides": [
-      {
-        "zoneId": "SPAWN_B_GATE_PLAZA",
-        "face": "north",
-        "segmentOrdinal": 1,
-        "balconies": [
-          {
-            "centerS": 0.0,
-            "storyIndex": 1,
-            "spanBays": 2,
-            "depthM": 1.1,
-            "parapetHeightM": 0.8,
-            "openingSurroundWidthM": 4.0,
-            "openingSurroundHeightM": 4.15,
-            "openingSurroundBottomOffsetM": 0.76,
-            "roofBreakWidthM": 4.0,
-            "roofBreakBottomOffsetM": 0.9,
-            "roofBreakHeightM": 0.0,
-            "roofBreakCapHeightM": 0.0,
-            "opening": {
-              "width": 2.8,
-              "height": 3.81,
-              "sillOffsetM": 0.96,
-              "headShape": "pointed_arch",
-              "glassStyle": "stained_glass_bright"
-            }
-          }
-        ]
-      }
-    ]
+    "door_layout_overrides": [],
+    "window_layout_overrides": [],
+    "balcony_layout_overrides": []
   },
   "layout_reference": {
     "zone_aliases": [
