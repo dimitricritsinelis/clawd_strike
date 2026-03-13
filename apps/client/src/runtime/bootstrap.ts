@@ -34,6 +34,7 @@ import { isMobileDevice } from "./input/MobileDetect";
 import { TouchInputManager } from "./input/TouchInputManager";
 import { MobileTouchHud } from "./ui/MobileTouchHud";
 import { MobileOrientationGuard } from "./ui/MobileOrientationGuard";
+import { MobileFullscreenHint } from "./ui/MobileFullscreenHint";
 import { BulletHoleManager } from "./effects/BulletHoleManager";
 import { BuffManager } from "./buffs/BuffManager";
 import { warmupOrbMaterials } from "./buffs/BuffOrb";
@@ -1445,19 +1446,40 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     };
     runtimeRoot.addEventListener("touchstart", unlockAudioOnTouch, { passive: true });
 
-    // Adjust HUD positions to avoid overlapping with touch controls
-    healthHud.root.style.bottom = "130px";
-    healthHud.root.style.left = `calc(12px + env(safe-area-inset-left, 0px))`;
-    ammoHud.root.style.bottom = "130px";
-    ammoHud.root.style.right = `calc(12px + env(safe-area-inset-right, 0px))`;
-    scoreHud.root.style.top = `calc(8px + env(safe-area-inset-top, 0px))`;
-    scoreHud.root.style.right = `calc(8px + env(safe-area-inset-right, 0px))`;
-    scoreHud.root.style.transform = "scale(0.85)";
+    // ── Scale all HUD elements for iPhone landscape ──────────────
+    // Effective viewport: ~667x325 (SE) to ~932x380 (Pro Max)
+
+    // Health: scale down, anchor bottom-left
+    healthHud.root.style.bottom = `calc(8px + env(safe-area-inset-bottom, 0px))`;
+    healthHud.root.style.left = `calc(8px + env(safe-area-inset-left, 0px))`;
+    healthHud.root.style.transform = "scale(0.6)";
+    healthHud.root.style.transformOrigin = "bottom left";
+
+    // Ammo: scale down, anchor bottom-right above fire button
+    ammoHud.root.style.bottom = `calc(100px + env(safe-area-inset-bottom, 0px))`;
+    ammoHud.root.style.right = `calc(8px + env(safe-area-inset-right, 0px))`;
+    ammoHud.root.style.transform = "scale(0.6)";
+    ammoHud.root.style.transformOrigin = "bottom right";
+
+    // Score: reduce width and scale significantly
+    scoreHud.root.style.top = `calc(4px + env(safe-area-inset-top, 0px))`;
+    scoreHud.root.style.right = `calc(4px + env(safe-area-inset-right, 0px))`;
+    scoreHud.root.style.width = "220px";
+    scoreHud.root.style.minWidth = "220px";
+    scoreHud.root.style.transform = "scale(0.65)";
     scoreHud.root.style.transformOrigin = "top right";
-    timerHud.root.style.top = `calc(8px + env(safe-area-inset-top, 0px))`;
+
+    // Timer: scale and reposition
+    timerHud.root.style.top = `calc(4px + env(safe-area-inset-top, 0px))`;
+    timerHud.root.style.transform = "translateX(-50%) scale(0.7)";
+    timerHud.root.style.transformOrigin = "top center";
 
     // Add touch-action: manipulation to root to prevent 300ms tap delay
     runtimeRoot.style.touchAction = "manipulation";
+
+    // Show one-time fullscreen hint
+    const fullscreenHint = new MobileFullscreenHint(runtimeRoot);
+    fullscreenHint.show();
   } else if (!inputFrozen && runtimeParams.controlMode === "human") {
     // ── Desktop: pointer lock as before ─────────────────────────────
     pointerLock = new PointerLockController({

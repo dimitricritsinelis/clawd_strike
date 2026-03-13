@@ -78,8 +78,8 @@ export class MobileTouchHud {
     this.joystickBase = document.createElement("div");
     Object.assign(this.joystickBase.style, {
       position: "absolute",
-      width: "120px",
-      height: "120px",
+      width: "90px",
+      height: "90px",
       borderRadius: "50%",
       border: "2px solid rgba(255, 255, 255, 0.25)",
       background: "rgba(255, 255, 255, 0.08)",
@@ -92,8 +92,8 @@ export class MobileTouchHud {
     this.joystickKnob = document.createElement("div");
     Object.assign(this.joystickKnob.style, {
       position: "absolute",
-      width: "50px",
-      height: "50px",
+      width: "38px",
+      height: "38px",
       borderRadius: "50%",
       background: "rgba(255, 255, 255, 0.35)",
       border: "2px solid rgba(255, 255, 255, 0.5)",
@@ -107,13 +107,13 @@ export class MobileTouchHud {
 
     // ── Fire button ───────────────────────────────────────────────────
     this.fireBtn = document.createElement("div");
-    applyButtonBase(this.fireBtn, 80);
+    applyButtonBase(this.fireBtn, 64);
     Object.assign(this.fireBtn.style, {
-      right: "calc(30px + env(safe-area-inset-right, 0px))",
-      bottom: "calc(100px + env(safe-area-inset-bottom, 0px))",
+      right: "calc(20px + env(safe-area-inset-right, 0px))",
+      bottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(220, 60, 40, 0.45)",
       border: "3px solid rgba(255, 100, 80, 0.5)",
-      fontSize: "11px",
+      fontSize: "10px",
       color: "rgba(255, 255, 255, 0.85)",
       boxShadow: "0 0 20px rgba(220, 60, 40, 0.25)",
     });
@@ -123,13 +123,13 @@ export class MobileTouchHud {
 
     // ── Reload button ─────────────────────────────────────────────────
     this.reloadBtn = document.createElement("div");
-    applyButtonBase(this.reloadBtn, 52);
+    applyButtonBase(this.reloadBtn, 40);
     Object.assign(this.reloadBtn.style, {
-      right: "calc(120px + env(safe-area-inset-right, 0px))",
-      bottom: "calc(170px + env(safe-area-inset-bottom, 0px))",
+      right: "calc(95px + env(safe-area-inset-right, 0px))",
+      bottom: "calc(75px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(255, 200, 100, 0.2)",
       border: "2px solid rgba(255, 214, 150, 0.35)",
-      fontSize: "9px",
+      fontSize: "8px",
       color: "rgba(255, 241, 224, 0.75)",
     });
     this.reloadBtn.textContent = "R";
@@ -138,13 +138,13 @@ export class MobileTouchHud {
 
     // ── Jump button ───────────────────────────────────────────────────
     this.jumpBtn = document.createElement("div");
-    applyButtonBase(this.jumpBtn, 52);
+    applyButtonBase(this.jumpBtn, 40);
     Object.assign(this.jumpBtn.style, {
-      right: "calc(120px + env(safe-area-inset-right, 0px))",
-      bottom: "calc(55px + env(safe-area-inset-bottom, 0px))",
+      right: "calc(95px + env(safe-area-inset-right, 0px))",
+      bottom: "calc(15px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(255, 255, 255, 0.12)",
       border: "2px solid rgba(255, 255, 255, 0.3)",
-      fontSize: "10px",
+      fontSize: "9px",
       color: "rgba(255, 255, 255, 0.7)",
     });
     // Jump arrow icon
@@ -162,13 +162,13 @@ export class MobileTouchHud {
 
     // ── Crouch button ─────────────────────────────────────────────────
     this.crouchBtn = document.createElement("div");
-    applyButtonBase(this.crouchBtn, 52);
+    applyButtonBase(this.crouchBtn, 40);
     Object.assign(this.crouchBtn.style, {
-      left: "calc(20px + env(safe-area-inset-left, 0px))",
-      bottom: "calc(170px + env(safe-area-inset-bottom, 0px))",
+      left: "calc(16px + env(safe-area-inset-left, 0px))",
+      bottom: "calc(75px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(255, 255, 255, 0.12)",
       border: "2px solid rgba(255, 255, 255, 0.3)",
-      fontSize: "10px",
+      fontSize: "9px",
       color: "rgba(255, 255, 255, 0.7)",
     });
     // Crouch arrow (downward)
@@ -190,8 +190,8 @@ export class MobileTouchHud {
       position: "absolute",
       top: "calc(12px + env(safe-area-inset-top, 0px))",
       left: "calc(12px + env(safe-area-inset-left, 0px))",
-      width: "44px",
-      height: "44px",
+      width: "36px",
+      height: "36px",
       borderRadius: "8px",
       background: "rgba(6, 10, 16, 0.5)",
       border: "1px solid rgba(255, 255, 255, 0.2)",
