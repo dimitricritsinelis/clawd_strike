@@ -676,12 +676,13 @@ body {
   }
   #start .actions-buttons {
     gap: 18px;
-    top: 46%;
+    top: 42%;
     width: min(364px, calc(100vw - 26px));
   }
   #start .actions-nameplate {
-    top: 44%;
+    top: 38%;
     width: min(280px, calc(100vw - 60px));
+    z-index: 4;
   }
   #start .name-entry {
     aspect-ratio: 2 / 1;
@@ -691,8 +692,8 @@ body {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
-    width: min(320px, calc(100vw - 50px));
-    bottom: 20px;
+    width: min(260px, calc(100vw - 80px));
+    bottom: 10px;
   }
   #start .shared-champion-name {
     font-size: var(--shared-champion-name-size);

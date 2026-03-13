@@ -20,6 +20,7 @@ import { HitVignette } from "./ui/HitVignette";
 import { KillFeed } from "./ui/KillFeed";
 import { HitMarker } from "./ui/HitMarker";
 import { ScoreHud } from "./ui/ScoreHud";
+import { MobileScoreStrip } from "./ui/MobileScoreStrip";
 import { RoundEndScreen, type RoundStats } from "./ui/RoundEndScreen";
 import { TimerHud } from "./ui/TimerHud";
 import { DamageNumbers } from "./ui/DamageNumbers";
@@ -807,7 +808,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   const hitVignette = new HitVignette(runtimeRoot);
   const deathScreen = new DeathScreen(runtimeRoot);
   const hitMarker = new HitMarker(crosshair);
-  const scoreHud = new ScoreHud(runtimeRoot, runtimeParams.playerName);
+  const scoreHud = isMobileDevice()
+    ? new MobileScoreStrip(runtimeRoot)
+    : new ScoreHud(runtimeRoot, runtimeParams.playerName);
   const killFeed = new KillFeed(runtimeRoot, {
     anchorEl: scoreHud.root,
     gapPx: 8,
@@ -1418,6 +1421,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let touchInput: TouchInputManager | null = null;
   let mobileTouchHud: MobileTouchHud | null = null;
   let mobileOrientationGuard: MobileOrientationGuard | null = null;
+  let mobileFlashUpdate: ((dt: number, health: number, mag: number) => void) | null = null;
 
   if (mobile && !inputFrozen && runtimeParams.controlMode === "human") {
     // ── Mobile: touch controls instead of pointer lock ──────────────
@@ -1446,33 +1450,126 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     };
     runtimeRoot.addEventListener("touchstart", unlockAudioOnTouch, { passive: true });
 
-    // ── Scale all HUD elements for iPhone landscape ──────────────
+    // ── PUBG-style compact HUD for iPhone landscape ──────────────
     // Effective viewport: ~667x325 (SE) to ~932x380 (Pro Max)
+    // Design: strip away panel chrome, use thin bars + floating text
+    // Auto-opacity: 0.45 base, flash to 1.0 on state change for 1.5s
 
-    // Health: scale down, anchor bottom-left
-    healthHud.root.style.bottom = `calc(8px + env(safe-area-inset-bottom, 0px))`;
-    healthHud.root.style.left = `calc(8px + env(safe-area-inset-left, 0px))`;
-    healthHud.root.style.transform = "scale(0.6)";
-    healthHud.root.style.transformOrigin = "bottom left";
+    const MOBILE_BASE_OPACITY = "0.45";
+    const MOBILE_FLASH_OPACITY = "1";
+    const MOBILE_FLASH_DURATION_S = 1.5;
+    let mobileHealthFlashTimer = 0;
+    let mobileAmmoFlashTimer = 0;
+    let mobilePrevHealth = 100;
+    let mobilePrevMag = 30;
 
-    // Ammo: scale down, anchor bottom-right above fire button
-    ammoHud.root.style.bottom = `calc(100px + env(safe-area-inset-bottom, 0px))`;
-    ammoHud.root.style.right = `calc(8px + env(safe-area-inset-right, 0px))`;
-    ammoHud.root.style.transform = "scale(0.6)";
-    ammoHud.root.style.transformOrigin = "bottom right";
+    // ── Health: thin edge bar + small number, no panel ──────────
+    const hRoot = healthHud.root;
+    Object.assign(hRoot.style, {
+      bottom: `calc(4px + env(safe-area-inset-bottom, 0px))`,
+      left: `calc(60px + env(safe-area-inset-left, 0px))`,
+      padding: "0",
+      background: "transparent",
+      border: "none",
+      borderRadius: "3px",
+      boxShadow: "none",
+      backdropFilter: "none",
+      transform: "none",
+      minWidth: "120px",
+      width: "120px",
+      opacity: MOBILE_BASE_OPACITY,
+      transition: "opacity 0.3s ease",
+    });
+    // Hide "HP" label (child 1), shrink numeric (child 2), widen bar (child 3)
+    const hChildren = Array.from(hRoot.children) as HTMLElement[];
+    if (hChildren[1]) hChildren[1].style.display = "none"; // "HP" label
+    if (hChildren[2]) {
+      Object.assign(hChildren[2].style, {
+        fontSize: "13px",
+        fontWeight: "700",
+        marginBottom: "2px",
+        minWidth: "0",
+        textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
+      });
+    }
+    if (hChildren[3]) (hChildren[3] as HTMLElement).style.height = "6px";
 
-    // Score: reduce width and scale significantly
-    scoreHud.root.style.top = `calc(4px + env(safe-area-inset-top, 0px))`;
-    scoreHud.root.style.right = `calc(4px + env(safe-area-inset-right, 0px))`;
-    scoreHud.root.style.width = "220px";
-    scoreHud.root.style.minWidth = "220px";
-    scoreHud.root.style.transform = "scale(0.65)";
-    scoreHud.root.style.transformOrigin = "top right";
+    // ── Ammo: floating text, no panel ───────────────────────────
+    const aRoot = ammoHud.root;
+    Object.assign(aRoot.style, {
+      bottom: `calc(112px + env(safe-area-inset-bottom, 0px))`,
+      right: `calc(30px + env(safe-area-inset-right, 0px))`,
+      padding: "0",
+      background: "transparent",
+      border: "none",
+      borderRadius: "0",
+      boxShadow: "none",
+      backdropFilter: "none",
+      transform: "none",
+      textAlign: "center",
+      opacity: MOBILE_BASE_OPACITY,
+      transition: "opacity 0.3s ease",
+    });
+    // Shrink ammo font sizes
+    const aChildren = Array.from(aRoot.children) as HTMLElement[];
+    if (aChildren[0]) {
+      // Row containing magEl and reserveWrap
+      aChildren[0].style.gap = "2px";
+      const magEl = aChildren[0].children[0] as HTMLElement | undefined;
+      if (magEl) {
+        Object.assign(magEl.style, {
+          fontSize: "20px",
+          minWidth: "0",
+          textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
+        });
+      }
+      const reserveWrap = aChildren[0].children[1] as HTMLElement | undefined;
+      if (reserveWrap) {
+        reserveWrap.style.fontSize = "11px";
+        const reserveSpan = reserveWrap.querySelector("span");
+        if (reserveSpan) (reserveSpan as HTMLElement).style.fontSize = "13px";
+      }
+    }
 
-    // Timer: scale and reposition
-    timerHud.root.style.top = `calc(4px + env(safe-area-inset-top, 0px))`;
-    timerHud.root.style.transform = "translateX(-50%) scale(0.7)";
-    timerHud.root.style.transformOrigin = "top center";
+    // ── Timer: more aggressive scale ────────────────────────────
+    Object.assign(timerHud.root.style, {
+      top: `calc(4px + env(safe-area-inset-top, 0px))`,
+      padding: "3px 14px 4px",
+      minWidth: "80px",
+      transform: "translateX(-50%) scale(0.5)",
+      transformOrigin: "top center",
+      opacity: MOBILE_BASE_OPACITY,
+      transition: "opacity 0.3s ease",
+    });
+
+    // ── Kill feed: compact width ────────────────────────────────
+    killFeed.root.style.width = "180px";
+    killFeed.root.style.minWidth = "0";
+
+    // ── Auto-opacity flash helper (called in step loop) ─────────
+    mobileFlashUpdate = (dt: number, currentHealth: number, currentMag: number): void => {
+      // Health flash
+      if (currentHealth !== mobilePrevHealth) {
+        hRoot.style.opacity = MOBILE_FLASH_OPACITY;
+        mobileHealthFlashTimer = MOBILE_FLASH_DURATION_S;
+        mobilePrevHealth = currentHealth;
+      }
+      if (mobileHealthFlashTimer > 0) {
+        mobileHealthFlashTimer -= dt;
+        if (mobileHealthFlashTimer <= 0) hRoot.style.opacity = MOBILE_BASE_OPACITY;
+      }
+
+      // Ammo flash
+      if (currentMag !== mobilePrevMag) {
+        aRoot.style.opacity = MOBILE_FLASH_OPACITY;
+        mobileAmmoFlashTimer = MOBILE_FLASH_DURATION_S;
+        mobilePrevMag = currentMag;
+      }
+      if (mobileAmmoFlashTimer > 0) {
+        mobileAmmoFlashTimer -= dt;
+        if (mobileAmmoFlashTimer <= 0) aRoot.style.opacity = MOBILE_BASE_OPACITY;
+      }
+    };
 
     // Add touch-action: manipulation to root to prevent 300ms tap delay
     runtimeRoot.style.touchAction = "manipulation";
@@ -2110,9 +2207,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     healthHud.setVisible(!overviewCamera);
     timerHud.setVisible(!overviewCamera);
     if (!overviewCamera) {
-      ammoHud.update(game.getAmmoSnapshot());
+      const ammoSnap = game.getAmmoSnapshot();
+      ammoHud.update(ammoSnap);
       const overshield = game.getOvershield();
       healthHud.update({ health: currentHealth + overshield, maxHealth: overshield > 0 ? 150 : 100 }, dt);
+      mobileFlashUpdate?.(dt, currentHealth, ammoSnap.mag);
     }
 
     // ── Deferred Rallying Cry activation ──────────────────────────────────────

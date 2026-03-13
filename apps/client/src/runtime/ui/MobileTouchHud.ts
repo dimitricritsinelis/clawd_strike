@@ -107,15 +107,15 @@ export class MobileTouchHud {
 
     // ── Fire button ───────────────────────────────────────────────────
     this.fireBtn = document.createElement("div");
-    applyButtonBase(this.fireBtn, 64);
+    applyButtonBase(this.fireBtn, 88);
     Object.assign(this.fireBtn.style, {
-      right: "calc(20px + env(safe-area-inset-right, 0px))",
-      bottom: "calc(20px + env(safe-area-inset-bottom, 0px))",
+      right: "calc(16px + env(safe-area-inset-right, 0px))",
+      bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(220, 60, 40, 0.45)",
-      border: "3px solid rgba(255, 100, 80, 0.5)",
-      fontSize: "10px",
+      border: "4px solid rgba(255, 100, 80, 0.5)",
+      fontSize: "13px",
       color: "rgba(255, 255, 255, 0.85)",
-      boxShadow: "0 0 20px rgba(220, 60, 40, 0.25)",
+      boxShadow: "0 0 24px rgba(220, 60, 40, 0.35)",
     });
     this.fireBtn.textContent = "FIRE";
     this.root.append(this.fireBtn);

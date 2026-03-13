@@ -15,7 +15,7 @@ const MAX_ENTRIES = 4;
 const DEFAULT_FEED_WIDTH_PX = 332;
 
 export class KillFeed {
-  private readonly root: HTMLDivElement;
+  readonly root: HTMLDivElement;
   private readonly entries: KillEntry[] = [];
   private readonly freeEls: HTMLDivElement[] = [];
   private readonly gapPx: number;

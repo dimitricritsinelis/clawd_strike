@@ -34,7 +34,7 @@ export class MobileFullscreenHint {
       touchAction: "none",
       userSelect: "none",
       WebkitUserSelect: "none",
-    } as CSSStyleDeclaration);
+    });
 
     const text = document.createElement("div");
     Object.assign(text.style, {
