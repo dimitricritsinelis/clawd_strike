@@ -1455,7 +1455,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     // Design: strip away panel chrome, use thin bars + floating text
     // Auto-opacity: 0.45 base, flash to 1.0 on state change for 1.5s
 
-    const MOBILE_BASE_OPACITY = "0.45";
+    const MOBILE_BASE_OPACITY = "0.6";
     const MOBILE_FLASH_OPACITY = "1";
     const MOBILE_FLASH_DURATION_S = 1.5;
     let mobileHealthFlashTimer = 0;
@@ -1466,7 +1466,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     // ── Health: thin edge bar + small number, no panel ──────────
     const hRoot = healthHud.root;
     Object.assign(hRoot.style, {
-      bottom: `calc(4px + env(safe-area-inset-bottom, 0px))`,
+      bottom: `calc(8px + env(safe-area-inset-bottom, 0px))`,
       left: `calc(60px + env(safe-area-inset-left, 0px))`,
       padding: "0",
       background: "transparent",
@@ -1485,9 +1485,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (hChildren[1]) hChildren[1].style.display = "none"; // "HP" label
     if (hChildren[2]) {
       Object.assign(hChildren[2].style, {
-        fontSize: "13px",
+        fontSize: "16px",
         fontWeight: "700",
-        marginBottom: "2px",
+        marginBottom: "3px",
         minWidth: "0",
         textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
       });
@@ -1497,8 +1497,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     // ── Ammo: floating text, no panel ───────────────────────────
     const aRoot = ammoHud.root;
     Object.assign(aRoot.style, {
-      bottom: `calc(112px + env(safe-area-inset-bottom, 0px))`,
-      right: `calc(30px + env(safe-area-inset-right, 0px))`,
+      bottom: `calc(108px + env(safe-area-inset-bottom, 0px))`,
+      right: `calc(20px + env(safe-area-inset-right, 0px))`,
       padding: "0",
       background: "transparent",
       border: "none",
@@ -1534,16 +1534,18 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     // ── Timer: more aggressive scale ────────────────────────────
     Object.assign(timerHud.root.style, {
       top: `calc(4px + env(safe-area-inset-top, 0px))`,
-      padding: "3px 14px 4px",
+      padding: "2px 10px 3px",
       minWidth: "80px",
       transform: "translateX(-50%) scale(0.5)",
       transformOrigin: "top center",
+      background: "rgba(8, 16, 28, 0.35)",
+      borderRadius: "6px",
       opacity: MOBILE_BASE_OPACITY,
       transition: "opacity 0.3s ease",
     });
 
     // ── Kill feed: compact width ────────────────────────────────
-    killFeed.root.style.width = "180px";
+    killFeed.root.style.width = "220px";
     killFeed.root.style.minWidth = "0";
 
     // ── Auto-opacity flash helper (called in step loop) ─────────

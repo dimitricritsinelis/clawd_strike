@@ -665,7 +665,7 @@ body {
     top: 22%;
   }
   #start[data-name-entry-visible="true"] .logo-wrap {
-    top: 18%;
+    top: 14%;
   }
   #start .logo-img {
     width: min(78vw, 520px);
@@ -676,11 +676,11 @@ body {
   }
   #start .actions-buttons {
     gap: 18px;
-    top: 42%;
+    top: 36%;
     width: min(364px, calc(100vw - 26px));
   }
   #start .actions-nameplate {
-    top: 38%;
+    top: 34%;
     width: min(280px, calc(100vw - 60px));
     z-index: 4;
   }

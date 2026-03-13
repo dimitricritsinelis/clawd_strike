@@ -144,6 +144,8 @@ export class KillFeed {
     el.style.textAlign = "center";
     el.style.textShadow = "0 1px 2px rgba(0, 0, 0, 0.9)";
     el.style.whiteSpace = "nowrap";
+    el.style.overflow = "hidden";
+    el.style.textOverflow = "ellipsis";
     el.style.width = "100%";
     el.style.boxSizing = "border-box";
     el.style.transition = `transform 0.16s ease-out, opacity ${KILL_FADE_S}s ease-out`;

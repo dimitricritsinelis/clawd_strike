@@ -18,7 +18,7 @@ type ScoreHudKillRecord = {
 };
 
 const SANS_FONT = '"Segoe UI", Tahoma, Verdana, sans-serif';
-const BASE_OPACITY = 0.45;
+const BASE_OPACITY = 0.6;
 const FLASH_OPACITY = 1.0;
 const FLASH_DURATION_S = 1.5;
 const FADE_TRANSITION = "opacity 0.3s ease";
@@ -54,12 +54,12 @@ export class MobileScoreStrip {
       pointerEvents: "none",
       userSelect: "none",
       fontFamily: SANS_FONT,
-      fontSize: "11px",
+      fontSize: "12px",
       fontWeight: "600",
       fontVariantNumeric: "tabular-nums",
       letterSpacing: "0.06em",
       color: "rgba(228, 238, 252, 0.92)",
-      textShadow: "0 1px 2px rgba(0, 0, 0, 0.8)",
+      textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
       opacity: String(BASE_OPACITY),
       transition: FADE_TRANSITION,
     });
@@ -76,7 +76,7 @@ export class MobileScoreStrip {
     this.scoreEl = document.createElement("span");
     Object.assign(this.scoreEl.style, {
       fontWeight: "700",
-      fontSize: "12px",
+      fontSize: "13px",
       color: "#ffd78d",
     });
     this.scoreEl.textContent = "0";
@@ -95,11 +95,11 @@ export class MobileScoreStrip {
 
     const labelEl = document.createElement("span");
     Object.assign(labelEl.style, {
-      fontSize: "9px",
+      fontSize: "10px",
       fontWeight: "600",
       letterSpacing: "0.08em",
       textTransform: "uppercase",
-      color: "rgba(180, 200, 230, 0.6)",
+      color: "rgba(180, 200, 230, 0.7)",
     });
     labelEl.textContent = label;
 

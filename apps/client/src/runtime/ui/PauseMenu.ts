@@ -7,6 +7,8 @@
  * Desert bazaar theme: warm sand/gold/brown palette matching the loading screen.
  */
 
+import { isMobileDevice } from "../input/MobileDetect";
+
 const SERIF_FONT = 'Georgia, "Palatino Linotype", Palatino, "Book Antiqua", serif';
 const SANS_FONT = '"Segoe UI", Tahoma, Verdana, sans-serif';
 
@@ -130,7 +132,9 @@ export class PauseMenu {
       letterSpacing: "0.04em",
       marginBottom: "18px",
     });
-    hintEl.textContent = "Press Escape to return to game";
+    hintEl.textContent = isMobileDevice()
+      ? "Tap Resume to return to game"
+      : "Press Escape to return to game";
 
     const buttonsGrid = document.createElement("div");
     Object.assign(buttonsGrid.style, {
@@ -140,7 +144,7 @@ export class PauseMenu {
       width: "100%",
     });
 
-    const baseBtnStyle = {
+    const baseBtnStyle: Record<string, string> = {
       border: "1px solid rgba(255, 214, 150, 0.26)",
       borderRadius: "8px",
       padding: "10px 14px",
@@ -149,6 +153,11 @@ export class PauseMenu {
       fontWeight: "600",
       letterSpacing: "0.03em",
       cursor: "pointer",
+      pointerEvents: "auto",
+      touchAction: "manipulation",
+      WebkitUserSelect: "none",
+      WebkitTouchCallout: "none",
+      userSelect: "none",
     };
 
     const PRIMARY_BG = "rgba(44, 24, 10, 0.86)";
@@ -207,6 +216,20 @@ export class PauseMenu {
       if (!this.visible) return;
       this.onShowControls?.();
     });
+
+    // Mobile: add touchend listeners as fallback for iOS Safari click synthesis issues
+    if (isMobileDevice()) {
+      for (const btn of [gameBtn, lobbyBtn, howToPlayBtn, controlsBtn]) {
+        btn.addEventListener(
+          "touchend",
+          (e) => {
+            e.preventDefault();
+            btn.click();
+          },
+          { passive: false },
+        );
+      }
+    }
   }
 
   show(): void {

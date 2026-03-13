@@ -1,4 +1,5 @@
 import type { LoadingScreenInitialNameEntry, LoadingScreenMode } from "./types";
+import { LoadingScreenOrientationGuard } from "./LoadingScreenOrientationGuard";
 import {
   getDeviceVariant,
   getLoadingScreenFallbackAssetUrl,
@@ -268,6 +269,9 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   start.dataset.assetsReady = "false";
   start.dataset.transitioning = "false";
   loadingScreenOverlay.setAttribute("aria-hidden", "true");
+
+  // Portrait lock: show overlay when mobile user rotates to landscape on loading screen
+  const loadingOrientationGuard = new LoadingScreenOrientationGuard(start);
 
   function setNameInputValidationState(reason: PlayerNameValidationReason): void {
     const invalid = reason !== "valid";
@@ -708,6 +712,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
       enterAgentModeBtn.removeEventListener("click", onEnterAgentMode);
       playerNameInput.removeEventListener("input", onNameInput);
       playerNameInput.removeEventListener("keydown", onNameInputKeyDown);
+      loadingOrientationGuard.dispose();
     },
     setMuteState(muted) {
       muteToggleBtn.classList.toggle("is-muted", muted);
