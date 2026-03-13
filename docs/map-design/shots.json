@@ -310,7 +310,7 @@
     {
       "id": "SHOT_12_SPAWN_B_BALCONY_HERO",
       "label": "Spawn B center-bay hero",
-      "description": "Spawn B north wall hero review; validates the dominant stained-glass bay, layered pediment, and stone entablature centered above the main door.",
+      "description": "Spawn B north wall hero review; validates the continuous stained-glass opening, integrated pediment, and structural entablature centered above the main door.",
       "camera": {
         "pos": {
           "x": 25.0,
@@ -332,14 +332,14 @@
       ],
       "reviewPriority": "high",
       "reviewFocus": [
-        "hero window dominance over the standard window field",
-        "layered pediment and entablature reading as one centered axis",
-        "pilaster and corbel symmetry"
+        "continuous arched hero opening reading as one field instead of a stacked transom",
+        "integrated pediment and entablature reading as one centered structural composition",
+        "substantial pilasters and five symmetric corbels reading clearly from gameplay distance"
       ],
       "mustShow": [
-        "hero stained-glass bay centered directly over the front door",
-        "stone entablature with symmetric corbels below the hero bay",
-        "layered pediment above the hero surround",
+        "one continuous hero stained-glass bay centered directly over the front door",
+        "stone entablature with five symmetric corbels below the hero bay",
+        "integrated pediment above the hero surround",
         "three upper standard windows framing each side of the center bay"
       ]
     }

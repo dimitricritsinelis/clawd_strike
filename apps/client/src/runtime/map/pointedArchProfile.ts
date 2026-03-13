@@ -89,14 +89,14 @@ export const HERO_POINTED_ARCH_APERTURE_PANEL_BOUNDS: PointedArchShapeBounds = O
 export const SPAWN_HERO_POINTED_ARCH_FRAME_OUTER_BOUNDS: PointedArchShapeBounds = Object.freeze({
   widthHalf: 0.5,
   bottomY: -0.5,
-  springY: 0.04,
+  springY: -0.05,
   apexY: 0.5,
 });
 
 export const SPAWN_HERO_POINTED_ARCH_FRAME_APERTURE_BOUNDS: PointedArchShapeBounds = Object.freeze({
   widthHalf: 0.39,
   bottomY: -0.44,
-  springY: 0.01,
+  springY: -0.08,
   apexY: 0.42,
 });
 

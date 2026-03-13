@@ -6,7 +6,7 @@ Do not use for: workflow policy, durable rationale, archive history, product tru
 Schema version: stm-v2
 Canonical playtest URL: http://127.0.0.1:4174/?map=bazaar-map
 Map approval status: NOT APPROVED
-Last compacted: 2026-03-13T15:28:30Z
+Last compacted: 2026-03-13T19:07:52Z
 
 # short_term_memory.md - Clawd Strike Status
 
@@ -106,9 +106,9 @@ Recent Notes:
 
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->
+- STM-20260313-185148-codex | map-visual | Spawn B center hero bay final polish | 2026-03-13 | Final Spawn B hero-bay pass rebuilt the center opening, pediment, entablature, and corbels into one integrated module; updated the owning map spec/hero shot criteria, regenerated derived map outputs, and passed typecheck/test:server/smoke:game/qa:completion with refreshed captures.
 - STM-20260313-152804-codex | map-visual | Spawn B facade second pass | 2026-03-13 | Spawn B now keeps the corrected layout skeleton while using Spawn B-specific arch profiles, deeper door surrounds with side-door crown accents, a rebuilt hero bay/ledge/corbel stack, improved stained-glass grading, regenerated map outputs, and passing typecheck/test:server/smoke:game/qa:completion plus verified facade captures.
 - STM-20260313-041415-codex | map-geometry | Spawn B courtyard registry pass | 2026-03-13 | Spawn B now uses module-driven composition overrides with one standard window family, one standard door family, a rebuilt centered hero bay, regenerated runtime map/shot data, and passing typecheck/test:server/smoke:game/qa:completion plus manual screenshot capture.
 - STM-20260312-034350-codex | ui-flow | Buff vignette reliability fix | 2026-03-12 | Replaced the fragile buff vignette compositor with an inline-SVG alpha overlay, verified visible buff/hit states in a real Chrome human runtime on localhost, and passed typecheck plus smoke validation.
 - STM-20260312-033605-codex | map-geometry | Tighten door surround reveal | 2026-03-12 | Root cause was the castle-door surround intentionally centering the model inside a 3.5–6 cm reveal; cover-envelope math now stays wide for masking while the visible surround reveal is tightened to 0.8–1.8 cm, with regeneration and validation passing.
-- STM-20260312-032013-codex | ui-flow | Buff charged-vessel screen effect | 2026-03-12 | Implemented a masked charged-vessel buff overlay with dominant-color refresh behavior, localhost QA hooks, captured visual screenshots, and passing typecheck plus smoke validation.
 <!-- TOOL-MANAGED END: completed-rollup -->

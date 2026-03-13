@@ -73,6 +73,8 @@ export type WallDetailMeshId =
   | "spawn_hero_window_pointed_arch_void"
   | "spawn_hero_window_pointed_arch_glass"
   | "spawn_hero_window_pointed_arch_frame"
+  | "spawn_hero_pediment"
+  | "spawn_hero_corbel"
   | "window_glass"
   | "balcony_slab"
   | "balcony_parapet"
@@ -155,6 +157,8 @@ const DETAIL_IDS: WallDetailMeshId[] = [
   "spawn_hero_window_pointed_arch_void",
   "spawn_hero_window_pointed_arch_glass",
   "spawn_hero_window_pointed_arch_frame",
+  "spawn_hero_pediment",
+  "spawn_hero_corbel",
   "window_glass",
   "balcony_slab",
   "balcony_parapet",
@@ -165,7 +169,9 @@ const DETAIL_IDS: WallDetailMeshId[] = [
 ];
 
 function isStainedGlassMaterialId(materialId: string | null): boolean {
-  return materialId === "tm_stained_glass_bright" || materialId === "tm_stained_glass_dim";
+  return materialId === "tm_stained_glass_bright"
+    || materialId === "tm_stained_glass_dim"
+    || materialId === "tm_stained_glass_hero";
 }
 
 const HEAVY_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
@@ -182,6 +188,8 @@ const HEAVY_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
   "spawn_window_pointed_arch_frame",
   "hero_window_pointed_arch_frame",
   "spawn_hero_window_pointed_arch_frame",
+  "spawn_hero_pediment",
+  "spawn_hero_corbel",
 ]);
 
 const LIGHT_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
@@ -205,6 +213,8 @@ const SURFACE_TRIM_MESH_IDS = new Set<WallDetailMeshId>([
   "spawn_window_pointed_arch_frame",
   "hero_window_pointed_arch_frame",
   "spawn_hero_window_pointed_arch_frame",
+  "spawn_hero_pediment",
+  "spawn_hero_corbel",
 ]);
 
 const WALL_DETAIL_RENDER_ORDER = 10;
@@ -396,8 +406,9 @@ function createSpawnHeroPointedArchShape(widthHalf: number, bottomY: number, spr
   shape.moveTo(-widthHalf, bottomY);
   shape.lineTo(widthHalf, bottomY);
   shape.lineTo(widthHalf, springY);
-  shape.quadraticCurveTo(widthHalf * 0.74, apexY * 0.92, 0, apexY);
-  shape.quadraticCurveTo(-widthHalf * 0.74, apexY * 0.92, -widthHalf, springY);
+  const shoulderLiftY = springY + (apexY - springY) * 0.46;
+  shape.bezierCurveTo(widthHalf * 0.9, shoulderLiftY, widthHalf * 0.34, apexY * 0.99, 0, apexY);
+  shape.bezierCurveTo(-widthHalf * 0.34, apexY * 0.99, -widthHalf * 0.9, shoulderLiftY, -widthHalf, springY);
   shape.lineTo(-widthHalf, bottomY);
   return shape;
 }
@@ -437,6 +448,51 @@ function createSpawnHeroPointedArchFrameGeometry(): BufferGeometry {
     depth: 1,
     bevelEnabled: false,
     curveSegments: 32,
+  });
+  geometry.rotateY(Math.PI * 0.5);
+  geometry.translate(-0.5, 0, 0);
+  applyProjectedArchUvs(geometry);
+  return geometry;
+}
+
+function createSpawnHeroPedimentGeometry(): BufferGeometry {
+  const shape = new Shape();
+  shape.moveTo(-0.5, -0.36);
+  shape.lineTo(0.5, -0.36);
+  shape.lineTo(0.34, -0.14);
+  shape.lineTo(0.18, 0.04);
+  shape.lineTo(0, 0.5);
+  shape.lineTo(-0.18, 0.04);
+  shape.lineTo(-0.34, -0.14);
+  shape.lineTo(-0.5, -0.36);
+
+  const geometry = new ExtrudeGeometry(shape, {
+    depth: 1,
+    bevelEnabled: false,
+    curveSegments: 10,
+  });
+  geometry.rotateY(Math.PI * 0.5);
+  geometry.translate(-0.5, 0, 0);
+  applyProjectedArchUvs(geometry);
+  return geometry;
+}
+
+function createSpawnHeroCorbelGeometry(): BufferGeometry {
+  const shape = new Shape();
+  shape.moveTo(-0.5, 0.5);
+  shape.lineTo(0.5, 0.5);
+  shape.lineTo(0.4, 0.08);
+  shape.lineTo(0.22, -0.22);
+  shape.lineTo(0.06, -0.5);
+  shape.lineTo(-0.06, -0.5);
+  shape.lineTo(-0.22, -0.22);
+  shape.lineTo(-0.4, 0.08);
+  shape.lineTo(-0.5, 0.5);
+
+  const geometry = new ExtrudeGeometry(shape, {
+    depth: 1,
+    bevelEnabled: false,
+    curveSegments: 4,
   });
   geometry.rotateY(Math.PI * 0.5);
   geometry.translate(-0.5, 0, 0);
@@ -484,15 +540,16 @@ function loadTemplateTexture(relativeUrl: string, colorSpace: Texture["colorSpac
 
 type PhysicalMaterialShader = Parameters<NonNullable<MeshPhysicalMaterial["onBeforeCompile"]>>[0];
 
-function applyStainedGlassShaderTweaks(material: MeshPhysicalMaterial, variant: "bright" | "dim"): void {
-  const isBright = variant === "bright";
-  const contrastBoost = isBright ? 1.18 : 1.08;
-  const saturationBoost = isBright ? 1.26 : 1.12;
-  const leadLumaStart = isBright ? 0.18 : 0.22;
-  const leadLumaEnd = isBright ? 0.36 : 0.42;
-  const leadDarken = isBright ? 0.38 : 0.48;
-  const emissiveBoost = isBright ? 1.18 : 1.05;
-  const emissiveLeadDarken = isBright ? 0.56 : 0.68;
+function applyStainedGlassShaderTweaks(material: MeshPhysicalMaterial, variant: "bright" | "dim" | "hero"): void {
+  const isHero = variant === "hero";
+  const isBright = variant === "bright" || isHero;
+  const contrastBoost = isHero ? 1.34 : (isBright ? 1.18 : 1.08);
+  const saturationBoost = isHero ? 1.42 : (isBright ? 1.26 : 1.12);
+  const leadLumaStart = isHero ? 0.24 : (isBright ? 0.18 : 0.22);
+  const leadLumaEnd = isHero ? 0.42 : (isBright ? 0.36 : 0.42);
+  const leadDarken = isHero ? 0.28 : (isBright ? 0.38 : 0.48);
+  const emissiveBoost = isHero ? 1.22 : (isBright ? 1.18 : 1.05);
+  const emissiveLeadDarken = isHero ? 0.42 : (isBright ? 0.56 : 0.68);
 
   const previousOnBeforeCompile = material.onBeforeCompile;
   material.onBeforeCompile = (shader: PhysicalMaterialShader, renderer): void => {
@@ -539,27 +596,48 @@ function applyStainedGlassShaderTweaks(material: MeshPhysicalMaterial, variant: 
   material.needsUpdate = true;
 }
 
-function createStainedGlassMaterial(variant: "bright" | "dim"): MeshPhysicalMaterial {
-  const baseColorTex = loadTemplateTexture(`${STAINED_GLASS_TEXTURE_BASE_URL}/Glass_Stained_Panel_001_basecolor.png`, SRGBColorSpace);
-  const opacityTex = loadTemplateTexture(`${STAINED_GLASS_TEXTURE_BASE_URL}/Glass_Stained_Panel_001_opacity.png`, NoColorSpace);
-  const roughnessTex = loadTemplateTexture(`${STAINED_GLASS_TEXTURE_BASE_URL}/Glass_Stained_Panel_001_roughness.png`, NoColorSpace);
+function createStainedGlassMaterial(variant: "bright" | "dim" | "hero"): MeshPhysicalMaterial {
+  const baseColorSource = loadTemplateTexture(
+    `${STAINED_GLASS_TEXTURE_BASE_URL}/Glass_Stained_Panel_001_basecolor.png`,
+    SRGBColorSpace,
+  );
+  const opacitySource = loadTemplateTexture(
+    `${STAINED_GLASS_TEXTURE_BASE_URL}/Glass_Stained_Panel_001_opacity.png`,
+    NoColorSpace,
+  );
+  const roughnessSource = loadTemplateTexture(
+    `${STAINED_GLASS_TEXTURE_BASE_URL}/Glass_Stained_Panel_001_roughness.png`,
+    NoColorSpace,
+  );
 
-  const isBright = variant === "bright";
+  const isHero = variant === "hero";
+  const isBright = variant === "bright" || isHero;
+  const baseColorTex = isHero ? baseColorSource.clone() : baseColorSource;
+  const opacityTex = isHero ? opacitySource.clone() : opacitySource;
+  const roughnessTex = isHero ? roughnessSource.clone() : roughnessSource;
+  if (isHero) {
+    for (const texture of [baseColorTex, opacityTex, roughnessTex]) {
+      texture.repeat.set(0.72, 0.72);
+      texture.offset.set(0.14, 0.12);
+      texture.needsUpdate = true;
+    }
+  }
+
   const material = new MeshPhysicalMaterial({
     color: isBright ? 0xffffff : 0xc3d0c8,
-    roughness: isBright ? 0.22 : 0.36,
+    roughness: isHero ? 0.18 : (isBright ? 0.22 : 0.36),
     roughnessMap: roughnessTex,
     metalness: 0.0,
     map: baseColorTex,
     alphaMap: opacityTex,
     emissive: 0xffffff,
     emissiveMap: baseColorTex,
-    emissiveIntensity: isBright ? 0.44 : 0.22,
-    transmission: isBright ? 0.06 : 0.02,
-    thickness: isBright ? 0.025 : 0.015,
+    emissiveIntensity: isHero ? 0.54 : (isBright ? 0.44 : 0.22),
+    transmission: isHero ? 0.08 : (isBright ? 0.06 : 0.02),
+    thickness: isHero ? 0.03 : (isBright ? 0.025 : 0.015),
     ior: 1.06,
-    clearcoat: 0.12,
-    clearcoatRoughness: 0.46,
+    clearcoat: isHero ? 0.16 : 0.12,
+    clearcoatRoughness: isHero ? 0.4 : 0.46,
     transparent: true,
     opacity: isBright ? 0.98 : 0.92,
     alphaTest: 0.02,
@@ -585,7 +663,8 @@ type TemplateMaterialOverrideId =
   | "tm_balcony_wood_dark"
   | "tm_balcony_painted_metal"
   | "tm_stained_glass_bright"
-  | "tm_stained_glass_dim";
+  | "tm_stained_glass_dim"
+  | "tm_stained_glass_hero";
 
 function applyRoofDustShader(material: MeshStandardMaterial): void {
   const previousOnBeforeCompile = material.onBeforeCompile;
@@ -862,6 +941,14 @@ function createTemplates(highVis: boolean): Record<WallDetailMeshId, DetailTempl
       geometry: createSpawnHeroPointedArchFrameGeometry(),
       material: frameTrim,
     },
+    spawn_hero_pediment: {
+      geometry: createSpawnHeroPedimentGeometry(),
+      material: stoneTrim,
+    },
+    spawn_hero_corbel: {
+      geometry: createSpawnHeroCorbelGeometry(),
+      material: stoneTrim,
+    },
     window_glass: {
       geometry: new BoxGeometry(1, 1, 1),
       material: windowGlass,
@@ -909,6 +996,7 @@ function createTemplateMaterialOverrides(
     }),
     tm_stained_glass_bright: createStainedGlassMaterial("bright"),
     tm_stained_glass_dim: createStainedGlassMaterial("dim"),
+    tm_stained_glass_hero: createStainedGlassMaterial("hero"),
   };
 }
 
