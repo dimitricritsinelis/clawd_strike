@@ -16,6 +16,7 @@ const KNOWN_ZONE_TYPES = new Set([
 const KNOWN_ANCHOR_TYPES = new Set([
   "cloth_canopy_span",
   "cover_cluster",
+  "decorative_palm",
   "hero_landmark",
   "landmark",
   "open_node",

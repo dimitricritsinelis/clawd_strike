@@ -145,6 +145,37 @@
     },
     "composition_layout_overrides": [
       {
+        "zoneId": "SPAWN_A_COURTYARD",
+        "face": "south",
+        "segmentOrdinal": 1,
+        "kind": "spawn_b_front_courtyard",
+        "windowModuleId": "spawn_standard_window",
+        "doorModuleId": "spawn_standard_door",
+        "heroBayModuleId": "spawn_b_center_hero",
+        "lowerWindowSillY": 0.98,
+        "upperWindowSillY": 3.78
+      },
+      {
+        "zoneId": "SPAWN_A_COURTYARD",
+        "face": "east",
+        "segmentOrdinal": 1,
+        "kind": "spawn_b_side_courtyard",
+        "windowModuleId": "spawn_standard_window",
+        "doorModuleId": "spawn_standard_door",
+        "lowerWindowSillY": 0.98,
+        "upperWindowSillY": 3.78
+      },
+      {
+        "zoneId": "SPAWN_A_COURTYARD",
+        "face": "west",
+        "segmentOrdinal": 1,
+        "kind": "spawn_b_side_courtyard",
+        "windowModuleId": "spawn_standard_window",
+        "doorModuleId": "spawn_standard_door",
+        "lowerWindowSillY": 0.98,
+        "upperWindowSillY": 3.78
+      },
+      {
         "zoneId": "SPAWN_B_GATE_PLAZA",
         "face": "north",
         "segmentOrdinal": 1,
@@ -1314,6 +1345,132 @@
       "yawDeg": 0,
       "widthM": 6,
       "notes": "Arch approach clear zone. width_m=radiusM=6m. No stalls or filler props. Arch is a solo landmark read."
+    },
+    {
+      "id": "PALM_M2_WEST_POCKET",
+      "type": "decorative_palm",
+      "zone": "BZ_M2_JOG",
+      "pos": {
+        "x": 21.35,
+        "y": 40.4,
+        "z": 0
+      },
+      "yawDeg": 92,
+      "widthM": 1.8,
+      "heightM": 6.4,
+      "notes": "Visual-only west jog pocket palm. Keep fully in the recess pocket so it reads as skyline/soft framing and stays subordinate to the well landmark."
+    },
+    {
+      "id": "PALM_SPAWN_A_NE",
+      "type": "decorative_palm",
+      "zone": "SPAWN_A_COURTYARD",
+      "pos": {
+        "x": 32.8,
+        "y": 10.8,
+        "z": 0
+      },
+      "yawDeg": 318,
+      "widthM": 1.85,
+      "heightM": 6.8,
+      "notes": "Visual-only courtyard palm in a planter near the northeast spawn corner; completes the courtyard ring while keeping the main north push clear."
+    },
+    {
+      "id": "PALM_SPAWN_A_NW",
+      "type": "decorative_palm",
+      "zone": "SPAWN_A_COURTYARD",
+      "pos": {
+        "x": 17.2,
+        "y": 10.8,
+        "z": 0
+      },
+      "yawDeg": 42,
+      "widthM": 1.85,
+      "heightM": 6.6,
+      "notes": "Visual-only courtyard palm in a planter near the northwest spawn corner; completes the courtyard ring while keeping the main north push clear."
+    },
+    {
+      "id": "PALM_SPAWN_A_SE",
+      "type": "decorative_palm",
+      "zone": "SPAWN_A_COURTYARD",
+      "pos": {
+        "x": 33.2,
+        "y": 3.5,
+        "z": 0
+      },
+      "yawDeg": 342,
+      "widthM": 1.85,
+      "heightM": 6.6,
+      "notes": "Visual-only courtyard palm in a planter against the southeast wall; keep the main north push and spawn exits clear."
+    },
+    {
+      "id": "PALM_SPAWN_A_SW",
+      "type": "decorative_palm",
+      "zone": "SPAWN_A_COURTYARD",
+      "pos": {
+        "x": 16.8,
+        "y": 3.2,
+        "z": 0
+      },
+      "yawDeg": 18,
+      "widthM": 1.85,
+      "heightM": 6.3,
+      "notes": "Visual-only courtyard palm in a planter against the southwest wall; keep the main north push and spawn exits clear."
+    },
+    {
+      "id": "PALM_SPAWN_B_NE",
+      "type": "decorative_palm",
+      "zone": "SPAWN_B_GATE_PLAZA",
+      "pos": {
+        "x": 33.2,
+        "y": 78.6,
+        "z": 0
+      },
+      "yawDeg": 206,
+      "widthM": 1.9,
+      "heightM": 7,
+      "notes": "Visual-only courtyard palm in a planter against the northeast shell wall; keeps the hero-arch approach uncluttered."
+    },
+    {
+      "id": "PALM_SPAWN_B_NW",
+      "type": "decorative_palm",
+      "zone": "SPAWN_B_GATE_PLAZA",
+      "pos": {
+        "x": 16.8,
+        "y": 78.8,
+        "z": 0
+      },
+      "yawDeg": 152,
+      "widthM": 1.9,
+      "heightM": 6.8,
+      "notes": "Visual-only courtyard palm in a planter against the northwest shell wall; keeps the hero-arch approach uncluttered."
+    },
+    {
+      "id": "PALM_SPAWN_B_SE",
+      "type": "decorative_palm",
+      "zone": "SPAWN_B_GATE_PLAZA",
+      "pos": {
+        "x": 32.8,
+        "y": 71.2,
+        "z": 0
+      },
+      "yawDeg": 222,
+      "widthM": 1.9,
+      "heightM": 7,
+      "notes": "Visual-only courtyard palm in a planter near the southeast gate-plaza corner; completes the courtyard ring while keeping the arch centerline open."
+    },
+    {
+      "id": "PALM_SPAWN_B_SW",
+      "type": "decorative_palm",
+      "zone": "SPAWN_B_GATE_PLAZA",
+      "pos": {
+        "x": 17.2,
+        "y": 71.2,
+        "z": 0
+      },
+      "yawDeg": 138,
+      "widthM": 1.9,
+      "heightM": 6.9,
+      "notes": "Visual-only courtyard palm in a planter near the southwest gate-plaza corner; completes the courtyard ring while keeping the arch centerline open."
     },
     {
       "id": "PP_M1_EAST_NEAR_CUT",

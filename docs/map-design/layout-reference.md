@@ -116,8 +116,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Contains: none
 - Linked walls: `WALL_BLDG_G_FRONT`, `WALL_AREA_SPAWN_A_SOUTH`, `WALL_AREA_SPAWN_A_EAST`, `WALL_AREA_SPAWN_A_WEST`
 - Linked buildings: `BLDG_G`
-- Anchors: spawn-cover x2
-- Anchor IDs: `PP_SPAWN_A_01`, `PP_SPAWN_A_02`
+- Anchors: decorative-palm x4, spawn-cover x2
+- Anchor IDs: `PALM_SPAWN_A_NE`, `PALM_SPAWN_A_NW`, `PALM_SPAWN_A_SE`, `PALM_SPAWN_A_SW`, `PP_SPAWN_A_01`, `PP_SPAWN_A_02`
 - Floor surface: PBR floor material `large_sandstone_blocks_01`
 - Wall material summary: Walls `ph_whitewashed_brick_warm`, `ph_aged_plaster_ochre` with heavy trims `ph_trim_sanded_01` and light trims `ph_band_beige_001`.
 - Constraints: Spawn safety cover + quick access to all lanes via bazaar center and side connectors.
@@ -135,8 +135,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Contains: none
 - Linked walls: `WALL_AREA_SPAWN_B_NORTH`, `WALL_BLDG_H_FRONT`, `WALL_AREA_SPAWN_B_EAST`, `WALL_AREA_SPAWN_B_WEST`
 - Linked buildings: `BLDG_H`
-- Anchors: spawn-cover x2
-- Anchor IDs: `PP_SPAWN_B_01`, `PP_SPAWN_B_02`
+- Anchors: decorative-palm x4, spawn-cover x2
+- Anchor IDs: `PALM_SPAWN_B_NE`, `PALM_SPAWN_B_NW`, `PALM_SPAWN_B_SE`, `PALM_SPAWN_B_SW`, `PP_SPAWN_B_01`, `PP_SPAWN_B_02`
 - Floor surface: PBR floor material `cobblestone_pavement`
 - Wall material summary: Walls `ph_brick_4_desert`, `ph_whitewashed_brick_warm` with heavy trims `ph_stone_trim_white`, `ph_trim_sanded_01` and light trims `ph_band_plastered`, `ph_band_beige_001`.
 - Constraints: Spawn safety cover + landmark arch threshold into bazaar.
@@ -173,8 +173,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Contains: `AREA_CLEAR_JOG`, `AREA_STALL_JOG_A`, `AREA_STALL_JOG_B`
 - Linked walls: `WALL_AREA_MAIN_HALL_JOG_NORTH`, `WALL_AREA_MAIN_HALL_JOG_SOUTH`, `WALL_BLDG_D_FRONT`, `WALL_BLDG_C_FRONT`
 - Linked buildings: `BLDG_C`, `BLDG_D`
-- Anchors: canopy x1, cover x2, landmark x1, open-node x1, shopfront x11, signage x5
-- Anchor IDs: `CLOTH_SPAN_02`, `LMK_MID_WELL_01`, `M2_SHOP_L_01`, `M2_SHOP_L_02`, `M2_SHOP_L_03`, `M2_SHOP_L_04`, `M2_SHOP_L_05`, `M2_SHOP_R_01`, `M2_SHOP_R_02`, `M2_SHOP_R_03`, `M2_SHOP_R_04`, `M2_SHOP_R_05`, `M2_SHOP_R_06`, `M2_SIGN_L_01`, `M2_SIGN_L_02`, `M2_SIGN_L_03`, `M2_SIGN_R_01`, `M2_SIGN_R_02`, `NODE_M2_COURT_01`, `PP_M2_EAST_NEAR_JOG`, `PP_M2_WEST_NEAR_JOG`
+- Anchors: canopy x1, cover x2, decorative-palm x1, landmark x1, open-node x1, shopfront x11, signage x5
+- Anchor IDs: `CLOTH_SPAN_02`, `LMK_MID_WELL_01`, `M2_SHOP_L_01`, `M2_SHOP_L_02`, `M2_SHOP_L_03`, `M2_SHOP_L_04`, `M2_SHOP_L_05`, `M2_SHOP_R_01`, `M2_SHOP_R_02`, `M2_SHOP_R_03`, `M2_SHOP_R_04`, `M2_SHOP_R_05`, `M2_SHOP_R_06`, `M2_SIGN_L_01`, `M2_SIGN_L_02`, `M2_SIGN_L_03`, `M2_SIGN_R_01`, `M2_SIGN_R_02`, `NODE_M2_COURT_01`, `PALM_M2_WEST_POCKET`, `PP_M2_EAST_NEAR_JOG`, `PP_M2_WEST_NEAR_JOG`
 - Floor surface: PBR floor material `cobblestone_color`
 - Wall material summary: Walls `ph_aged_plaster_ochre`, `ph_beige_wall_002`, `ph_lime_plaster_sun` with heavy trims `ph_trim_sanded_01`, `ph_stone_trim_white` and light trims `ph_band_beige_001`, `ph_band_beige_002`.
 - Constraints: Wider stalls, fewer count. Jog +2.0m East breaks LoS. Asymmetric left/right stall count. Well node at Y=41. Keep 6.0m minimum main-lane width.
@@ -641,7 +641,7 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Trim materials: heavy `ph_stone_trim_white`, light `ph_band_beige_002`
 - Balcony material: none
 - Opening totals: 1 ground doors, 0 upper door openings, 0 balconies, 6 glass windows, 0 dark windows, 0 shuttered windows
-- Anchor summary: canopy x1, cover x1, shopfront x5, signage x3
+- Anchor summary: canopy x1, cover x1, decorative-palm x1, shopfront x5, signage x3
 - Texture logic: service facade family on BZ_M2_JOG:west resolves wall `ph_beige_wall_002` with balcony material none.
 - Trim logic: Restrained trim tier minimizes banding and keeps trims on `ph_stone_trim_white` / `ph_band_beige_002`.
 - Notes: Service wall on the west side of the jog.
@@ -717,7 +717,7 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Trim materials: heavy `ph_trim_sanded_01`, light `ph_band_beige_001`
 - Balcony material: `ph_trim_sanded_01`
 - Opening totals: 0 ground doors, 0 upper door openings, 0 balconies, 4 glass windows, 8 dark windows, 0 shuttered windows
-- Anchor summary: spawn-cover x2
+- Anchor summary: decorative-palm x2, spawn-cover x2
 - Texture logic: spawn facade family on SPAWN_A_COURTYARD:north resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
 - Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
 - Notes: Spawn A entry frontage looking into the bazaar.
@@ -736,7 +736,7 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Trim materials: heavy `ph_trim_sanded_01`, light `ph_band_beige_001`
 - Balcony material: `ph_trim_sanded_01`
 - Opening totals: 0 ground doors, 0 upper door openings, 0 balconies, 4 glass windows, 8 dark windows, 0 shuttered windows
-- Anchor summary: spawn-cover x2
+- Anchor summary: decorative-palm x1, spawn-cover x2
 - Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:south resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
 - Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
 - Notes: Spawn B entry frontage behind the hero arch.
@@ -804,8 +804,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Balcony logic: #1 No balconies because the segment does not provide enough contiguous window bays for a dominant door. #2 No balconies because the segment does not provide enough contiguous window bays for a dominant door.
 - Texture logic: spawn facade family on SPAWN_A_COURTYARD:north resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
 - Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
-- Anchor summary: spawn-cover x2
-- Anchor IDs: `PP_SPAWN_A_01`, `PP_SPAWN_A_02`
+- Anchor summary: decorative-palm x2, spawn-cover x2
+- Anchor IDs: `PALM_SPAWN_A_NE`, `PALM_SPAWN_A_NW`, `PP_SPAWN_A_01`, `PP_SPAWN_A_02`
 - Segment breakdown:
   - #1: usable=5.55m, bays=2, pattern=W W, doors=0/0, balconies=0, windows=2 glass / 4 dark / 0 shuttered
     logic: Facade grid uses 2 bays across 5.55m usable length with 2.77m bay width. No ground doors because 5.55m usable length does not reach the frontage threshold. 2 window column(s) with accent columns [0, 1]. No balconies because the segment does not provide enough contiguous window bays for a dominant door.
@@ -865,7 +865,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Balcony logic: #1 No balconies because preset residential_quiet does not enable balcony stacks. #2 No balcony evaluation; segment is below the minimum facade length.
 - Texture logic: spawn facade family on SPAWN_A_COURTYARD:east resolves wall `ph_aged_plaster_ochre` with balcony material `ph_trim_sanded_01`.
 - Trim logic: Accented trim tier keeps base trim and string-course reads with `ph_trim_sanded_01` / `ph_band_beige_001`.
-- Anchor summary: none
+- Anchor summary: decorative-palm x1
+- Anchor IDs: `PALM_SPAWN_A_SE`
 - Segment breakdown:
   - #1: usable=7.30m, bays=3, pattern=W W W, doors=0/0, balconies=0, windows=3 glass / 1 dark / 2 shuttered
     logic: Facade grid uses 3 bays across 7.30m usable length with 2.43m bay width. No ground doors because wall role spawn_side_window_rich suppresses frontage openings. 3 window column(s) with accent columns [0, 1]. No balconies because preset residential_quiet does not enable balcony stacks.
@@ -896,7 +897,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Balcony logic: #1 No balconies because preset residential_quiet does not enable balcony stacks. #2 No balcony evaluation; segment is below the minimum facade length.
 - Texture logic: spawn facade family on SPAWN_A_COURTYARD:west resolves wall `ph_aged_plaster_ochre` with balcony material `ph_trim_sanded_01`.
 - Trim logic: Accented trim tier keeps base trim and string-course reads with `ph_trim_sanded_01` / `ph_band_beige_001`.
-- Anchor summary: none
+- Anchor summary: decorative-palm x1
+- Anchor IDs: `PALM_SPAWN_A_SW`
 - Segment breakdown:
   - #1: usable=7.30m, bays=3, pattern=W W W, doors=0/0, balconies=0, windows=3 glass / 1 dark / 2 shuttered
     logic: Facade grid uses 3 bays across 7.30m usable length with 2.43m bay width. No ground doors because wall role spawn_side_window_rich suppresses frontage openings. 3 window column(s) with accent columns [0, 1]. No balconies because preset residential_quiet does not enable balcony stacks.
@@ -956,8 +958,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Balcony logic: #1 No balconies because the segment does not provide enough contiguous window bays for a dominant door. #2 No balconies because the segment does not provide enough contiguous window bays for a dominant door.
 - Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:south resolves wall `ph_whitewashed_brick_warm` with balcony material `ph_trim_sanded_01`.
 - Trim logic: Hero trim tier uses the heaviest parapet and trim emphasis with `ph_trim_sanded_01` and `ph_band_beige_001`.
-- Anchor summary: spawn-cover x2
-- Anchor IDs: `PP_SPAWN_B_01`, `PP_SPAWN_B_02`
+- Anchor summary: decorative-palm x1, spawn-cover x2
+- Anchor IDs: `PALM_SPAWN_B_SE`, `PP_SPAWN_B_01`, `PP_SPAWN_B_02`
 - Segment breakdown:
   - #1: usable=5.55m, bays=2, pattern=W W, doors=0/0, balconies=0, windows=2 glass / 4 dark / 0 shuttered
     logic: Facade grid uses 2 bays across 5.55m usable length with 2.77m bay width. No ground doors because 5.55m usable length does not reach the frontage threshold. 2 window column(s) with accent columns [0, 1]. No balconies because the segment does not provide enough contiguous window bays for a dominant door.
@@ -988,7 +990,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because spawn frontage resolves balcony style "none".
 - Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:east resolves wall `ph_brick_4_desert` with balcony material none.
 - Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
-- Anchor summary: none
+- Anchor summary: decorative-palm x1
+- Anchor IDs: `PALM_SPAWN_B_NE`
 - Segment breakdown:
   - #1: usable=1.30m, bays=0, pattern=n/a, doors=0/0, balconies=0, windows=0 glass / 0 dark / 0 shuttered
     logic: Segment is too short for a procedural facade grid after edge margins. No procedural doors; segment is below the minimum frontage length. No procedural windows; segment is below the minimum facade length. No balcony evaluation; segment is below the minimum facade length.
@@ -1019,7 +1022,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Balcony logic: #1 No balcony evaluation; segment is below the minimum facade length. #2 No balconies because spawn frontage resolves balcony style "none".
 - Texture logic: spawn facade family on SPAWN_B_GATE_PLAZA:west resolves wall `ph_brick_4_desert` with balcony material none.
 - Trim logic: Spawn B shell cleanup keeps only edge trims: shared plinth 0.58m / 0.17m, heavy top-edge trims on `ph_stone_trim_white`, no string-course bands, and no full-height pilaster grid.
-- Anchor summary: none
+- Anchor summary: decorative-palm x2
+- Anchor IDs: `PALM_SPAWN_B_NW`, `PALM_SPAWN_B_SW`
 - Segment breakdown:
   - #1: usable=1.30m, bays=0, pattern=n/a, doors=0/0, balconies=0, windows=0 glass / 0 dark / 0 shuttered
     logic: Segment is too short for a procedural facade grid after edge margins. No procedural doors; segment is below the minimum frontage length. No procedural windows; segment is below the minimum facade length. No balcony evaluation; segment is below the minimum facade length.
@@ -1231,8 +1235,8 @@ Generated from `docs/map-design/specs/map_spec.json` with `pnpm --filter @clawd-
 - Balcony logic: #1 No balconies because service frontage resolves balcony style "none".
 - Texture logic: service facade family on BZ_M2_JOG:west resolves wall `ph_beige_wall_002` with balcony material none.
 - Trim logic: Restrained trim tier minimizes banding and keeps trims on `ph_stone_trim_white` / `ph_band_beige_002`.
-- Anchor summary: canopy x1, cover x1, shopfront x5, signage x3
-- Anchor IDs: `CLOTH_SPAN_02`, `M2_SHOP_L_01`, `M2_SHOP_L_02`, `M2_SHOP_L_03`, `M2_SHOP_L_04`, `M2_SHOP_L_05`, `M2_SIGN_L_01`, `M2_SIGN_L_02`, `M2_SIGN_L_03`, `PP_M2_WEST_NEAR_JOG`
+- Anchor summary: canopy x1, cover x1, decorative-palm x1, shopfront x5, signage x3
+- Anchor IDs: `CLOTH_SPAN_02`, `M2_SHOP_L_01`, `M2_SHOP_L_02`, `M2_SHOP_L_03`, `M2_SHOP_L_04`, `M2_SHOP_L_05`, `M2_SIGN_L_01`, `M2_SIGN_L_02`, `M2_SIGN_L_03`, `PALM_M2_WEST_POCKET`, `PP_M2_WEST_NEAR_JOG`
 - Segment breakdown:
   - #1: usable=17.30m, bays=5, pattern=_ W D W _, doors=1/0, balconies=0, windows=6 glass / 0 dark / 0 shuttered
     logic: Facade grid uses 5 bays across 17.30m usable length with 3.46m bay width. 1 ground door column(s) derived from wall role main_frontage. 2 window column(s) with accent columns [1, 3]. No balconies because service frontage resolves balcony style "none".

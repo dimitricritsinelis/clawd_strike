@@ -1645,6 +1645,8 @@ function mapAnchorCategory(anchorType) {
       return "canopy";
     case "cover_cluster":
       return "cover";
+    case "decorative_palm":
+      return "decorative-palm";
     case "hero_landmark":
     case "landmark":
       return "landmark";
