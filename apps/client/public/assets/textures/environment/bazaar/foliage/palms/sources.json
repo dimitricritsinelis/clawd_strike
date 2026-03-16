@@ -1,0 +1,47 @@
+{
+  "assets": [
+    {
+      "id": "palm_tree_bark",
+      "source": "https://polyhaven.com/a/palm_tree_bark",
+      "license": "CC0",
+      "files": [
+        "palm_tree_bark/palm_tree_bark_diff_1k.jpg",
+        "palm_tree_bark/palm_tree_bark_nor_gl_1k.jpg",
+        "palm_tree_bark/palm_tree_bark_arm_1k.jpg",
+        "palm_tree_bark/palm_tree_bark_diff_2k.jpg",
+        "palm_tree_bark/palm_tree_bark_nor_gl_2k.jpg",
+        "palm_tree_bark/palm_tree_bark_arm_2k.jpg"
+      ]
+    },
+    {
+      "id": "palm_bark",
+      "source": "https://polyhaven.com/a/palm_bark",
+      "license": "CC0",
+      "files": [
+        "palm_bark/palm_bark_diff_1k.jpg",
+        "palm_bark/palm_bark_nor_gl_1k.jpg",
+        "palm_bark/palm_bark_arm_1k.jpg"
+      ]
+    },
+    {
+      "id": "palm_frond_generated",
+      "source": "https://everytexture.com/everytexture-com-stock-nature-leaf-texture-00009/",
+      "license": "See upstream source page",
+      "notes": "Derived foliage-card textures generated in-repo on 2026-03-14 from the EveryTexture diffuse, normal, and bump maps with a custom palm-frond alpha silhouette and packed ARM output.",
+      "files": [
+        "palm_frond_generated/palm_frond_diff_1k.png",
+        "palm_frond_generated/palm_frond_nor_gl_1k.png",
+        "palm_frond_generated/palm_frond_arm_1k.png",
+        "palm_frond_generated/palm_frond_juvenile_diff_1k.png",
+        "palm_frond_generated/palm_frond_torn_diff_1k.png",
+        "palm_frond_generated/palm_frond_partial_diff_1k.png",
+        "palm_frond_generated/palm_frond_diff_2k.png",
+        "palm_frond_generated/palm_frond_nor_gl_2k.png",
+        "palm_frond_generated/palm_frond_arm_2k.png",
+        "palm_frond_generated/palm_frond_juvenile_diff_2k.png",
+        "palm_frond_generated/palm_frond_torn_diff_2k.png",
+        "palm_frond_generated/palm_frond_partial_diff_2k.png"
+      ]
+    }
+  ]
+}

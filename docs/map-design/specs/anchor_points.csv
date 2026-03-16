@@ -89,6 +89,15 @@ PP_SPAWN_A_01,spawn_cover,SPAWN_A_COURTYARD,20.0,8.0,0.0,,,,,,,Crates + planters
 PP_SPAWN_A_02,spawn_cover,SPAWN_A_COURTYARD,30.0,8.0,0.0,,,,,,,Low cover (bags/rugs) near exit; do not block main push.
 PP_SPAWN_B_01,spawn_cover,SPAWN_B_GATE_PLAZA,20.0,74.0,0.0,,,,,,,Crates + half-walls (spawn safety).
 PP_SPAWN_B_02,spawn_cover,SPAWN_B_GATE_PLAZA,30.0,74.0,0.0,,,,,,,Low cover near arch approach; avoid headglitch dominance.
+PALM_SPAWN_A_SW,decorative_palm,SPAWN_A_COURTYARD,16.8,3.2,0.0,18.0,,,,1.85,6.3,Visual-only courtyard palm in a planter against the southwest wall; keep the main north push and spawn exits clear.
+PALM_SPAWN_A_NW,decorative_palm,SPAWN_A_COURTYARD,17.2,10.8,0.0,42.0,,,,1.85,6.6,Visual-only courtyard palm in a planter near the northwest spawn corner; completes the courtyard ring while keeping the main north push clear.
+PALM_SPAWN_A_SE,decorative_palm,SPAWN_A_COURTYARD,33.2,3.5,0.0,342.0,,,,1.85,6.6,Visual-only courtyard palm in a planter against the southeast wall; keep the main north push and spawn exits clear.
+PALM_SPAWN_A_NE,decorative_palm,SPAWN_A_COURTYARD,32.8,10.8,0.0,318.0,,,,1.85,6.8,Visual-only courtyard palm in a planter near the northeast spawn corner; completes the courtyard ring while keeping the main north push clear.
+PALM_SPAWN_B_NW,decorative_palm,SPAWN_B_GATE_PLAZA,16.8,78.8,0.0,152.0,,,,1.9,6.8,Visual-only courtyard palm in a planter against the northwest shell wall; keeps the hero-arch approach uncluttered.
+PALM_SPAWN_B_SW,decorative_palm,SPAWN_B_GATE_PLAZA,17.2,71.2,0.0,138.0,,,,1.9,6.9,Visual-only courtyard palm in a planter near the southwest gate-plaza corner; completes the courtyard ring while keeping the arch centerline open.
+PALM_SPAWN_B_NE,decorative_palm,SPAWN_B_GATE_PLAZA,33.2,78.6,0.0,206.0,,,,1.9,7.0,Visual-only courtyard palm in a planter against the northeast shell wall; keeps the hero-arch approach uncluttered.
+PALM_SPAWN_B_SE,decorative_palm,SPAWN_B_GATE_PLAZA,32.8,71.2,0.0,222.0,,,,1.9,7.0,Visual-only courtyard palm in a planter near the southeast gate-plaza corner; completes the courtyard ring while keeping the arch centerline open.
+PALM_M2_WEST_POCKET,decorative_palm,BZ_M2_JOG,21.35,40.4,0.0,92.0,,,,1.8,6.4,Visual-only west jog pocket palm. Keep fully in the recess pocket so it reads as skyline/soft framing and stays subordinate to the well landmark.
 PP_M1_WEST_NEAR_CUT,cover_cluster,BZ_M1,21.0,24.5,0.0,,,,,,,Edge cover near west mid cut entrance (carts/barrels).
 PP_M1_EAST_NEAR_CUT,cover_cluster,BZ_M1,29.0,24.5,0.0,,,,,,,Edge cover near east mid cut entrance (crates/pottery).
 PP_M2_WEST_NEAR_JOG,cover_cluster,BZ_M2_JOG,23.0,38.0,0.0,,,,,,,Jog-side cover; break mid-lane LoS without blocking.

@@ -45,6 +45,16 @@ export type ResolvedFacadeStyle = {
   materials: FacadeMaterialSlots;
 };
 
+export type WallPlaneOverrideKind =
+  | "spawn_facing_end_wall"
+  | "connector_adjacent_corner_window"
+  | "spawn_b_reference_shell";
+
+export type WallPlaneOverride = {
+  kind: WallPlaneOverrideKind;
+  materials: FacadeMaterialSlots;
+};
+
 const SLOT_MERCHANT_WARM: FacadeMaterialSlots = {
   wall: "ph_lime_plaster_sun",
   trimHeavy: "ph_trim_sanded_01",
@@ -101,6 +111,8 @@ const SLOT_SPAWN_B_BRICK: FacadeMaterialSlots = {
   balcony: null,
 };
 
+const SLOT_STANDARDIZED_REFERENCE = SLOT_SPAWN_B_BRICK;
+
 const SLOT_SIDE_HALL: FacadeMaterialSlots = {
   wall: "ph_whitewashed_brick",
   trimHeavy: "ph_sandstone_blocks_05",
@@ -149,6 +161,51 @@ function getZoneCenter(zone: ZoneLike): { x: number; z: number } {
     x: zone.rect.x + zone.rect.w * 0.5,
     z: zone.rect.y + zone.rect.h * 0.5,
   };
+}
+
+export function resolveWallPlaneOverride(
+  zone: ZoneLike,
+  face: FacadeFace,
+  segmentOrdinal: number | null,
+): WallPlaneOverride | null {
+  if (!zone || segmentOrdinal === null) {
+    return null;
+  }
+
+  if (
+    (zone.id === "SPAWN_A_COURTYARD" && face === "north" && (segmentOrdinal === 1 || segmentOrdinal === 2))
+    || (zone.id === "SPAWN_B_GATE_PLAZA" && face === "south" && (segmentOrdinal === 1 || segmentOrdinal === 2))
+  ) {
+    return {
+      kind: "spawn_facing_end_wall",
+      materials: SLOT_STANDARDIZED_REFERENCE,
+    };
+  }
+
+  if (
+    (zone.id === "SPAWN_A_COURTYARD" && face === "west" && segmentOrdinal === 2)
+    || (zone.id === "SPAWN_A_COURTYARD" && face === "east" && segmentOrdinal === 2)
+    || (zone.id === "SPAWN_B_GATE_PLAZA" && face === "west" && segmentOrdinal === 1)
+    || (zone.id === "SPAWN_B_GATE_PLAZA" && face === "east" && segmentOrdinal === 1)
+  ) {
+    return {
+      kind: "connector_adjacent_corner_window",
+      materials: SLOT_STANDARDIZED_REFERENCE,
+    };
+  }
+
+  if (
+    (zone.id === "SPAWN_B_GATE_PLAZA" && face === "north" && segmentOrdinal === 1)
+    || (zone.id === "SPAWN_B_GATE_PLAZA" && face === "west" && segmentOrdinal === 2)
+    || (zone.id === "SPAWN_B_GATE_PLAZA" && face === "east" && segmentOrdinal === 2)
+  ) {
+    return {
+      kind: "spawn_b_reference_shell",
+      materials: SLOT_SPAWN_B_BRICK,
+    };
+  }
+
+  return null;
 }
 
 function resolveMainLaneStyle(zone: NonNullable<ZoneLike>, frame: FacadeSegmentFrame): ResolvedFacadeStyle {
@@ -232,7 +289,11 @@ export function resolveFacadeStyleForSegment(zone: ZoneLike, frame: FacadeSegmen
   }
 
   if (zone.type === "main_lane_segment") {
-    return resolveMainLaneStyle(zone, frame);
+    const style = resolveMainLaneStyle(zone, frame);
+    return {
+      ...style,
+      materials: SLOT_STANDARDIZED_REFERENCE,
+    };
   }
 
   if (zone.type === "spawn_plaza") {
@@ -243,7 +304,9 @@ export function resolveFacadeStyleForSegment(zone: ZoneLike, frame: FacadeSegmen
       family: "spawn",
       trimTier: isSpawnBOuterShell ? (face === "north" ? "hero" : "accented") : isHorizontalFace ? "hero" : "accented",
       balconyStyle: isSpawnBOuterShell ? "none" : "residential_parapet",
-      materials: isSpawnBOuterShell ? SLOT_SPAWN_B_BRICK : isHorizontalFace ? SLOT_SPAWN : SLOT_SPAWN_SIDE,
+      materials: zone.id === "SPAWN_B_GATE_PLAZA"
+        ? isSpawnBOuterShell ? SLOT_SPAWN_B_BRICK : isHorizontalFace ? SLOT_SPAWN : SLOT_SPAWN_SIDE
+        : SLOT_STANDARDIZED_REFERENCE,
     };
   }
 
@@ -252,7 +315,7 @@ export function resolveFacadeStyleForSegment(zone: ZoneLike, frame: FacadeSegmen
       family: "connector",
       trimTier: "restrained",
       balconyStyle: "none",
-      materials: SLOT_CONNECTOR,
+      materials: SLOT_STANDARDIZED_REFERENCE,
     };
   }
 
@@ -261,7 +324,7 @@ export function resolveFacadeStyleForSegment(zone: ZoneLike, frame: FacadeSegmen
       family: "cut",
       trimTier: "restrained",
       balconyStyle: "none",
-      materials: SLOT_CUT,
+      materials: SLOT_STANDARDIZED_REFERENCE,
     };
   }
 

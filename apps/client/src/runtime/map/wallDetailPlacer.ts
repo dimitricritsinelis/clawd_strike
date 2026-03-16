@@ -35,6 +35,7 @@ import {
 } from "./pointedArchProfile";
 import {
   resolveFacadeStyleForSegment,
+  resolveWallPlaneOverride,
   type BalconyStyle,
   type FacadeFace,
   type FacadeFamily,
@@ -65,6 +66,22 @@ const SPAWN_B_HERO_DOOR_SURROUND_DEPTH_M = 0.21;
 const SPAWN_B_STANDARD_WINDOW_MODULE_ID = "spawn_standard_window";
 const SPAWN_B_STANDARD_DOOR_MODULE_ID = "spawn_standard_door";
 const SPAWN_B_CENTER_HERO_MODULE_ID = "spawn_b_center_hero";
+const CANONICAL_STANDARD_WINDOW_MODULE_ID = SPAWN_B_STANDARD_WINDOW_MODULE_ID;
+const CANONICAL_STANDARD_DOOR_MODULE_ID = SPAWN_B_STANDARD_DOOR_MODULE_ID;
+const CONNECTOR_ADJACENT_CORNER_WINDOW_MODULE_ID = "spawn_connector_adjacent_corner_window";
+const CONNECTOR_ADJACENT_CORNER_WINDOW_WIDTH_SCALE = 0.5;
+const CANONICAL_STANDARD_WALL_MATERIAL_ID = "ph_brick_4_desert";
+const CANONICAL_STANDARD_TRIM_HEAVY_MATERIAL_ID = "ph_stone_trim_white";
+const CANONICAL_STANDARD_TRIM_LIGHT_MATERIAL_ID = "ph_band_plastered";
+const CANONICAL_STANDARD_WALL_SLOTS: FacadeMaterialSlots = {
+  wall: CANONICAL_STANDARD_WALL_MATERIAL_ID,
+  trimHeavy: CANONICAL_STANDARD_TRIM_HEAVY_MATERIAL_ID,
+  trimLight: CANONICAL_STANDARD_TRIM_LIGHT_MATERIAL_ID,
+  balcony: null,
+};
+const CANONICAL_STANDARD_LOWER_WINDOW_SILL_Y_M = 0.98;
+const CANONICAL_STANDARD_UPPER_WINDOW_SILL_Y_M = 3.78;
+const CANONICAL_REFERENCE_SIDE_SEGMENT_LENGTH_M = 8;
 const SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_M = 0.58;
 const SPAWN_B_SHELL_SHARED_PLINTH_DEPTH_M = 0.17;
 const SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_SCALE = 0.85;
@@ -209,6 +226,18 @@ type WallRole =
   | "spawn_side_window_rich"
   | "connector_blank"
   | "cut_blank";
+
+type WallPlaneClass =
+  | "B_SPAWN_REFERENCE"
+  | "A_SPAWN_REPLICA"
+  | "SPAWN_FACING_MAIN_BUILDING_END_WALL"
+  | "CONNECTOR_ADJACENT_CORNER_WINDOW"
+  | "SIDE_HALLWAY_CLEANUP_ONLY"
+  | "BACKSIDE_HALLWAY_FACE_CLEANUP_ONLY"
+  | "STANDARD_DOOR_WALL"
+  | "STANDARD_WINDOW_ONLY_WALL"
+  | "BLANK_WALL";
+
 type HeroFacadeState = keyof typeof SPAWN_HERO_WINDOW_REACH_BY_STATE;
 
 type FacadeSpec = {
@@ -285,6 +314,8 @@ type SegmentDecorContext = {
   authoredWindowLayout: RuntimeWindowLayoutOverride | null;
   authoredBalconyLayout: RuntimeBalconyLayoutOverride | null;
   authoredCompositionLayout: RuntimeCompositionLayoutOverride | null;
+  wallClass: WallPlaneClass;
+  legacyDoorCentersS: number[];
   windowModules: ReadonlyMap<string, RuntimeWindowModule>;
   doorModules: ReadonlyMap<string, RuntimeDoorModule>;
   heroBayModules: ReadonlyMap<string, RuntimeHeroBayModule>;
@@ -485,6 +516,82 @@ function resolveWallRole(
   }
 }
 
+function resolveWallPlaneClass(
+  zone: RuntimeBlockoutZone | null,
+  facadeFace: FacadeFace,
+  segmentOrdinal: number | null,
+  legacyDoorCentersS: readonly number[],
+  isInsideWall: boolean,
+): WallPlaneClass {
+  if (!zone) {
+    return "BLANK_WALL";
+  }
+
+  const wallPlaneOverride = resolveWallPlaneOverride(zone, facadeFace, segmentOrdinal);
+  if (wallPlaneOverride?.kind === "spawn_facing_end_wall") {
+    return "SPAWN_FACING_MAIN_BUILDING_END_WALL";
+  }
+  if (wallPlaneOverride?.kind === "connector_adjacent_corner_window") {
+    return "CONNECTOR_ADJACENT_CORNER_WINDOW";
+  }
+  if (wallPlaneOverride?.kind === "spawn_b_reference_shell") {
+    return "B_SPAWN_REFERENCE";
+  }
+
+  if (zone.id === "SPAWN_A_COURTYARD") {
+    if (facadeFace === "south" || facadeFace === "east" || facadeFace === "west") {
+      return "A_SPAWN_REPLICA";
+    }
+    return "BLANK_WALL";
+  }
+
+  if (zone.type === "side_hall") {
+    return isInsideWall ? "BACKSIDE_HALLWAY_FACE_CLEANUP_ONLY" : "SIDE_HALLWAY_CLEANUP_ONLY";
+  }
+
+  if (zone.type === "main_lane_segment") {
+    if (facadeFace === "east" || facadeFace === "west") {
+      return legacyDoorCentersS.length > 0 ? "STANDARD_DOOR_WALL" : "STANDARD_WINDOW_ONLY_WALL";
+    }
+    return "BLANK_WALL";
+  }
+
+  if (zone.type === "connector" || zone.type === "cut") {
+    return "BLANK_WALL";
+  }
+
+  return "BLANK_WALL";
+}
+
+function usesCanonicalWallSystemClass(wallClass: WallPlaneClass): boolean {
+  return wallClass === "A_SPAWN_REPLICA"
+    || wallClass === "SPAWN_FACING_MAIN_BUILDING_END_WALL"
+    || wallClass === "CONNECTOR_ADJACENT_CORNER_WINDOW"
+    || wallClass === "STANDARD_DOOR_WALL"
+    || wallClass === "STANDARD_WINDOW_ONLY_WALL"
+    || wallClass === "BLANK_WALL";
+}
+
+function usesCanonicalShellTrimSurface(ctx: SegmentDecorContext): boolean {
+  if (usesCanonicalWallSystemClass(ctx.wallClass)) {
+    return true;
+  }
+  return ctx.wallClass === "B_SPAWN_REFERENCE"
+    && ctx.zone?.id === "SPAWN_B_GATE_PLAZA"
+    && (ctx.facadeFace === "north" || ctx.facadeFace === "east" || ctx.facadeFace === "west");
+}
+
+function usesCanonicalSpawnTrimDims(ctx: SegmentDecorContext): boolean {
+  return usesCanonicalShellTrimSurface(ctx) || ctx.zone?.type === "spawn_plaza";
+}
+
+function isASpawnReplicaHeroWall(ctx: SegmentDecorContext): boolean {
+  return ctx.wallClass === "A_SPAWN_REPLICA"
+    && ctx.zone?.id === "SPAWN_A_COURTYARD"
+    && ctx.facadeFace === "south"
+    && ctx.frame.lengthM >= 6;
+}
+
 function toSegmentFrame(segment: BoundarySegment): SegmentFrame {
   if (segment.orientation === "vertical") {
     return {
@@ -682,7 +789,8 @@ function resolveCorniceStripHeight(ctx: SegmentDecorContext, dims: TrimDims): nu
 }
 
 function isSpawnHeroFacade(ctx: SegmentDecorContext): boolean {
-  return ctx.compositionPreset === "spawn_courtyard_landmark"
+  return isASpawnReplicaHeroWall(ctx)
+    || ctx.compositionPreset === "spawn_courtyard_landmark"
     || isSpawnGateBrickBackdropPreset(ctx.compositionPreset);
 }
 
@@ -757,9 +865,9 @@ function resolveSegmentWallHeight(
 
 function placeParapetCap(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
-  const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
+  const dims = getTrimDims(ctx.wallHeightM, usesCanonicalSpawnTrimDims(ctx));
   const isHero = isSpawnHeroFacade(ctx);
-  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
+  const isSpawnBCleanup = usesCanonicalShellTrimSurface(ctx);
   ctx.rng.range(0.18, 0.35); // consume
   ctx.rng.range(0.06, 0.14); // consume
   const tierHeightScale = ctx.trimTier === "hero" ? 1.08 : ctx.trimTier === "accented" ? 0.98 : 0.86;
@@ -877,8 +985,8 @@ function placeBuildingEnclosure(ctx: SegmentDecorContext): void {
  *  Call emitPlinthStrip() later once door gap positions are known. */
 function computePlinthDims(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
-  const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
-  if (isSpawnBShellCleanupSurface(ctx)) {
+  const dims = getTrimDims(ctx.wallHeightM, usesCanonicalSpawnTrimDims(ctx));
+  if (usesCanonicalShellTrimSurface(ctx)) {
     ctx.rng.range(0.28, 0.48); // consume (preserve determinism)
     ctx.rng.range(0.06, 0.13); // consume
     ctx.plinthHeight = SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_M * SPAWN_B_SHELL_SHARED_PLINTH_HEIGHT_SCALE;
@@ -951,8 +1059,8 @@ function emitPlinthStrip(
 
 function placeStringCourses(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.5) return;
-  if (isSpawnBShellCleanupSurface(ctx)) return;
-  const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
+  if (usesCanonicalShellTrimSurface(ctx)) return;
+  const dims = getTrimDims(ctx.wallHeightM, usesCanonicalSpawnTrimDims(ctx));
   ctx.rng.range(0.10, 0.18); // consume
   ctx.rng.range(0.06, 0.11); // consume
   // Spawn: 2-story walls get string courses. Non-spawn: original 3-story guard.
@@ -976,8 +1084,8 @@ function placeStringCourses(ctx: SegmentDecorContext): void {
 
 function placeCorniceStrip(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 1.0) return;
-  const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
-  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
+  const dims = getTrimDims(ctx.wallHeightM, usesCanonicalSpawnTrimDims(ctx));
+  const isSpawnBCleanup = usesCanonicalShellTrimSurface(ctx);
   ctx.rng.range(0.18, 0.30); // consume
   ctx.rng.range(0.10, 0.19); // consume
   // Spawn hero facades now keep their cornice for silhouette definition.
@@ -1004,16 +1112,16 @@ function placeCorniceStrip(ctx: SegmentDecorContext): void {
 function placeCornerPiers(ctx: SegmentDecorContext): void {
   if (ctx.frame.lengthM < 0.8) return;
 
-  const dims = getTrimDims(ctx.wallHeightM, ctx.zone?.type === "spawn_plaza");
+  const dims = getTrimDims(ctx.wallHeightM, usesCanonicalSpawnTrimDims(ctx));
   const isHero = isSpawnHeroFacade(ctx);
-  const isSpawnBCleanup = isSpawnBShellCleanupSurface(ctx);
+  const isSpawnBCleanup = usesCanonicalShellTrimSurface(ctx);
   const marginM = ctx.profile === "pbr" ? 0.04 : 0.02;
   const maxWidth = Math.max(0.28, Math.min(1.05, ctx.frame.lengthM * 0.4));
   // Consume RNG calls that were previously used for random dims (preserves sequence).
   ctx.rng.range(0.4, 0.72);   // was baseWidth
   ctx.rng.range(0.05, 0.1);   // was baseDepth
   ctx.rng.range(0.35, 0.75);  // was pierHeight offset
-  const isSpawn = ctx.zone?.type === "spawn_plaza";
+  const isSpawn = usesCanonicalSpawnTrimDims(ctx);
   const tierWidthScale = isHero ? 0.88
     : ctx.trimTier === "hero" ? 0.88
     : ctx.trimTier === "accented" ? (isSpawn ? 0.82 : 0.72)
@@ -1580,7 +1688,8 @@ function requireHeroBayModule(ctx: SegmentDecorContext, moduleId: string): Runti
 }
 
 function isSpawnBStandardWindowModule(module: RuntimeWindowModule): boolean {
-  return module.id === SPAWN_B_STANDARD_WINDOW_MODULE_ID;
+  return module.id === SPAWN_B_STANDARD_WINDOW_MODULE_ID
+    || module.id === CONNECTOR_ADJACENT_CORNER_WINDOW_MODULE_ID;
 }
 
 function isSpawnBStandardDoorModule(module: RuntimeDoorModule): boolean {
@@ -2081,6 +2190,350 @@ function placeCompositionLayout(
       throw new Error(`[wall-detail] unsupported composition layout '${String(exhaustive)}'`);
     }
   }
+}
+
+type ReservedSpan = {
+  startS: number;
+  endS: number;
+};
+
+function resolveCanonicalMinimumGapM(
+  windowModule: RuntimeWindowModule,
+  doorModule: RuntimeDoorModule,
+): number {
+  return (
+    CANONICAL_REFERENCE_SIDE_SEGMENT_LENGTH_M
+    - SEGMENT_EDGE_MARGIN_M * 2
+    - windowModule.frameWidthM * 2
+    - doorModule.coverWidthM
+  ) / 4;
+}
+
+function computeEqualMarginCentersWithMinimumGap(
+  leftBoundary: number,
+  rightBoundary: number,
+  widthM: number,
+  count: number,
+  minimumGapM: number,
+): { gapM: number; centersS: number[] } | null {
+  if (count <= 0) {
+    return null;
+  }
+  const layout = computeEqualMarginCenters(leftBoundary, rightBoundary, widthM, count);
+  return layout.gapM + 1e-6 >= minimumGapM ? layout : null;
+}
+
+function resolveLargestWindowCountForSpan(
+  spanLengthM: number,
+  widthM: number,
+  minimumGapM: number,
+  oddOnly: boolean,
+): number {
+  if (!(spanLengthM > 0) || !(widthM > 0)) {
+    return 0;
+  }
+
+  for (let count = Math.floor(spanLengthM / widthM); count >= 1; count -= 1) {
+    if (oddOnly && count % 2 === 0) {
+      continue;
+    }
+    const gapM = (spanLengthM - count * widthM) / (count + 1);
+    if (gapM + 1e-6 >= minimumGapM) {
+      return count;
+    }
+  }
+
+  return 0;
+}
+
+function subtractReservedSpans(
+  leftBoundary: number,
+  rightBoundary: number,
+  reservedSpans: readonly ReservedSpan[],
+): ReservedSpan[] {
+  if (reservedSpans.length === 0) {
+    return [{ startS: leftBoundary, endS: rightBoundary }];
+  }
+
+  const merged: ReservedSpan[] = [];
+  for (const span of [...reservedSpans]
+    .map((span) => ({
+      startS: clamp(span.startS, leftBoundary, rightBoundary),
+      endS: clamp(span.endS, leftBoundary, rightBoundary),
+    }))
+    .filter((span) => span.endS - span.startS > 1e-6)
+    .sort((left, right) => left.startS - right.startS)) {
+    const previous = merged[merged.length - 1];
+    if (previous && span.startS <= previous.endS + 1e-6) {
+      previous.endS = Math.max(previous.endS, span.endS);
+      continue;
+    }
+    merged.push(span);
+  }
+
+  const spans: ReservedSpan[] = [];
+  let cursor = leftBoundary;
+  for (const span of merged) {
+    if (span.startS > cursor + 1e-6) {
+      spans.push({ startS: cursor, endS: span.startS });
+    }
+    cursor = Math.max(cursor, span.endS);
+  }
+  if (cursor < rightBoundary - 1e-6) {
+    spans.push({ startS: cursor, endS: rightBoundary });
+  }
+  return spans;
+}
+
+function placeWindowsAcrossSpan(
+  ctx: SegmentDecorContext,
+  span: ReservedSpan,
+  sillY: number,
+  windowModule: RuntimeWindowModule,
+  minimumGapM: number,
+  oddOnly: boolean,
+): number {
+  const count = resolveLargestWindowCountForSpan(
+    span.endS - span.startS,
+    windowModule.frameWidthM,
+    minimumGapM,
+    oddOnly,
+  );
+  const layout = computeEqualMarginCentersWithMinimumGap(
+    span.startS,
+    span.endS,
+    windowModule.frameWidthM,
+    count,
+    minimumGapM,
+  );
+  if (!layout) {
+    return 0;
+  }
+
+  for (const centerS of layout.centersS) {
+    placeModuleWindow(ctx, centerS, sillY, windowModule);
+  }
+  return layout.centersS.length;
+}
+
+function resolveStandardizedUpperRowSills(ctx: SegmentDecorContext): number[] {
+  const sills = [CANONICAL_STANDARD_UPPER_WINDOW_SILL_Y_M];
+  if (ctx.zone?.type === "main_lane_segment" && ctx.wallHeightM >= STORY_HEIGHT_M * 3) {
+    sills.push(CANONICAL_STANDARD_UPPER_WINDOW_SILL_Y_M + STORY_HEIGHT_M);
+  } else if (
+    (ctx.wallClass === "SPAWN_FACING_MAIN_BUILDING_END_WALL"
+      || ctx.wallClass === "CONNECTOR_ADJACENT_CORNER_WINDOW")
+    && ctx.wallHeightM >= STORY_HEIGHT_M * 3
+  ) {
+    sills.push(CANONICAL_STANDARD_UPPER_WINDOW_SILL_Y_M + STORY_HEIGHT_M);
+  }
+  return sills;
+}
+
+function resolveConnectorAdjacentCornerWindowModule(ctx: SegmentDecorContext): RuntimeWindowModule {
+  const standardWindowModule = requireWindowModule(ctx, CANONICAL_STANDARD_WINDOW_MODULE_ID);
+  const apertureWidthM = standardWindowModule.apertureWidthM * CONNECTOR_ADJACENT_CORNER_WINDOW_WIDTH_SCALE;
+  const frameMetrics = resolveSpawnWindowPointedArchFrameFromAperture(
+    apertureWidthM,
+    standardWindowModule.apertureHeightM,
+  );
+
+  return {
+    ...standardWindowModule,
+    id: CONNECTOR_ADJACENT_CORNER_WINDOW_MODULE_ID,
+    apertureWidthM,
+    frameWidthM: frameMetrics.frameWidth,
+    frameHeightM: frameMetrics.frameHeight,
+    sillWidthM: standardWindowModule.sillWidthM * CONNECTOR_ADJACENT_CORNER_WINDOW_WIDTH_SCALE,
+    apronWidthM: standardWindowModule.apronWidthM * CONNECTOR_ADJACENT_CORNER_WINDOW_WIDTH_SCALE,
+  };
+}
+
+type StandardizedDoorWallUpperLayout = {
+  centeredWindowCentersS: number[];
+  sideSpans: ReservedSpan[];
+};
+
+function resolveStandardizedDoorWallUpperLayout(
+  doorCentersS: readonly number[],
+  windowModule: RuntimeWindowModule,
+  leftBoundary: number,
+  rightBoundary: number,
+): StandardizedDoorWallUpperLayout {
+  const upperReserved: ReservedSpan[] = [];
+  const centeredWindowCentersS: number[] = [];
+  const windowHalfWidth = windowModule.frameWidthM * 0.5;
+
+  for (const centerS of doorCentersS) {
+    const reserved = {
+      startS: centerS - windowHalfWidth,
+      endS: centerS + windowHalfWidth,
+    };
+    const fitsBounds = reserved.startS >= leftBoundary - 1e-6 && reserved.endS <= rightBoundary + 1e-6;
+    const overlapsReserved = upperReserved.some((span) => (
+      reserved.startS < span.endS - 1e-6 && reserved.endS > span.startS + 1e-6
+    ));
+    if (!fitsBounds || overlapsReserved) {
+      continue;
+    }
+    upperReserved.push(reserved);
+    centeredWindowCentersS.push(centerS);
+  }
+
+  return {
+    centeredWindowCentersS,
+    sideSpans: subtractReservedSpans(leftBoundary, rightBoundary, upperReserved),
+  };
+}
+
+function placeSpawnFacingMainBuildingEndWall(ctx: SegmentDecorContext): void {
+  const windowModule = requireWindowModule(ctx, CANONICAL_STANDARD_WINDOW_MODULE_ID);
+  const doorModule = requireDoorModule(ctx, CANONICAL_STANDARD_DOOR_MODULE_ID);
+  const minimumGapM = resolveCanonicalMinimumGapM(windowModule, doorModule);
+  const leftBoundary = -ctx.frame.lengthM * 0.5 + SEGMENT_EDGE_MARGIN_M;
+  const rightBoundary = ctx.frame.lengthM * 0.5 - SEGMENT_EDGE_MARGIN_M;
+  const layout = computeEqualMarginCentersWithMinimumGap(
+    leftBoundary,
+    rightBoundary,
+    windowModule.frameWidthM,
+    2,
+    minimumGapM,
+  );
+  if (!layout) {
+    throw new Error(
+      `[wall-detail] spawn-facing end wall ${ctx.zone?.id ?? "unknown"}:${ctx.facadeFace}#${ctx.segmentOrdinal ?? "?"} cannot fit canonical dual-window layout`,
+    );
+  }
+
+  for (const centerS of layout.centersS) {
+    placeModuleWindow(ctx, centerS, CANONICAL_STANDARD_LOWER_WINDOW_SILL_Y_M, windowModule);
+  }
+  for (const sillY of resolveStandardizedUpperRowSills(ctx)) {
+    for (const centerS of layout.centersS) {
+      placeModuleWindow(ctx, centerS, sillY, windowModule);
+    }
+  }
+
+  emitPlinthStrip(ctx, []);
+}
+
+function placeConnectorAdjacentCornerWindowWall(ctx: SegmentDecorContext): void {
+  const windowModule = resolveConnectorAdjacentCornerWindowModule(ctx);
+  const clearWidth = ctx.frame.lengthM - SEGMENT_EDGE_MARGIN_M * 2;
+  const widestFeatureWidth = Math.max(
+    windowModule.frameWidthM,
+    windowModule.sillWidthM,
+    windowModule.apronWidthM,
+  );
+  if (widestFeatureWidth > clearWidth + 1e-6) {
+    throw new Error(
+      `[wall-detail] connector-adjacent corner window '${windowModule.id}' does not fit ${ctx.zone?.id ?? "unknown"}:${ctx.facadeFace}#${ctx.segmentOrdinal ?? "?"} (feature=${widestFeatureWidth.toFixed(3)} clear=${clearWidth.toFixed(3)})`,
+    );
+  }
+
+  placeModuleWindow(ctx, 0, CANONICAL_STANDARD_LOWER_WINDOW_SILL_Y_M, windowModule);
+  for (const sillY of resolveStandardizedUpperRowSills(ctx)) {
+    placeModuleWindow(ctx, 0, sillY, windowModule);
+  }
+
+  emitPlinthStrip(ctx, []);
+}
+
+function placeStandardizedWindowOnlyWall(ctx: SegmentDecorContext): void {
+  const windowModule = requireWindowModule(ctx, CANONICAL_STANDARD_WINDOW_MODULE_ID);
+  const doorModule = requireDoorModule(ctx, CANONICAL_STANDARD_DOOR_MODULE_ID);
+  const minimumGapM = resolveCanonicalMinimumGapM(windowModule, doorModule);
+  const leftBoundary = -ctx.frame.lengthM * 0.5 + SEGMENT_EDGE_MARGIN_M;
+  const rightBoundary = ctx.frame.lengthM * 0.5 - SEGMENT_EDGE_MARGIN_M;
+  const count = resolveLargestWindowCountForSpan(
+    rightBoundary - leftBoundary,
+    windowModule.frameWidthM,
+    minimumGapM,
+    true,
+  );
+  const layout = computeEqualMarginCentersWithMinimumGap(
+    leftBoundary,
+    rightBoundary,
+    windowModule.frameWidthM,
+    count,
+    minimumGapM,
+  );
+
+  if (layout) {
+    for (const centerS of layout.centersS) {
+      placeModuleWindow(ctx, centerS, CANONICAL_STANDARD_LOWER_WINDOW_SILL_Y_M, windowModule);
+      for (const sillY of resolveStandardizedUpperRowSills(ctx)) {
+        placeModuleWindow(ctx, centerS, sillY, windowModule);
+      }
+    }
+  }
+
+  emitPlinthStrip(ctx, []);
+}
+
+function placeStandardizedDoorWall(ctx: SegmentDecorContext): void {
+  const doorCentersS = [...ctx.legacyDoorCentersS].sort((left, right) => left - right);
+  if (doorCentersS.length === 0) {
+    placeStandardizedWindowOnlyWall(ctx);
+    return;
+  }
+
+  const windowModule = requireWindowModule(ctx, CANONICAL_STANDARD_WINDOW_MODULE_ID);
+  const doorModule = requireDoorModule(ctx, CANONICAL_STANDARD_DOOR_MODULE_ID);
+  const minimumGapM = resolveCanonicalMinimumGapM(windowModule, doorModule);
+  const leftBoundary = -ctx.frame.lengthM * 0.5 + SEGMENT_EDGE_MARGIN_M;
+  const rightBoundary = ctx.frame.lengthM * 0.5 - SEGMENT_EDGE_MARGIN_M;
+  const doorHalfWidth = doorModule.coverWidthM * 0.5;
+
+  const lowerSpans = subtractReservedSpans(
+    leftBoundary,
+    rightBoundary,
+    doorCentersS.map((centerS) => ({
+      startS: centerS - doorHalfWidth,
+      endS: centerS + doorHalfWidth,
+    })),
+  );
+  for (const span of lowerSpans) {
+    placeWindowsAcrossSpan(
+      ctx,
+      span,
+      CANONICAL_STANDARD_LOWER_WINDOW_SILL_Y_M,
+      windowModule,
+      minimumGapM,
+      span.startS < 0 && span.endS > 0,
+    );
+  }
+
+  const upperLayout = resolveStandardizedDoorWallUpperLayout(
+    doorCentersS,
+    windowModule,
+    leftBoundary,
+    rightBoundary,
+  );
+  for (const sillY of resolveStandardizedUpperRowSills(ctx)) {
+    for (const centerS of upperLayout.centeredWindowCentersS) {
+      placeModuleWindow(ctx, centerS, sillY, windowModule);
+    }
+    for (const span of upperLayout.sideSpans) {
+      placeWindowsAcrossSpan(
+        ctx,
+        span,
+        sillY,
+        windowModule,
+        minimumGapM,
+        span.startS < 0 && span.endS > 0,
+      );
+    }
+  }
+
+  for (const centerS of doorCentersS) {
+    placeModuleDoor(ctx, centerS, doorModule, { addSpawnSideCrownAccent: true });
+  }
+
+  emitPlinthStrip(ctx, doorCentersS.map((centerS) => ({
+    centerS,
+    halfW: doorHalfWidth,
+  })));
 }
 
 function placeAuthoredPointedArchWindow(
@@ -2964,6 +3417,44 @@ function decorateSegment(ctx: SegmentDecorContext): void {
   placeStringCourses(ctx);
   placeCorniceStrip(ctx);
 
+  switch (ctx.wallClass) {
+    case "SPAWN_FACING_MAIN_BUILDING_END_WALL":
+      placeSpawnFacingMainBuildingEndWall(ctx);
+      placeCableSegments(ctx);
+      return;
+    case "CONNECTOR_ADJACENT_CORNER_WINDOW":
+      placeConnectorAdjacentCornerWindowWall(ctx);
+      placeCableSegments(ctx);
+      return;
+    case "SIDE_HALLWAY_CLEANUP_ONLY":
+    case "BACKSIDE_HALLWAY_FACE_CLEANUP_ONLY":
+    case "BLANK_WALL":
+      emitPlinthStrip(ctx, []);
+      placeCableSegments(ctx);
+      return;
+    case "STANDARD_WINDOW_ONLY_WALL":
+      placeStandardizedWindowOnlyWall(ctx);
+      placeCableSegments(ctx);
+      return;
+    case "STANDARD_DOOR_WALL":
+      placeStandardizedDoorWall(ctx);
+      placeCableSegments(ctx);
+      return;
+    case "A_SPAWN_REPLICA":
+      if (!ctx.authoredCompositionLayout) {
+        emitPlinthStrip(ctx, []);
+        placeCableSegments(ctx);
+        return;
+      }
+      break;
+    case "B_SPAWN_REFERENCE":
+      break;
+    default: {
+      const exhaustive: never = ctx.wallClass;
+      throw new Error(`[wall-detail] unhandled wall class '${String(exhaustive)}'`);
+    }
+  }
+
   if (ctx.authoredCompositionLayout) {
     placeCompositionLayout(ctx, ctx.authoredCompositionLayout);
     placeCableSegments(ctx);
@@ -3280,6 +3771,8 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
     authoredBalconyLayout: RuntimeBalconyLayoutOverride | null;
     authoredCompositionLayout: RuntimeCompositionLayoutOverride | null;
     wallRole: WallRole;
+    wallClass: WallPlaneClass;
+    legacyDoorCentersS: number[];
   };
 
   const segmentDescriptorCache = new Map<number, SegmentDescriptor>();
@@ -3382,22 +3875,132 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       ? compositionLayoutMap.get(compositionLayoutKey(zone.id, facadeFace, segmentMeta.segmentOrdinal)) ?? null
       : null;
     const wallRole = resolveWallRole(zone, facadeFace, isInsideWall, isSpawnEntryWall);
+    const legacySpec = computeFacadeSpec({
+      frame,
+      zone,
+      facadeFace,
+      segmentOrdinal: segmentMeta?.segmentOrdinal ?? null,
+      wallRole,
+      compositionPreset,
+      isMainLane,
+      isShopfrontZone: isShopfront,
+      isSideHall,
+      isConnector,
+      isCut,
+      mapCenterX,
+      mapCenterZ,
+      profile: options.profile,
+      facadeFamily: facadeStyle.family,
+      trimTier: facadeStyle.trimTier,
+      balconyStyle: facadeStyle.balconyStyle,
+      materialSlots: facadeStyle.materials,
+      wallMaterialId,
+      trimHeavyMaterialId,
+      trimLightMaterialId,
+      wallHeightM: segHeight,
+      maxProtrusionM: segmentMaxProtrusion,
+      density: segmentDensity,
+      rng: rootRng.fork(String(segSeed)),
+      instances: [],
+      maxInstances: 1,
+      cornerAtStart,
+      cornerAtEnd,
+      isSpawnOuterWall,
+      isConnectorSpawnFacing,
+      doorModelPlacements: [],
+      plinthHeight: 0,
+      plinthDepth: 0,
+      authoredDoorLayout,
+      authoredDoorStyleSpec: null,
+      authoredDoorStyleSource: null,
+      authoredWindowLayout,
+      authoredBalconyLayout,
+      authoredCompositionLayout,
+      wallClass: "B_SPAWN_REFERENCE",
+      legacyDoorCentersS: [],
+      windowModules: windowModuleMap,
+      doorModules: doorModuleMap,
+      heroBayModules: heroBayModuleMap,
+    });
+    const legacyDoorCentersS = legacySpec ? resolveDoorCentersS(legacySpec, authoredDoorLayout) : [];
+    const wallPlaneOverride = resolveWallPlaneOverride(
+      zone,
+      facadeFace,
+      segmentMeta?.segmentOrdinal ?? null,
+    );
+    const wallClass = resolveWallPlaneClass(
+      zone,
+      facadeFace,
+      segmentMeta?.segmentOrdinal ?? null,
+      legacyDoorCentersS,
+      isInsideWall,
+    );
+
+    let actualCompositionPreset = compositionPreset;
+    let actualWallRole = wallRole;
+    let actualFacadeStyle = facadeStyle;
+    let actualWallMaterialId = wallMaterialId;
+    let actualTrimHeavyMaterialId = trimHeavyMaterialId;
+    let actualTrimLightMaterialId = trimLightMaterialId;
+
+    if (wallClass === "A_SPAWN_REPLICA") {
+      actualCompositionPreset = facadeFace === "south" ? "spawn_gate_brick_backdrop" : "residential_quiet";
+      actualFacadeStyle = {
+        family: "spawn",
+        trimTier: facadeFace === "south" ? "hero" : "accented",
+        balconyStyle: "none",
+        materials: CANONICAL_STANDARD_WALL_SLOTS,
+      };
+      actualWallMaterialId = CANONICAL_STANDARD_WALL_MATERIAL_ID;
+      actualTrimHeavyMaterialId = CANONICAL_STANDARD_TRIM_HEAVY_MATERIAL_ID;
+      actualTrimLightMaterialId = CANONICAL_STANDARD_TRIM_LIGHT_MATERIAL_ID;
+    } else if (
+      wallClass === "SPAWN_FACING_MAIN_BUILDING_END_WALL"
+      || wallClass === "CONNECTOR_ADJACENT_CORNER_WINDOW"
+      || wallClass === "STANDARD_DOOR_WALL"
+      || wallClass === "STANDARD_WINDOW_ONLY_WALL"
+      || wallClass === "BLANK_WALL"
+    ) {
+      actualCompositionPreset = "service_blank";
+      actualFacadeStyle = {
+        family: "spawn",
+        trimTier: "accented",
+        balconyStyle: "none",
+        materials: wallPlaneOverride?.materials ?? CANONICAL_STANDARD_WALL_SLOTS,
+      };
+      actualWallMaterialId = (wallPlaneOverride?.materials ?? CANONICAL_STANDARD_WALL_SLOTS).wall;
+      actualTrimHeavyMaterialId = (wallPlaneOverride?.materials ?? CANONICAL_STANDARD_WALL_SLOTS).trimHeavy;
+      actualTrimLightMaterialId = (wallPlaneOverride?.materials ?? CANONICAL_STANDARD_WALL_SLOTS).trimLight;
+      if (wallClass === "BLANK_WALL") {
+        actualWallRole = "connector_blank";
+      }
+    } else if (
+      wallClass === "SIDE_HALLWAY_CLEANUP_ONLY"
+      || wallClass === "BACKSIDE_HALLWAY_FACE_CLEANUP_ONLY"
+    ) {
+      actualCompositionPreset = "service_blank";
+      actualWallRole = "sidehall_back_blank";
+      actualFacadeStyle = {
+        ...facadeStyle,
+        balconyStyle: "none",
+      };
+    }
 
     const descriptor: SegmentDescriptor = {
       frame,
       zone,
-      facadeStyle,
+      facadeStyle: actualFacadeStyle,
       facadeFace,
       segmentOrdinal: segmentMeta?.segmentOrdinal ?? null,
-      compositionPreset,
+      compositionPreset: actualCompositionPreset,
       isMainLane,
       isShopfront,
       isSideHall,
       isConnector,
       isCut,
-      wallMaterialId,
-      trimHeavyMaterialId,
-      trimLightMaterialId,
+      wallMaterialId: actualWallMaterialId,
+      trimHeavyMaterialId: actualTrimHeavyMaterialId,
+      trimLightMaterialId: actualTrimLightMaterialId,
       isInsideWall,
       isSpawnEntryWall,
       segHeight,
@@ -3412,7 +4015,9 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       authoredWindowLayout,
       authoredBalconyLayout,
       authoredCompositionLayout,
-      wallRole,
+      wallRole: actualWallRole,
+      wallClass,
+      legacyDoorCentersS,
     };
     segmentDescriptorCache.set(index, descriptor);
     return descriptor;
@@ -3480,6 +4085,8 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       authoredWindowLayout: sourceDescriptor.authoredWindowLayout,
       authoredBalconyLayout: sourceDescriptor.authoredBalconyLayout,
       authoredCompositionLayout: sourceDescriptor.authoredCompositionLayout,
+      wallClass: sourceDescriptor.wallClass,
+      legacyDoorCentersS: sourceDescriptor.legacyDoorCentersS,
       windowModules: windowModuleMap,
       doorModules: doorModuleMap,
       heroBayModules: heroBayModuleMap,
@@ -3543,6 +4150,8 @@ export function buildWallDetailPlacements(options: BuildWallDetailPlacementsOpti
       authoredWindowLayout: descriptor.authoredWindowLayout,
       authoredBalconyLayout: descriptor.authoredBalconyLayout,
       authoredCompositionLayout: descriptor.authoredCompositionLayout,
+      wallClass: descriptor.wallClass,
+      legacyDoorCentersS: descriptor.legacyDoorCentersS,
       windowModules: windowModuleMap,
       doorModules: doorModuleMap,
       heroBayModules: heroBayModuleMap,

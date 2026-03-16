@@ -11,6 +11,7 @@ import { buildPbrWalls } from "./buildPbrWalls";
 import { buildWallDetailMeshes } from "./wallDetailKit";
 import { buildWallDetailPlacements, type WallDetailPlacementStats } from "./wallDetailPlacer";
 import { buildDoorModels } from "./buildDoorModels";
+import { buildDecorativePalms } from "./buildDecorativePalms";
 import type { PropModelLibrary } from "../render/models/PropModelLibrary";
 
 const WALKABLE_ZONE_TYPES = new Set([
@@ -446,6 +447,11 @@ export function buildBlockout(spec: RuntimeBlockoutSpec, options: BlockoutBuildO
       );
       root.add(doorRoot);
     }
+  }
+
+  const decorativePalms = buildDecorativePalms(options.anchors, options.seed, wallTextureQuality);
+  if (decorativePalms) {
+    root.add(decorativePalms);
   }
 
   colliders.push({

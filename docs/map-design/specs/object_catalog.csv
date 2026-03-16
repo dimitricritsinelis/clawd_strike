@@ -7,6 +7,7 @@ Barrel_Group,metal/wood barrels,1.0 x 1.0,0.9,prop_pocket,low cover,Avoid placin
 Handcart,"market cart, wheelbarrow",1.6 x 0.8,1.1,prop_pocket / stall_strip,mobile cover silhouette,Angle slightly (10–25°) for visual rhythm; keep nav clearance.
 Sack_Pile,"burlap sacks, grain bags",1.4 x 1.0,0.8,stall_strip / prop_pocket,soft cover,Prefer along walls; reduce grenade spam angles.
 Planter_Box,planter with greenery,1.6 x 0.6,0.9,spawn_plaza / prop_pocket,spawn safety + readability,Use as spawn break-up; avoid hiding spawn exits.
+Decorative_Palm_Planter,"sun-bleached palm in a stone planter",1.8 x 1.8,6.0,spawn_plaza,courtyard scale + landmark dressing,Visual-only dressing; keep planters tight to spawn walls and away from main exits.
 Half_Wall,"stone half-wall, low parapet",2.0 x 0.5,1.1,spawn_plaza / side_hall_corners,controlled cover,Use sparingly; avoid infinite headglitches.
 Shop_Shutter_Module,shutter + frame + recess,3.0 x 0.6,3.5,shopfront_anchor,theme + silhouette,Place centered on shopfront anchors; add 0.5m recess where possible.
 Sign_Hanging,wood sign + metal bracket,0.8 x 0.1,0.6,signage_anchor,wayfinding,Provide 6–10 unique sign textures for callouts.
