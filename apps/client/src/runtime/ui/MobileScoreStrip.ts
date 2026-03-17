@@ -42,7 +42,7 @@ export class MobileScoreStrip {
     Object.assign(this.root.style, {
       position: "absolute",
       top: `calc(4px + env(safe-area-inset-top, 0px))`,
-      right: `calc(4px + env(safe-area-inset-right, 0px))`,
+      right: `calc(8px + env(safe-area-inset-right, 0px))`,
       zIndex: "22",
       display: "flex",
       alignItems: "center",
@@ -50,11 +50,11 @@ export class MobileScoreStrip {
       background: "rgba(8, 16, 28, 0.5)",
       border: "1px solid rgba(255, 255, 255, 0.08)",
       borderRadius: "6px",
-      padding: "3px 10px",
+      padding: "5px 12px",
       pointerEvents: "none",
       userSelect: "none",
       fontFamily: SANS_FONT,
-      fontSize: "12px",
+      fontSize: "14px",
       fontWeight: "600",
       fontVariantNumeric: "tabular-nums",
       letterSpacing: "0.06em",
@@ -76,7 +76,7 @@ export class MobileScoreStrip {
     this.scoreEl = document.createElement("span");
     Object.assign(this.scoreEl.style, {
       fontWeight: "700",
-      fontSize: "13px",
+      fontSize: "14px",
       color: "#ffd78d",
     });
     this.scoreEl.textContent = "0";
@@ -95,7 +95,7 @@ export class MobileScoreStrip {
 
     const labelEl = document.createElement("span");
     Object.assign(labelEl.style, {
-      fontSize: "10px",
+      fontSize: "11px",
       fontWeight: "600",
       letterSpacing: "0.08em",
       textTransform: "uppercase",

@@ -109,7 +109,7 @@ export class MobileTouchHud {
     this.fireBtn = document.createElement("div");
     applyButtonBase(this.fireBtn, 88);
     Object.assign(this.fireBtn.style, {
-      right: "calc(16px + env(safe-area-inset-right, 0px))",
+      right: "calc(12px + env(safe-area-inset-right, 0px))",
       bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(220, 60, 40, 0.45)",
       border: "4px solid rgba(255, 100, 80, 0.5)",
@@ -125,11 +125,11 @@ export class MobileTouchHud {
     this.reloadBtn = document.createElement("div");
     applyButtonBase(this.reloadBtn, 40);
     Object.assign(this.reloadBtn.style, {
-      right: "calc(95px + env(safe-area-inset-right, 0px))",
-      bottom: "calc(75px + env(safe-area-inset-bottom, 0px))",
+      right: "calc(108px + env(safe-area-inset-right, 0px))",
+      bottom: "calc(70px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(255, 200, 100, 0.2)",
       border: "2px solid rgba(255, 214, 150, 0.35)",
-      fontSize: "8px",
+      fontSize: "14px",
       color: "rgba(255, 241, 224, 0.75)",
     });
     this.reloadBtn.textContent = "R";
@@ -140,8 +140,8 @@ export class MobileTouchHud {
     this.jumpBtn = document.createElement("div");
     applyButtonBase(this.jumpBtn, 40);
     Object.assign(this.jumpBtn.style, {
-      right: "calc(95px + env(safe-area-inset-right, 0px))",
-      bottom: "calc(15px + env(safe-area-inset-bottom, 0px))",
+      right: "calc(108px + env(safe-area-inset-right, 0px))",
+      bottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(255, 255, 255, 0.12)",
       border: "2px solid rgba(255, 255, 255, 0.3)",
       fontSize: "9px",
@@ -165,7 +165,7 @@ export class MobileTouchHud {
     applyButtonBase(this.crouchBtn, 40);
     Object.assign(this.crouchBtn.style, {
       left: "calc(16px + env(safe-area-inset-left, 0px))",
-      bottom: "calc(75px + env(safe-area-inset-bottom, 0px))",
+      bottom: "calc(10px + env(safe-area-inset-bottom, 0px))",
       background: "rgba(255, 255, 255, 0.12)",
       border: "2px solid rgba(255, 255, 255, 0.3)",
       fontSize: "9px",

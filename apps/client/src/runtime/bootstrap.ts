@@ -1466,8 +1466,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     // ── Health: thin edge bar + small number, no panel ──────────
     const hRoot = healthHud.root;
     Object.assign(hRoot.style, {
-      bottom: `calc(8px + env(safe-area-inset-bottom, 0px))`,
-      left: `calc(60px + env(safe-area-inset-left, 0px))`,
+      bottom: `calc(4px + env(safe-area-inset-bottom, 0px))`,
+      left: `calc(16px + env(safe-area-inset-left, 0px))`,
       padding: "0",
       background: "transparent",
       border: "none",
@@ -1485,11 +1485,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (hChildren[1]) hChildren[1].style.display = "none"; // "HP" label
     if (hChildren[2]) {
       Object.assign(hChildren[2].style, {
-        fontSize: "16px",
+        fontSize: "18px",
         fontWeight: "700",
         marginBottom: "3px",
         minWidth: "0",
-        textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
+        textShadow: "0 1px 4px rgba(0, 0, 0, 1), 0 0 8px rgba(0, 0, 0, 0.5)",
       });
     }
     if (hChildren[3]) (hChildren[3] as HTMLElement).style.height = "6px";
@@ -1497,8 +1497,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     // ── Ammo: floating text, no panel ───────────────────────────
     const aRoot = ammoHud.root;
     Object.assign(aRoot.style, {
-      bottom: `calc(108px + env(safe-area-inset-bottom, 0px))`,
-      right: `calc(20px + env(safe-area-inset-right, 0px))`,
+      bottom: `calc(4px + env(safe-area-inset-bottom, 0px))`,
+      right: `calc(10px + env(safe-area-inset-right, 0px))`,
       padding: "0",
       background: "transparent",
       border: "none",
@@ -1506,7 +1506,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       boxShadow: "none",
       backdropFilter: "none",
       transform: "none",
-      textAlign: "center",
+      textAlign: "right",
       opacity: MOBILE_BASE_OPACITY,
       transition: "opacity 0.3s ease",
     });
@@ -1518,9 +1518,9 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       const magEl = aChildren[0].children[0] as HTMLElement | undefined;
       if (magEl) {
         Object.assign(magEl.style, {
-          fontSize: "20px",
+          fontSize: "22px",
           minWidth: "0",
-          textShadow: "0 1px 3px rgba(0, 0, 0, 0.9)",
+          textShadow: "0 1px 4px rgba(0, 0, 0, 1), 0 0 8px rgba(0, 0, 0, 0.5)",
         });
       }
       const reserveWrap = aChildren[0].children[1] as HTMLElement | undefined;
@@ -1532,12 +1532,11 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     }
 
     // ── Timer: more aggressive scale ────────────────────────────
+    timerHud.setBaseScale(0.45);
     Object.assign(timerHud.root.style, {
       top: `calc(4px + env(safe-area-inset-top, 0px))`,
       padding: "2px 10px 3px",
       minWidth: "80px",
-      transform: "translateX(-50%) scale(0.5)",
-      transformOrigin: "top center",
       background: "rgba(8, 16, 28, 0.35)",
       borderRadius: "6px",
       opacity: MOBILE_BASE_OPACITY,

@@ -13,6 +13,7 @@ export class TimerHud {
   private running = false;
   private lastDisplaySecs = -1;
   private pulsePhase = 0; // drives 1Hz scale pulse at low time
+  private baseScale = 1; // set via setBaseScale() for mobile
 
   constructor(mountEl: HTMLElement) {
     this.root = document.createElement("div");
@@ -67,7 +68,13 @@ export class TimerHud {
     this.lastDisplaySecs = -1;
     this.timeEl.textContent = "00:00";
     this.timeEl.style.color = "rgba(180, 200, 230, 0.65)";
-    this.root.style.transform = "translateX(-50%) scale(1)";
+    this.root.style.transform = `translateX(-50%) scale(${this.baseScale})`;
+  }
+
+  /** Set a base scale factor (used for mobile sizing). */
+  setBaseScale(s: number): void {
+    this.baseScale = s;
+    this.root.style.transformOrigin = "top center";
   }
 
   /** Called every frame from bootstrap step(). */
@@ -97,10 +104,10 @@ export class TimerHud {
     // Pulse scale at ≥90s (long wave — urgency signal)
     if (totalSecs >= 90) {
       this.pulsePhase += deltaSeconds * Math.PI * 2 / 0.6; // 0.6s period
-      const scale = 1 + 0.06 * Math.abs(Math.sin(this.pulsePhase));
+      const scale = this.baseScale * (1 + 0.06 * Math.abs(Math.sin(this.pulsePhase)));
       this.root.style.transform = `translateX(-50%) scale(${scale.toFixed(3)})`;
     } else {
-      this.root.style.transform = "translateX(-50%) scale(1)";
+      this.root.style.transform = `translateX(-50%) scale(${this.baseScale})`;
       this.pulsePhase = 0;
     }
   }
