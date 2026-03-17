@@ -247,6 +247,7 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   const sharedChampionCard = getRequiredEl<HTMLElement>("#shared-champion-card");
   const sharedChampionNameEl = getRequiredEl<HTMLElement>("#shared-champion-name");
   const sharedChampionScoreEl = getRequiredEl<HTMLElement>("#shared-champion-score");
+  const enterGameBtn = document.getElementById("enter-game-btn");
 
   let disposed = false;
   let bannerTimer: number | null = null;
@@ -617,6 +618,10 @@ export function createLoadingScreenUI(callbacks: LoadingScreenUICallbacks): Load
   enterAgentModeBtn.addEventListener("click", onEnterAgentMode);
   playerNameInput.addEventListener("input", onNameInput);
   playerNameInput.addEventListener("keydown", onNameInputKeyDown);
+  enterGameBtn?.addEventListener("click", () => {
+    if (disposed) return;
+    submitPendingModeSelection();
+  });
 
   function setSharedChampion(snapshot: SharedChampionSnapshot) {
     if (disposed) return;
