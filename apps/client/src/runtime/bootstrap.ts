@@ -85,6 +85,7 @@ const SCORE_RULESET_KEY = SHARED_CHAMPION_SCORE_RULESET;
 const AGENT_VISIBLE_RENDER_INTERVAL_MS = 1000 / 30;
 const AGENT_BACKGROUND_STEP_INTERVAL_MS = 500;
 const TEXTURE_STABLE_WINDOW_MS = 500;
+const PUBLIC_AGENT_FEEDBACK_MAX_EVENTS = 24;
 
 type ScenePerfSnapshot = {
   materials: number;
@@ -110,6 +111,59 @@ type QueuedCombatFeedbackEvent =
       enemyName: string;
       isHeadshot: boolean;
     };
+
+export type PublicAgentFeedbackEvent =
+  | {
+      id: number;
+      type: "damage-taken";
+      amount?: number;
+    }
+  | {
+      id: number;
+      type: "enemy-hit";
+    }
+  | {
+      id: number;
+      type: "kill";
+    }
+  | {
+      id: number;
+      type: "wave-complete";
+    }
+  | {
+      id: number;
+      type: "reload-start";
+    }
+  | {
+      id: number;
+      type: "reload-end";
+    };
+
+type PublicAgentFeedbackEventInput =
+  | {
+      type: "damage-taken";
+      amount?: number;
+    }
+  | {
+      type: "enemy-hit";
+    }
+  | {
+      type: "kill";
+    }
+  | {
+      type: "wave-complete";
+    }
+  | {
+      type: "reload-start";
+    }
+  | {
+      type: "reload-end";
+    };
+
+export type PublicAgentFeedback = {
+  episodeId?: string | number;
+  recentEvents?: PublicAgentFeedbackEvent[];
+};
 
 type DebugCombatFeedbackPayload = {
   isHeadshot?: boolean;
@@ -516,6 +570,7 @@ export type PublicAgentObserveState = {
   };
   sharedChampion: SharedChampion | null;
   lastRunSummary: PublicAgentRunSummary | null;
+  feedback?: PublicAgentFeedback | null;
 };
 
 export type RuntimeHandle = {
@@ -1118,6 +1173,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
           }
           waveStats.shotsHit++;
           runStats.shotsHit++;
+          pushPublicFeedback({ type: "enemy-hit" });
           game.applyDamageToEnemy(enemyHit.enemyId, damage, isHeadshot);
           enqueueCombatFeedback({ type: "hit", isHeadshot });
           enqueueCombatFeedback({
@@ -1226,8 +1282,14 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
 
   // Weapon audio callbacks: reload sounds + dry-fire click
   game.setWeaponCallbacks({
-    onReloadStart: () => weaponAudio.playReloadStart(),
-    onReloadEnd: () => weaponAudio.playReloadEnd(),
+    onReloadStart: () => {
+      weaponAudio.playReloadStart();
+      pushPublicFeedback({ type: "reload-start" });
+    },
+    onReloadEnd: () => {
+      weaponAudio.playReloadEnd();
+      pushPublicFeedback({ type: "reload-end" });
+    },
     onReloadCancel: () => weaponAudio.stopReload(),
     onDryFire: () => weaponAudio.playDryFire(),
   });
@@ -1262,6 +1324,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       enemyName: name,
       isHeadshot,
     });
+    pushPublicFeedback({ type: "kill" });
     buffManager.recordKill(isHeadshot);
     buffManager.onEnemyDeath(enemyIndex, deathPos);
   });
@@ -1334,6 +1397,8 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       previousHealth = game.getPlayerHealth();
       footstepTimerS = 0;
       wasAlive = true;
+      feedbackEpisodeId += 1;
+      resetPublicFeedback();
       beginSharedChampionRun();
       game.setFreezeInput(false);
       pauseMenu.hide();
@@ -1711,9 +1776,24 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
   let runStartedAtMs = performance.now();
   let lastDamageCause: PublicAgentRunSummary["deathCause"] | null = null;
   let wasAlive = !game.getIsDead();
+  let feedbackEpisodeId = 1;
+  let feedbackEventId = 0;
+  let recentPublicFeedbackEvents: PublicAgentFeedbackEvent[] = [];
   beginSharedChampionRun();
   const pendingAgentActions: AgentAction[] = [];
   const isInternalDebugSurface = import.meta.env.DEV || isLocalHostRuntime;
+  const resetPublicFeedback = (): void => {
+    feedbackEventId = 0;
+    recentPublicFeedbackEvents = [];
+  };
+  const pushPublicFeedback = (event: PublicAgentFeedbackEventInput): void => {
+    feedbackEventId += 1;
+    const nextEvent = {
+      id: feedbackEventId,
+      ...event,
+    } as PublicAgentFeedbackEvent;
+    recentPublicFeedbackEvents = [...recentPublicFeedbackEvents, nextEvent].slice(-PUBLIC_AGENT_FEEDBACK_MAX_EVENTS);
+  };
   const applyQueuedAgentActions = (): void => {
     if (pendingAgentActions.length === 0) return;
     if (runtimeParams.controlMode === "agent") {
@@ -2026,6 +2106,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
       },
       sharedChampion: sharedChampionSnapshot.champion,
       lastRunSummary,
+      feedback: {
+        episodeId: feedbackEpisodeId,
+        recentEvents: recentPublicFeedbackEvents.map((event) => ({ ...event })),
+      },
     };
   };
 
@@ -2159,6 +2243,10 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (currentHealth < previousHealth) {
       hitVignette.triggerHit(previousHealth - currentHealth);
       lastDamageCause = "enemy-fire";
+      pushPublicFeedback({
+        type: "damage-taken",
+        amount: Math.max(1, Math.round(previousHealth - currentHealth)),
+      });
     }
     previousHealth = currentHealth;
     hitVignette.setHealth(currentHealth);
@@ -2185,6 +2273,7 @@ export async function bootstrapRuntime(options: RuntimeBootstrapOptions = {}): P
     if (allDead && !roundEndShowing && !game.getIsDead()) {
       // First frame all enemies are dead — show the round-end screen with stats
       roundEndShowing = true;
+      pushPublicFeedback({ type: "wave-complete" });
       roundEndScreen.show(waveElapsedS, game.getWaveNumber(), { ...waveStats });
     }
     if (roundEndShowing) {
