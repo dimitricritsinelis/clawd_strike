@@ -1,0 +1,18 @@
+{
+  "name": {{PUBLIC_AGENT_COMPANION_REPO_NAME_JSON}},
+  "private": true,
+  "type": "module",
+  "packageManager": {{PACKAGE_MANAGER_JSON}},
+  "scripts": {
+    "smoke:no-context": "node examples/no-context-smoke.mjs",
+    "agent:baseline": "node examples/baseline-loop.mjs",
+    "agent:self-improve": "node examples/self-improving-runner.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": {{PUBLIC_AGENT_COMPANION_REPO_URL_GIT_JSON}}
+  },
+  "devDependencies": {
+    "playwright": {{PLAYWRIGHT_VERSION_JSON}}
+  }
+}

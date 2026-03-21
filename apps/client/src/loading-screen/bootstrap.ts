@@ -195,6 +195,7 @@ export function bootstrapLoadingScreen(options: BootstrapLoadingScreenOptions = 
     },
     sharedChampion: sharedChampionSnapshot.champion,
     lastRunSummary: null,
+    feedback: null,
   });
 
   window.agent_observe = () => JSON.stringify(publicObserveState());

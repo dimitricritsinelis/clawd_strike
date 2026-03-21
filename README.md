@@ -33,10 +33,11 @@ pnpm qa:release
 pnpm smoke:no-context
 pnpm verify:skills-contract
 pnpm test:stm
+pnpm test:agent-sdk-export
 pnpm test:agent-export
 pnpm test:postgres-audit
 pnpm build
-pnpm export:agent-starter -- --out ../clawd-strike-agent-starter
+pnpm export:agent-sdk -- --out ../clawd-strike-agent-sdk
 pnpm reconcile:shared-champion -- --help
 pnpm stats:admin -- --help
 ```
@@ -103,21 +104,23 @@ Recommended sequence:
 3. Run `pnpm validate:shared-champion-constraints -- --env-file .env.production.local`
 4. Review the reported `sslmode before/after` values and stats overview
 
-## Agent Starter Export
+## Agent SDK Export
 
-The public agent starter kit lives in a separate git repository. Export the managed public-safe artifacts into a sibling checkout:
+The public agent SDK lives in a separate git repository. Export the managed public-safe artifacts into a sibling checkout:
 
 ```bash
-pnpm export:agent-starter -- --out ../clawd-strike-agent-starter
+pnpm export:agent-sdk -- --out ../clawd-strike-agent-sdk
 ```
 
 Optional guard when the remote exists:
 
 ```bash
-pnpm export:agent-starter -- --out ../clawd-strike-agent-starter --expect-origin https://github.com/dimitricritsinelis/clawd-strike-agent-starter
+pnpm export:agent-sdk -- --out ../clawd-strike-agent-sdk --expect-origin https://github.com/dimitricritsinelis/clawd-strike-agent-sdk
 ```
 
-The exporter manages only generated starter files such as the mirrored `skills.md`, starter code, CI workflow, and manifest. Keep README, troubleshooting docs, and issue templates in the separate repo itself.
+The exporter manages the full public-safe SDK snapshot, including the mirrored `skills.md`, SDK code, learning runner, CI workflow, README, troubleshooting docs, and manifest.
+
+Compatibility alias: `pnpm export:agent-starter` still points at the same exporter for one release, but `agent-sdk` is the canonical name.
 
 ## Directory Map
 - `apps/client/src/runtime/`: gameplay runtime, simulation, rendering, HUD, weapons, bots

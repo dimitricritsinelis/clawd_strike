@@ -20,6 +20,45 @@ function expectSharedChampionShape(sharedChampion: unknown) {
   });
 }
 
+function expectFeedbackShape(feedback: unknown) {
+  if (feedback === null || feedback === undefined) return;
+
+  expect(typeof feedback).toBe("object");
+  const payload = feedback as Record<string, unknown>;
+  expect(Object.keys(payload).every((key) => key === "episodeId" || key === "recentEvents")).toBe(true);
+
+  if ("episodeId" in payload && payload.episodeId !== undefined) {
+    expect(typeof payload.episodeId === "string" || typeof payload.episodeId === "number").toBe(true);
+  }
+
+  if (!("recentEvents" in payload) || payload.recentEvents === undefined) {
+    return;
+  }
+
+  expect(Array.isArray(payload.recentEvents)).toBe(true);
+  const recentEvents = payload.recentEvents as Array<Record<string, unknown>>;
+  expect(recentEvents.length).toBeLessThanOrEqual(24);
+
+  for (const event of recentEvents) {
+    expect(typeof event.id).toBe("number");
+    expect(Number.isInteger(event.id)).toBe(true);
+    expect([
+      "damage-taken",
+      "enemy-hit",
+      "kill",
+      "wave-complete",
+      "reload-start",
+      "reload-end",
+    ]).toContain(event.type);
+    expect(Object.keys(event).every((key) => key === "id" || key === "type" || key === "amount")).toBe(true);
+    if (event.type === "damage-taken" && "amount" in event && event.amount !== undefined) {
+      expect(typeof event.amount).toBe("number");
+    } else {
+      expect("amount" in event && event.amount !== undefined).toBe(false);
+    }
+  }
+}
+
 async function readSelectionState(page: Page) {
   return page.evaluate(() => {
     const selection = window.getSelection();
@@ -152,6 +191,8 @@ test("exposes the public agent contract before runtime boot", async ({ page }, t
   expectSharedChampionShape(state.sharedChampion ?? null);
   expect(state.health).toBeNull();
   expect(state.ammo).toBeNull();
+  expect("feedback" in state).toBe(true);
+  expect(state.feedback ?? null).toBeNull();
   expect(recorder.counts().errorCount).toBe(0);
 });
 
@@ -503,6 +544,7 @@ test("keeps the public agent payload fair and minimal in runtime", async ({ page
   expect("sharedChampion" in state).toBe(true);
   expectSharedChampionShape(state.sharedChampion ?? null);
   expect(state.lastRunSummary).toBeNull();
+  expectFeedbackShape(state.feedback ?? null);
 
   for (const forbiddenKey of [
     "agent",
@@ -522,6 +564,55 @@ test("keeps the public agent payload fair and minimal in runtime", async ({ page
     expect(forbiddenKey in state).toBe(false);
   }
 
+  expect(recorder.counts().errorCount).toBe(0);
+});
+
+test("keeps public feedback bounded, whitelisted, and episode-scoped", async ({ page }, testInfo) => {
+  const recorder = attachConsoleRecorder(page);
+  await gotoAgentRuntime(page, {
+    baseUrl: testInfo.project.use.baseURL as string,
+    agentName: "FeedbackProbe",
+  });
+
+  const initialState = await readDocumentedAgentState(page);
+  expectFeedbackShape(initialState.feedback ?? null);
+  const initialEpisodeId = Number(initialState.feedback?.episodeId ?? 0);
+
+  await page.evaluate(() => {
+    window.agent_apply_action?.({ fire: true });
+  });
+  await advanceRuntime(page, 150);
+  await page.evaluate(() => {
+    window.agent_apply_action?.({ reload: true });
+  });
+
+  await expect.poll(async () => {
+    const state = await readDocumentedAgentState(page);
+    return state.feedback?.recentEvents?.map((event: { type: string }) => event.type) ?? [];
+  }).toContain("reload-start");
+
+  await expect.poll(async () => {
+    const state = await readDocumentedAgentState(page);
+    return state.feedback?.recentEvents?.map((event: { type: string }) => event.type) ?? [];
+  }).toContain("reload-end");
+
+  const feedbackState = await readDocumentedAgentState(page);
+  expectFeedbackShape(feedbackState.feedback ?? null);
+  expect(Number(feedbackState.feedback?.episodeId ?? 0)).toBe(initialEpisodeId);
+
+  const feedbackJson = JSON.stringify(feedbackState.feedback ?? null).toLowerCase();
+  for (const forbiddenSnippet of [
+    "enemyid",
+    "position",
+    "coordinates",
+    "zone",
+    "route",
+    "seed",
+    "los",
+    "landmark",
+  ]) {
+    expect(feedbackJson).not.toContain(forbiddenSnippet);
+  }
   expect(recorder.counts().errorCount).toBe(0);
 });
 
@@ -607,6 +698,9 @@ test("supports the documented no-context death and retry loop", async ({ page },
       expect(restartedState.score?.current).toBe(0);
       expect(restartedState.score?.lastRun ?? null).toBe(deathLastRun);
       expect(restartedState.lastRunSummary?.finalScore ?? null).toBe(deathLastRunSummary?.finalScore ?? null);
+      expectFeedbackShape(restartedState.feedback ?? null);
+      expect(Number(restartedState.feedback?.episodeId ?? 0)).toBeGreaterThan(Number(state.feedback?.episodeId ?? 0));
+      expect((restartedState.feedback?.recentEvents ?? []).length).toBeLessThanOrEqual(24);
 
       respawns += 1;
       previousAlive = true;

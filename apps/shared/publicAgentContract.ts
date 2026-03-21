@@ -8,9 +8,9 @@ export const PUBLIC_AGENT_CANONICAL_SKILLS_URL = new URL(
   PUBLIC_AGENT_CANONICAL_SKILLS_PATH,
   PUBLIC_AGENT_CANONICAL_HOST,
 ).toString();
-export const PUBLIC_AGENT_COMPANION_REPO_NAME = "clawd-strike-agent-starter";
+export const PUBLIC_AGENT_COMPANION_REPO_NAME = "clawd-strike-agent-sdk";
 export const PUBLIC_AGENT_COMPANION_REPO_URL =
-  "https://github.com/dimitricritsinelis/clawd-strike-agent-starter";
+  "https://github.com/dimitricritsinelis/clawd-strike-agent-sdk";
 export const PUBLIC_AGENT_NAME_MAX_LENGTH = PLAYER_NAME_MAX_LENGTH;
 
 export const PUBLIC_AGENT_STABLE_SELECTORS = {

@@ -16,7 +16,7 @@ Do not assume repo access, source access, map coordinates, hidden enemy data, ro
 ## Companion SDK repo
 
 - Separate public repo: `https://github.com/dimitricritsinelis/clawd-strike-agent-sdk`
-- Use that repo for runnable Playwright starter code, learning loops, troubleshooting, and issue reporting.
+- Use that repo for runnable Playwright SDK code, persistent learning loops, troubleshooting, and issue reporting.
 - If that repo and this document ever disagree, follow this `/skills.md` contract.
 
 ## Goal
@@ -280,8 +280,9 @@ Recommended lexicographic comparison:
 2. more total kills
 3. higher best score in batch
 4. higher median score
-5. higher mean survival time
-6. higher accuracy, only when shot volume is comparable
+5. higher mean score
+6. higher mean survival time
+7. higher accuracy, only when shot volume is comparable
 
 ### What to tune
 
