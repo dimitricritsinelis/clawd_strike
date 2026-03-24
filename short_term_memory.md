@@ -6,7 +6,7 @@ Do not use for: workflow policy, durable rationale, archive history, product tru
 Schema version: stm-v2
 Canonical playtest URL: http://127.0.0.1:4174/?map=bazaar-map
 Map approval status: NOT APPROVED
-Last compacted: 2026-03-16T00:35:52Z
+Last compacted: 2026-03-21T14:21:31Z
 
 # short_term_memory.md - Clawd Strike Status
 
@@ -106,9 +106,9 @@ Recent Notes:
 
 ## Recent Completed Rollup
 <!-- TOOL-MANAGED START: completed-rollup -->
+- STM-20260321-141728-codex | ui-flow | Responsive loading-screen desktop layout | 2026-03-21 | Made desktop loading-screen layout viewport-aware; smoke:game and targeted loading-screen Playwright checks pass. Full Playwright still has an unrelated shared-champion expectation mismatch (403 expected, 400 received).
 - STM-20260316-002631-codex | map-visual | Additional palm anchor placement | 2026-03-16 | Added the 4 spawn-ring decorative palms plus the west-jog pocket palm to the bazaar map authority, regenerated the runtime/layout artifacts, and validated with typecheck, smoke:game, and qa:completion against a local server at 127.0.0.1:4174.
 - STM-20260314-200934-codex | map-visual | Palm crown refinement | 2026-03-14 | Rebuilt the decorative palm crown into three deterministic frond layers with juvenile/torn/partial variants, enabled frond receive-shadowing, retuned alpha edges, and swapped the planter shell from a flat fill to the spawn trim texture family. Validation passed with typecheck, smoke:game, and qa:completion.
 - STM-20260314-172757-codex | map-visual | Bazaar palm texture integration | 2026-03-14 | Integrated sourced palm bark and generated frond textures into a visual-only courtyard palm system, added decorative palm anchors to the bazaar authority, regenerated derived map outputs, and passed typecheck/test:server/smoke:game/qa:completion.
 - STM-20260313-185148-codex | map-visual | Spawn B center hero bay final polish | 2026-03-13 | Final Spawn B hero-bay pass rebuilt the center opening, pediment, entablature, and corbels into one integrated module; updated the owning map spec/hero shot criteria, regenerated derived map outputs, and passed typecheck/test:server/smoke:game/qa:completion with refreshed captures.
-- STM-20260313-152804-codex | map-visual | Spawn B facade second pass | 2026-03-13 | Spawn B now keeps the corrected layout skeleton while using Spawn B-specific arch profiles, deeper door surrounds with side-door crown accents, a rebuilt hero bay/ledge/corbel stack, improved stained-glass grading, regenerated map outputs, and passing typecheck/test:server/smoke:game/qa:completion plus verified facade captures.
 <!-- TOOL-MANAGED END: completed-rollup -->

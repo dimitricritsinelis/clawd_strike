@@ -24,6 +24,13 @@ body {
   --info-textbox-top-desktop: 56%;
   --info-textbox-top-mobile: 58%;
   --info-textbox-y-lift: -90px;
+  --loading-logo-width-desktop: min(1008px, 61vw, max(468px, calc((100dvh - 360px) * 1.499)));
+  --loading-logo-top-desktop: clamp(294px, 35.5vh, 392px);
+  --loading-logo-top-name-entry-desktop: clamp(244px, 29.5vh, 334px);
+  --loading-logo-top-info-desktop: clamp(176px, 21vh, 248px);
+  --loading-actions-top-desktop: clamp(404px, 52vh, 500px);
+  --loading-nameplate-top-desktop: clamp(364px, 46vh, 446px);
+  --loading-champion-top-desktop: clamp(500px, 64vh, 610px);
 }
 #app {
   position: relative;
@@ -212,7 +219,7 @@ body {
 #start .logo-wrap {
   position: absolute;
   left: 50%;
-  top: 33%;
+  top: var(--loading-logo-top-desktop);
   transform: translate(-50%, -50%);
   width: 100%;
   display: grid;
@@ -241,7 +248,7 @@ body {
   display: block;
 }
 #start .logo-img {
-  width: clamp(468px, 61vw, 1008px);
+  width: var(--loading-logo-width-desktop);
   height: auto;
   display: block;
   position: relative;
@@ -251,7 +258,7 @@ body {
   transition: transform 380ms ease;
 }
 #start[data-name-entry-visible="true"] .logo-wrap {
-  top: 29%;
+  top: var(--loading-logo-top-name-entry-desktop);
 }
 #start[data-name-entry-visible="true"] .logo-img {
   transform: scale(0.8);
@@ -262,14 +269,14 @@ body {
   transform: translateX(-50%);
 }
 #start .actions-buttons {
-  top: 493px;
+  top: var(--loading-actions-top-desktop);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 30px;
   width: min(515px, calc(100vw - 150px));
 }
 #start .actions-nameplate {
-  top: 435px;
+  top: var(--loading-nameplate-top-desktop);
   left: 50%;
   width: min(364px, calc(100vw - 150px));
   display: none;
@@ -277,7 +284,7 @@ body {
 #start .shared-champion-card {
   position: absolute;
   left: 50%;
-  top: 598px;
+  top: var(--loading-champion-top-desktop);
   transform: translateX(-50%);
   width: min(384px, calc(100vw - 30px));
   aspect-ratio: 3 / 2;
@@ -507,7 +514,7 @@ body {
   color: #2f1a0b;
 }
 #start[data-info-visible="true"] .logo-wrap {
-  top: 21%;
+  top: var(--loading-logo-top-info-desktop);
 }
 #start[data-info-visible="true"] .logo-img {
   transform: scale(0.65);

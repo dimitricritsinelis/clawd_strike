@@ -1,0 +1,78 @@
+{
+  "exportVersion": 2,
+  "contract": {
+    "apiVersion": 1,
+    "contract": "public-agent-v1",
+    "canonicalHost": "https://clawd-strike.vercel.app/",
+    "canonicalSkillsUrl": "https://clawd-strike.vercel.app/skills.md",
+    "companionRepoName": "clawd-strike-agent-sdk",
+    "companionRepoUrl": "https://github.com/dimitricritsinelis/clawd-strike-agent-sdk"
+  },
+  "manifestPath": ".clawd-strike-agent-export.json",
+  "managedFiles": [
+    {
+      "path": ".github/workflows/public-agent-smoke.yml",
+      "sha256": "a9589570c974c2b8f82a252fd8a0053460f3df830c28d80c6f440b44c3ee4476"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "3f0269621c81ac73f1400ec460c5f2e6330f6a543a73388615044701bbfd5914"
+    },
+    {
+      "path": "README.md",
+      "sha256": "530d6bc639626a9af9294a4c739508b5d4a47440380b18c5afd56895db944fb1"
+    },
+    {
+      "path": "docs/PLAYBOOK.md",
+      "sha256": "83828286e975dd4c7c0a90f96b72f57276acb56d5af0a0b4bc5a73a044d7946b"
+    },
+    {
+      "path": "docs/TUNING_GUIDE.md",
+      "sha256": "5fbf45a06d4e1b0ac2298cf48ac5c1903919d6b678e7684edfb2d659531962f9"
+    },
+    {
+      "path": "docs/troubleshooting.md",
+      "sha256": "e5e1ccf55e733690c466ad6855fc5496fb6cf2474f6bf23eec701e66c7a5cc34"
+    },
+    {
+      "path": "examples/baseline-loop.mjs",
+      "sha256": "8db3ef576195abedd5c168886cf1dae410e75282670a9fa1cb2299fff5007000"
+    },
+    {
+      "path": "examples/no-context-smoke.mjs",
+      "sha256": "c9226843847af5305afee9e989082ed57773fd172dd01a11eb2d827a5fd4d5a9"
+    },
+    {
+      "path": "examples/self-improving-runner.mjs",
+      "sha256": "6585c0c1d8fb01364a72b131967ad98b1ff633e8d2eabf9132585238bfe7a550"
+    },
+    {
+      "path": "package.json",
+      "sha256": "0d5a4b81a0420ecd9841d1ed32791b83bee282dacee523071e4a11792763612c"
+    },
+    {
+      "path": "skills.md",
+      "sha256": "4bf3e13f879ac4f67d1e3eec21ad89677b5186a9ed8a7edb942b4ed76db14dd2"
+    },
+    {
+      "path": "src/contract.mjs",
+      "sha256": "1665b2cb445c08968aa3881f0300ce3e724889799b2d0732390475f3316171f4"
+    },
+    {
+      "path": "src/index.mjs",
+      "sha256": "7c02e178f634fdaeaaa90b7bba601797ba20ec6c65bf53b2bfbc2d83e20d3e7f"
+    },
+    {
+      "path": "src/learn/optimizer.mjs",
+      "sha256": "e378be568f007017d594e38d8301df7cf25e2edc1ed605b50b8dd6abaf37a1cc"
+    },
+    {
+      "path": "src/learn/storage.mjs",
+      "sha256": "2c3039732a7918e3fe3830e58cc6d3ed3970bc13f35c2bd52d6c3919375f23fd"
+    },
+    {
+      "path": "src/policies/adaptive-sweeper.mjs",
+      "sha256": "41e0acab09da7fbb62cf6679a72cd560f876329f377d77a608bdd1b8ad3586a2"
+    }
+  ]
+}
