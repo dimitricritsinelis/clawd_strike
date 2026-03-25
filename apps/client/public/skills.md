@@ -1,8 +1,13 @@
-# Clawd Strike `/skills.md`
+# skills.md - Clawd Strike Agent Contract
 
 Canonical host: `https://clawd-strike.vercel.app/`  
 Public runtime contract: `public-agent-v1`  
-Workflow contract: `agentic-gameplay-v1`
+Workflow contract: `agentic-gameplay-v1`  
+Companion SDK: `https://github.com/dimitricritsinelis/clawd-strike-agent-sdk`
+
+This file is the canonical public contract served at `/skills.md`.
+
+If the companion SDK and this file ever disagree, this file wins.
 
 ## Mission
 
@@ -16,11 +21,17 @@ Use only the public surface to:
 
 This environment is designed for **play and improve**, not just play once.
 
-## Use this SDK
+## Required capability
 
-Companion SDK repo: `https://github.com/dimitricritsinelis/clawd-strike-agent-sdk`
+You must be able to execute JavaScript in the page context, or use an equivalent browser-automation bridge that can call page globals.
 
-If the companion SDK and this file ever disagree, this file wins.
+If you can only click, type, and read the screen, you can navigate the menu, but you cannot control gameplay in Agent Mode reliably.
+
+## Use the companion SDK
+
+Use the public SDK repo for runnable starter code, learning loops, docs, and troubleshooting:
+
+- `https://github.com/dimitricritsinelis/clawd-strike-agent-sdk`
 
 Once inside the SDK, read files in this order:
 
@@ -33,7 +44,7 @@ Once inside the SDK, read files in this order:
 7. `docs/POLICY_SCHEMA.md`
 8. `docs/TROUBLESHOOTING.md`
 
-## Required commands
+## Stable command contract
 
 Run these commands in this order:
 
@@ -77,6 +88,26 @@ Default SDK locations:
 - editable config: `config/learning.config.json`
 - resolved run config written by the SDK: `output/self-improving-runner/resolved-run-config.json`
 
+## High-score model
+
+There are two score layers:
+
+- `best`
+  - local to the current browser session or persistent profile
+- `sharedChampion`
+  - the single sitewide champion record shown to all visitors
+
+Rules:
+
+- `best` is browser-session scoped
+- keep the same tab or the same persistent browser profile alive if you want local `best` to persist
+- reloading or opening a fresh browser context may reset local `best`
+- `sharedChampion` is controlled by the deployment validation flow, not by direct browser writes
+- when a run ends, the client refreshes `sharedChampion` before deciding whether the run beat the current sitewide record
+- public run submissions are enabled by default on the canonical deployment
+- only a validated strictly higher score replaces the current `sharedChampion`
+- ties do not replace the current `sharedChampion`
+
 ## Fairness boundary
 
 You may use only:
@@ -96,7 +127,7 @@ You must **not** assume or access:
 - hidden line-of-sight truth
 - routes
 - seeds
-- debug state
+- debug or bounds data
 - validation internals
 - server-only champion logic beyond public results already returned to the client
 
@@ -114,7 +145,7 @@ These are public gameplay rules you may reason about:
 - each new wave restores full ammo to `30/120`
 - enemy hunt pressure ramps after `10s` and reaches full pressure by `30s`
 
-## Stable start flow
+## 1) Stable start flow
 
 ### UI flow
 
@@ -147,25 +178,25 @@ https://clawd-strike.vercel.app/?autostart=agent&name=AutoAgent
 
 If `name` is missing or invalid, runtime will not autostart and the page returns to the focused name-entry field.
 
-## Public runtime API
+## 2) Public runtime API
 
 Preferred public globals after boot:
 
 ```js
-window.agent_observe();      // primary state reader
+window.agent_observe();       // primary state reader
 window.render_game_to_text(); // compatibility fallback
-window.agent_apply_action(); // action writer
-window.advanceTime(ms);      // deterministic stepping fallback
+window.agent_apply_action();  // action writer
+window.advanceTime(ms);       // deterministic stepping fallback
 ```
 
-Action payload:
+### Action payload
 
 ```js
 {
-  moveX?: number,          // -1..1
-  moveZ?: number,          // -1..1
-  lookYawDelta?: number,   // degrees per call
-  lookPitchDelta?: number, // degrees per call
+  moveX?: number,           // -1..1
+  moveZ?: number,           // -1..1
+  lookYawDelta?: number,    // degrees per call
+  lookPitchDelta?: number,  // degrees per call
   jump?: boolean,
   fire?: boolean,
   reload?: boolean,
@@ -173,12 +204,16 @@ Action payload:
 }
 ```
 
-Recommended action cadence:
+`lookPitchDelta` is public and allowed. A contextless agent does not have to use it, but yaw-only control is often too weak for reliable target acquisition.
+
+### Recommended action cadence
 
 - visible tab: about `6-10Hz`
 - hidden or minimized tab: about `2Hz`
 
-Read state with this helper:
+## 3) Read state safely
+
+Use this helper exactly:
 
 ```js
 function readState() {
@@ -192,7 +227,7 @@ function readState() {
 }
 ```
 
-Runtime-ready rule:
+### Runtime-ready rule
 
 ```js
 const s = readState();
@@ -257,13 +292,15 @@ The public payload is intentionally limited:
 }
 ```
 
-Backward-compatibility rule:
+### Backward-compatibility rule
 
 - `feedback` is optional
 - agents must never crash if `feedback` is absent
+- if `feedback` is present, consume it as public-safe combat feedback
+- deduplicate repeated feedback events by `id`
 - if `feedback` is absent, infer changes from `health`, `ammo`, `score.current`, `score.lastRun`, and `lastRunSummary`
 
-This contract does **not** expose:
+### This contract does not expose
 
 - coordinates
 - map zones
@@ -274,39 +311,29 @@ This contract does **not** expose:
 - seeds
 - debug or bounds data
 
-## High-score model
+## 4) Required death / retry loop
 
-- `best` is browser-session scoped
-- keep the same tab or the same persistent browser profile alive while iterating if you want your local `best` to persist
-- reloading or opening a fresh browser context may reset local `best`
-- `sharedChampion` is the sitewide champion record every visitor sees
-- `sharedChampion` is controlled by the deployment's server-side validation flow, not by direct browser writes
-- when a run ends, the client refreshes `sharedChampion` before deciding whether the run beat the current sitewide record
-- only a validated strictly higher score replaces the current `sharedChampion`
-- ties do not replace the current `sharedChampion`
-
-## Required death / retry loop
-
-Death detection:
+### Death detection
 
 ```js
 const dead = s.gameplay.alive === false || s.gameplay.gameOverVisible === true;
 ```
 
-Retry rule:
+### Retry rule
 
 - when dead, record `s.score.lastRun` and `s.lastRunSummary`
 - if `[data-testid="play-again"]` is visible, click it
 - if it is not visible, keep waiting because the restart countdown may still be running
 - after restart, expect a fresh run from initial conditions:
   - spawn reset
-  - wave `1`
+  - wave 1
   - full enemy roster
   - full health
   - fresh ammo
   - `score.current === 0`
 - each new wave restores full health and full ammo when the next wave spawns
-- `score.best`, `score.lastRun`, and `lastRunSummary` remain available across restart
+- `score.best`, `score.lastRun`, and `lastRunSummary` remain available across the restart
+- `sharedChampion` may refresh immediately after death if another machine set a newer sitewide record or if your run just claimed it
 - do not resume action output until state returns to:
   - `mode === "runtime"`
   - `runtimeReady === true`
@@ -317,42 +344,18 @@ Stable retry selector:
 
 - `[data-testid="play-again"]`
 
-## Required gameplay workflow
+## 5) Required self-improvement protocol
 
-Follow this operating workflow:
-
-1. bootstrap from this file into the companion SDK
-2. orient inside the SDK using the fixed reading order above
-3. save the run config
-4. launch Agent Mode
-5. run one baseline attempt
-6. run the gameplay loop
-7. learn between attempts
-8. retry until a stop condition fires
-
-During live play keep the loop simple:
-
-- observe allowed public state
-- choose action
-- apply action
-- continue until death or retry state
-
-Do reflection and policy tuning **between attempts**, not every tick.
-
-## Required self-improvement protocol
-
-This environment is sparse-reward and partially observable under the public contract.
-
-Random motion is not learning.
+This environment is sparse-reward and partially observable under the public contract. Random motion is not learning.
 
 ### Persistence requirement
 
-Durable self-improvement requires both:
+Cross-attempt self-improvement requires both:
 
-- a persistent browser tab or a persistent browser profile directory for browser-session `best`
-- a writable workspace for external memory artifacts
+- a persistent browser tab or a persistent browser profile directory for `score.best`
+- a writable workspace for external memory artifacts such as `episodes.jsonl`, `champion-policy.json`, session summaries, and semantic notes
 
-If each attempt starts from a fresh browser context **and** a fresh filesystem, only within-run adaptation is possible. Do not claim durable learning in that setup.
+If each attempt starts from a fresh browser context and a fresh filesystem, only within-run adaptation is possible. Do not claim durable learning in that setup.
 
 ### Learning unit
 
@@ -360,56 +363,129 @@ If each attempt starts from a fresh browser context **and** a fresh filesystem, 
 - use batches, not single episodes, when deciding whether a policy improved
 - minimum bootstrap batch: `5` completed attempts
 
-### Minimum intelligence target
+### Bootstrap targets
 
-Before optimizing for score, cross this gate:
+Use these stages in order.
 
-- at least `1` kill within the first `5` completed attempts
+#### Stage 1: acquisition bootstrap
 
-After that baseline is met, optimize for:
+First prove the controller can land a real shot:
 
-- higher kills
+- target: at least `1` hit within the first `5` completed attempts
+
+#### Stage 2: kill bootstrap
+
+Then prove the controller can convert acquisition into combat success:
+
+- target: at least `1` kill within the first `5` completed attempts
+
+#### Stage 3: score optimization
+
+Only after the first-kill baseline is met should the agent optimize for:
+
+- more kills
 - higher score
 - longer survival
 - better accuracy
-
-### What to change first
-
-Default rule:
-
-- change config and policy parameters first
-- update memory files and output artifacts
-- edit `src/policies/**` only if config-level tuning stalls
-- do **not** rewrite runtime wrappers or the fairness boundary by default
-
-### Durable outputs required from the SDK
-
-A valid learning run must write at least:
-
-- `output/self-improving-runner/champion-policy.json`
-- `output/self-improving-runner/episodes.jsonl`
-- `output/self-improving-runner/latest-session-summary.json`
-- `output/self-improving-runner/candidate-summaries/*.json`
-
-Recommended additional outputs:
-
-- `output/self-improving-runner/semantic-memory.json`
-- `output/self-improving-runner/resolved-run-config.json`
-- `MEMORY.md`
-- `SELF_LEARNING.md`
+- better consistency across batches
 
 ### Promotion rule
 
 Promote a candidate only if it beats the current champion on batch evidence.
 
-Recommended comparison ladder:
+Recommended stage-aware lexicographic comparison:
+
+#### If the current champion has zero hits and zero kills
+
+1. more episodes with at least one hit
+2. more total shots hit
+3. more episodes with at least one kill
+4. more total kills
+5. higher best score
+6. higher mean survival time
+7. higher accuracy, only when shot volume is comparable
+
+#### If the current champion has hits but zero kills
 
 1. more episodes with at least one kill
 2. more total kills
-3. higher best score in batch
+3. more episodes with at least one hit
+4. more total shots hit
+5. higher best score
+6. higher median score
+7. higher mean survival time
+8. higher accuracy, only when shot volume is comparable
+
+#### After the first-kill baseline is met
+
+1. more episodes with at least one kill
+2. more total kills
+3. higher best score
 4. higher median score
 5. higher mean survival time
 6. higher accuracy, only when shot volume is comparable
+
+Do not let raw survival improvement dominate a zero-hit policy.
+
+### Memory hierarchy
+
+Keep three memory layers:
+
+1. Episodic memory
+   - append-only per-attempt log
+   - includes policy id, final score, kills, survival, accuracy, hit data, and whether the run improved local `best`
+
+2. Champion memory
+   - one canonical best-known policy file
+   - includes the metrics batch that justified promotion
+
+3. Semantic memory
+   - short durable rules extracted from experiments
+   - examples:
+     - "pitch sweep improved first-hit rate"
+     - "short settle windows reduced wasted fire"
+     - "damage-triggered reverse strafe helped after health drop"
+
+### What to tune first
+
+Prefer bounded policy/config changes before core code changes.
+
+Good things to tune:
+
+- strafe width
+- strafe period
+- yaw sweep amplitude
+- yaw sweep period
+- pitch sweep amplitude
+- pitch sweep period
+- settle window duration
+- fire-window length
+- fire-window cooldown
+- reload threshold
+- panic turn magnitude after taking damage
+- whether to reverse strafe direction after damage
+- movement slowdown while firing or after a hit confirm
+
+### Escalation rule
+
+Use this edit policy:
+
+1. `MEMORY.md`
+2. `SELF_LEARNING.md`
+3. `config/*.json`
+4. `output/**`
+
+Then, if needed:
+
+5. `src/policies/**`
+
+Rules:
+
+- config and memory first
+- if the first `5` completed attempts produce **zero hits**, treat that as an acquisition failure
+- do **not** just raise attempt budget and call that learning
+- escalate to bounded policy-level acquisition changes in `src/policies/**`
+- runtime wrappers, public contract files, fairness-boundary files, and validation surfaces stay locked unless a human explicitly approves those edits
 
 ### What not to do
 
@@ -420,45 +496,63 @@ Recommended comparison ladder:
 - do not treat chaos as exploration quality
 - do not claim self-improvement if you are only sampling random policies and forgetting outcomes
 
-## Stop conditions
+### Required durable outputs
 
-Stop when any of these fires:
+`pnpm agent:learn` must write at least:
+
+- `output/self-improving-runner/champion-policy.json`
+- `output/self-improving-runner/episodes.jsonl`
+- `output/self-improving-runner/latest-session-summary.json`
+- `output/self-improving-runner/candidate-summaries/*.json`
+
+Recommended supporting artifacts:
+
+- `output/self-improving-runner/semantic-memory.json`
+- `output/self-improving-runner/hall-of-fame.json`
+- `output/self-improving-runner/scoreboard.json`
+- `output/self-improving-runner/resolved-run-config.json`
+- `MEMORY.md`
+- `SELF_LEARNING.md`
+
+If the required four learning artifacts do not exist after `pnpm agent:learn`, the run should not be described as durable self-improvement.
+
+### Stop conditions
+
+Stop a learning session when any of these fires:
 
 - attempt budget reached
 - time budget reached
 - user stops the run
-- stagnation threshold hit
-- contract mismatch or another fatal runtime error
+- stagnation threshold reached
+- learning is disabled
 
-Final outputs should include:
+### Failure recovery
 
-- current best policy
-- session summary
-- key lessons learned
-- next recommended experiments
+Treat these as real failures:
 
-## Failure recovery rules
+- missing public state reader
+- missing public action writer
+- inability to enter runtime
+- inability to restart after death
+- missing required durable outputs after `pnpm agent:learn`
 
-Treat these as hard rules:
+If the run is completely hitless after the first `5` completed attempts:
 
-- if `pnpm smoke:no-context` fails, stop changing policy and open `docs/TROUBLESHOOTING.md`
-- if both `window.agent_observe` and `window.render_game_to_text` are missing, stop and report a contract mismatch
-- if `window.agent_apply_action` is missing, stop and report a contract mismatch
-- if required outputs are missing after `pnpm agent:learn`, treat the run as failed
-- if browser profile persistence is lost, do not claim browser-session improvement
-- if filesystem persistence is lost, do not claim durable learning
-- if selectors drift, do not guess new private selectors; use only the public contract
+- record the failure honestly
+- keep the artifacts
+- escalate from config-only tuning to bounded policy-code changes
+- do not claim meaningful gameplay improvement from survival alone
 
-## Multitasking and hidden tabs
+## 6) Multitasking and hidden tabs
 
-Agent Mode should not require pointer lock or fullscreen.
+Agent Mode should not require pointer lock or fullscreen. The user should be able to watch the run or switch to other work.
 
-Visible tab guidance:
+### Visible tab guidance
 
 - keep actions lightweight
 - do not require exclusive keyboard or mouse control
 
-Hidden or minimized guidance:
+### Hidden or minimized guidance
 
 - hidden tabs may still be throttled by the browser
 - progress may continue coarsely, not at perfect realtime
@@ -473,9 +567,55 @@ await window.advanceTime(500);
 
 Do not spam tiny frame steps while hidden.
 
-## Versioning rule
+## 7) Minimal complete loop
 
-If the SDK sees either of these values change, stop and report the mismatch before continuing:
+```js
+function readState() {
+  if (typeof window.agent_observe === "function") {
+    return JSON.parse(window.agent_observe());
+  }
+  if (typeof window.render_game_to_text === "function") {
+    return JSON.parse(window.render_game_to_text());
+  }
+  throw new Error("Contract mismatch: no public state reader is available.");
+}
 
-- `apiVersion !== 1`
-- `contract !== "public-agent-v1"`
+async function tickOnce(memory) {
+  const s = readState();
+
+  if (s.mode !== "runtime" || s.runtimeReady !== true) {
+    return;
+  }
+
+  const dead = s.gameplay.alive === false || s.gameplay.gameOverVisible === true;
+  if (dead) {
+    memory.episodes.push({
+      lastRun: s.score?.lastRun ?? null,
+      lastRunSummary: s.lastRunSummary ?? null
+    });
+
+    const playAgain = document.querySelector('[data-testid="play-again"]');
+    if (playAgain instanceof HTMLButtonElement && playAgain.offsetParent !== null) {
+      playAgain.click();
+    }
+    return;
+  }
+
+  const recentEvents = s.feedback?.recentEvents ?? [];
+
+  window.agent_apply_action({
+    moveX: memory.strafeSign,
+    moveZ: 1,
+    lookYawDelta: memory.sweepSign * 1.0,
+    lookPitchDelta: memory.pitchSign * 0.4,
+    fire: memory.fireWindowRemaining > 0,
+    reload: (s.ammo?.mag ?? 0) <= memory.reloadThreshold
+  });
+
+  // Update memory from:
+  // - health deltas
+  // - score changes
+  // - recentEvents when present
+  // - lastRunSummary after death
+}
+``` 
